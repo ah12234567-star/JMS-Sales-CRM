@@ -1,3 +1,11 @@
 # JMS Sales CRM
 
-iPhone Ready CRM for Jeddah Model Industrial Co.
+نظام إدارة علاقات العملاء والمناديب لشركة جدة النموذجي للصناعة.
+
+## الدخول التجريبي
+- البريد: admin@jms.local
+- كلمة المرور: 123456
+
+## ملاحظات
+- يعمل النظام الآن حتى بدون Supabase بوضع محلي على نفس الجهاز.
+- لتفعيل الحفظ السحابي شغّل ملف `supabase_schema.sql` داخل Supabase.
