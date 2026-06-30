@@ -54,6 +54,7 @@
     <nav>
       <button class="nav active" data-page="dashboard">لوحة التحكم</button>
       <button class="nav" data-page="customers">العملاء</button>
+      <button class="nav" data-page="visits">الزيارات</button>
       <button class="nav" data-page="orders">طلبات التصنيع</button>
       <button class="nav" data-page="routes">المسارات</button>
       <button class="nav" data-page="alerts">تنبيهات 30 يوم</button>
@@ -99,6 +100,73 @@
       <input id="customerSearch" class="search" placeholder="بحث باسم العميل أو الجوال أو المدينة">
       <div id="customersGrid" class="customer-grid"></div>
     </section>
+
+
+    <section id="visits" class="page">
+      <div class="page-head with-action">
+        <div>
+          <h2>الزيارات</h2>
+          <p>اعرف من زار، ومين ما زار، وتقرير كل مندوب حسب الفترة</p>
+        </div>
+        <button class="primary small" onclick="openVisitForm()">تسجيل زيارة يدوي</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <b>فلترة الزيارات</b>
+          <span>اختر الفترة والمندوب</span>
+        </div>
+        <div class="form-grid four">
+          <label>من تاريخ
+            <input id="visitFrom" type="date">
+          </label>
+          <label>إلى تاريخ
+            <input id="visitTo" type="date">
+          </label>
+          <label>المندوب
+            <select id="visitRepFilter"></select>
+          </label>
+          <label>نوع التقرير
+            <select id="visitReportType">
+              <option value="visited">العملاء الذين تمت زيارتهم</option>
+              <option value="notvisited">العملاء الذين لم تتم زيارتهم</option>
+              <option value="late30">أكثر من 30 يوم بدون زيارة</option>
+              <option value="summary">ملخص المناديب</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions-row">
+          <button class="primary small" type="button" onclick="renderVisits()">عرض التقرير</button>
+          <button class="secondary" type="button" onclick="setVisitQuickRange('today')">اليوم</button>
+          <button class="secondary" type="button" onclick="setVisitQuickRange('week')">هذا الأسبوع</button>
+          <button class="secondary" type="button" onclick="setVisitQuickRange('month')">هذا الشهر</button>
+        </div>
+      </div>
+
+      <div class="stats visit-stats">
+        <div class="stat"><span>زيارات الفترة</span><b id="visitsPeriodCount">0</b><small>زيارة</small></div>
+        <div class="stat"><span>عملاء تمت زيارتهم</span><b id="visitedCustomersCount">0</b><small>عميل</small></div>
+        <div class="stat danger-card"><span>لم تتم زيارتهم</span><b id="notVisitedCustomersCount">0</b><small>عميل</small></div>
+        <div class="stat danger-card"><span>متأخرين +30 يوم</span><b id="late30CustomersCount">0</b><small>عميل</small></div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-head"><b>سجل الزيارات</b><span>حسب الفترة المختارة</span></div>
+          <div id="visitsList"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><b>العملاء بدون زيارة</b><span>حسب الفترة المختارة</span></div>
+          <div id="notVisitedList"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><b>تقرير المناديب</b><span>زيارات، طلبات، عملاء بدون زيارة</span></div>
+        <div id="repVisitSummary"></div>
+      </div>
+    </section>
+
 
     <section id="orders" class="page">
       <div class="page-head">

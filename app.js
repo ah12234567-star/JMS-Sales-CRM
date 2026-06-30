@@ -65,7 +65,7 @@ document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   renderAll();
 });
 
-function renderAll(){renderStats();renderCustomers();renderSelects();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
+function renderAll(){renderStats();renderCustomers();renderSelects();renderVisitFilters();renderVisits();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
 function repName(id){return db.reps.find(r=>r.id===id)?.name||'-'}
 function customerName(id){return db.customers.find(c=>c.id===id)?.name||'-'}
 function lastVisit(cid){return db.visits.filter(v=>v.customer_id===cid).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||''}
@@ -160,3 +160,123 @@ function toggleUser(uid){let u=db.users.find(x=>x.id===uid);u.status=u.status===
 function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة','123456');if(!p)return;u.password=p;save();alert('تم تغيير كلمة المرور')}
 function changeMyPassword(){let u=db.users.find(x=>x.email===currentUser.email);if(!u)return;if(oldPassword.value!==u.password)return alert('كلمة المرور الحالية غير صحيحة');if(!newPassword.value)return alert('اكتب كلمة مرور جديدة');u.password=newPassword.value;save();alert('تم تغيير كلمة المرور')}
 function closeModal(){modal.classList.add('hidden');modalBody.innerHTML=''}
+
+
+
+/* JMS visits module */
+function inRange(date, from, to){
+  if(!date) return false;
+  if(from && date < from) return false;
+  if(to && date > to) return false;
+  return true;
+}
+function startOfWeekISO(){
+  const d=new Date();
+  const day=(d.getDay()+6)%7;
+  d.setDate(d.getDate()-day);
+  return d.toISOString().slice(0,10);
+}
+function renderVisitFilters(){
+  if(!window.visitFrom) return;
+  if(!visitFrom.value) visitFrom.value=today();
+  if(!visitTo.value) visitTo.value=today();
+  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const current=visitRepFilter.value;
+  visitRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  if(current) visitRepFilter.value=current;
+}
+function setVisitQuickRange(type){
+  if(type==='today'){visitFrom.value=today();visitTo.value=today();}
+  if(type==='week'){visitFrom.value=startOfWeekISO();visitTo.value=today();}
+  if(type==='month'){visitFrom.value=month()+'-01';visitTo.value=today();}
+  renderVisits();
+}
+function visitScopeCustomers(repId){
+  let cs=allowedCustomers();
+  if(repId && repId!=='all') cs=cs.filter(c=>c.rep_id===repId);
+  return cs;
+}
+function visitsInPeriod(){
+  if(!window.visitFrom) return [];
+  const repId=visitRepFilter.value||'all';
+  let vs=db.visits.filter(v=>inRange(v.date,visitFrom.value,visitTo.value));
+  if(currentUser.role==='rep') vs=vs.filter(v=>v.rep_id===currentUser.id);
+  if(repId!=='all') vs=vs.filter(v=>v.rep_id===repId);
+  return vs;
+}
+function renderVisits(){
+  if(!window.visitsList) return;
+  renderVisitFilters();
+  const repId=visitRepFilter.value||'all';
+  const cs=visitScopeCustomers(repId);
+  const vs=visitsInPeriod();
+  const visitedIds=new Set(vs.map(v=>v.customer_id));
+  const notVisited=cs.filter(c=>!visitedIds.has(c.id));
+  const late30=cs.filter(c=>daysFrom(lastVisit(c.id))>=30);
+
+  visitsPeriodCount.textContent=vs.length;
+  visitedCustomersCount.textContent=visitedIds.size;
+  notVisitedCustomersCount.textContent=notVisited.length;
+  late30CustomersCount.textContent=late30.length;
+
+  visitsList.innerHTML=vs.map(v=>{
+    const c=db.customers.find(x=>x.id===v.customer_id)||{};
+    return `<div class="visit-card">
+      <h4>${c.name||'-'}</h4>
+      <p>المندوب: ${repName(v.rep_id)}<br>التاريخ: ${v.date}<br>النتيجة: ${v.result||v.notes||'تمت الزيارة'}</p>
+      <div class="mini"><span>وقت الوصول: ${v.arrive_time||'-'}</span><span>وقت المغادرة: ${v.leave_time||'-'}</span><span>مدة الزيارة: ${v.duration||'-'}</span></div>
+    </div>`;
+  }).join('') || '<div class="ok-line">لا توجد زيارات في هذه الفترة</div>';
+
+  const reportType=visitReportType.value;
+  let notList = reportType==='late30' ? late30 : notVisited;
+  notVisitedList.innerHTML=notList.map(c=>`<div class="late-line">
+    <b>${c.name}</b><br>
+    المندوب: ${repName(c.rep_id)} — آخر زيارة: ${lastVisit(c.id)||'لم يزر'} — التأخير: ${daysFrom(lastVisit(c.id))} يوم
+    <div class="row-actions"><button onclick="visit('${c.id}')">تسجيل زيارة</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div>
+  </div>`).join('') || '<div class="ok-line">لا يوجد عملاء في هذا التقرير</div>';
+
+  renderRepVisitSummary();
+}
+function renderRepVisitSummary(){
+  if(!window.repVisitSummary) return;
+  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  repVisitSummary.innerHTML='<div class="summary-grid">'+reps.map(r=>{
+    const cs=allowedCustomers().filter(c=>c.rep_id===r.id);
+    const vs=db.visits.filter(v=>v.rep_id===r.id && (!window.visitFrom || inRange(v.date,visitFrom.value,visitTo.value)));
+    const orders=db.orders.filter(o=>o.rep_id===r.id && (!window.visitFrom || inRange(o.date,visitFrom.value,visitTo.value)));
+    const visited=new Set(vs.map(v=>v.customer_id));
+    const notv=cs.filter(c=>!visited.has(c.id)).length;
+    return `<div class="summary-card"><h4>${r.name}</h4><div class="nums">
+      <div><b>${vs.length}</b><span>زيارات</span></div>
+      <div><b>${orders.length}</b><span>طلبات</span></div>
+      <div><b>${notv}</b><span>بدون زيارة</span></div>
+    </div></div>`;
+  }).join('')+'</div>';
+}
+function openVisitForm(){
+  const cs=allowedCustomers();
+  modalBody.innerHTML=`<h2>تسجيل زيارة يدوية</h2>
+    <div class="form-grid two">
+      <label>العميل<select id="mvCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+      <label>المندوب<select id="mvRep">${(currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
+      <label>التاريخ<input id="mvDate" type="date" value="${today()}"></label>
+      <label>نتيجة الزيارة<select id="mvResult"><option>متابعة</option><option>طلب جديد</option><option>تحصيل</option><option>بدون طلب</option></select></label>
+      <label>وقت الوصول<input id="mvArrive" type="time"></label>
+      <label>وقت المغادرة<input id="mvLeave" type="time"></label>
+    </div>
+    <br><label>ملاحظات<input id="mvNotes" placeholder="ملاحظات الزيارة"></label>
+    <br><button class="primary" onclick="saveManualVisit()">حفظ الزيارة</button>`;
+  modal.classList.remove('hidden');
+}
+function saveManualVisit(){
+  const arrive=mvArrive.value||'', leave=mvLeave.value||'';
+  let duration='-';
+  if(arrive && leave){
+    const [ah,am]=arrive.split(':').map(Number), [lh,lm]=leave.split(':').map(Number);
+    const mins=(lh*60+lm)-(ah*60+am);
+    if(mins>=0) duration=mins+' دقيقة';
+  }
+  db.visits.unshift({id:id(),customer_id:mvCustomer.value,rep_id:mvRep.value,date:mvDate.value||today(),result:mvResult.value,arrive_time:arrive,leave_time:leave,duration,notes:mvNotes.value});
+  save();closeModal();renderAll();
+}
