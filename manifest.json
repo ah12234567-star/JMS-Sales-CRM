@@ -1,1 +1,16 @@
-{"name":"JMS Sales CRM","short_name":"JMS CRM","start_url":"/","display":"standalone","background_color":"#111827","theme_color":"#111827"}
+{
+  "name": "JMS Factory CRM",
+  "short_name": "JMS CRM",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#111827",
+  "background_color": "#f4f6f9",
+  "icons": [
+    {
+      "src": "assets/jms-logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
