@@ -1,3 +1,33 @@
+
+// JMS role selector patch
+(function(){
+  const byId = (id) => document.getElementById(id);
+  function setVal(id, v){ const el = byId(id); if(el) el.value = v; }
+  function selectedRole(){
+    return document.querySelector('input[name="loginRole"]:checked')?.value || 'admin';
+  }
+  function updateRoleHint(){
+    const hint = byId('roleHint');
+    const role = selectedRole();
+    if(hint){
+      hint.textContent = role === 'admin'
+        ? 'دخول المدير: admin@jms.local / 123456'
+        : 'دخول المندوب: rep@jms.local / 123456';
+    }
+    if(role === 'admin'){
+      setVal('loginEmail','admin@jms.local');
+      setVal('loginPassword','123456');
+    } else {
+      setVal('loginEmail','rep@jms.local');
+      setVal('loginPassword','123456');
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('input[name="loginRole"]').forEach(r => r.addEventListener('change', updateRoleHint));
+    updateRoleHint();
+  });
+})();
+
 (function () {
   'use strict';
 
@@ -17,7 +47,7 @@
   const ADMIN_EMAIL = 'admin@jms.local';
   const ADMIN_PASS = '123456';
 
-  let db = {
+  window.db = {
     reps: [{ id: 'rep-demo-1', name: 'مندوب جدة', phone: '', email: 'rep@jms.local', status: 'نشط' }],
     users: [
       { id: 'admin-1', name: 'مدير النظام', email: ADMIN_EMAIL, password: ADMIN_PASS, role: 'admin', rep_id: null, status: 'نشط' },
@@ -35,7 +65,7 @@
   function loadLocalData() {
     try {
       const saved = JSON.parse(localStorage.getItem('jms_crm_data') || 'null');
-      if (saved && typeof saved === 'object') db = { ...db, ...saved };
+      if (saved && typeof saved === 'object') window.db = { ...db, ...saved };
       if (!Array.isArray(db.users)) db.users = [];
       if (!db.users.some(u => u.email === ADMIN_EMAIL)) db.users.unshift({ id: 'admin-1', name: 'مدير النظام', email: ADMIN_EMAIL, password: ADMIN_PASS, role: 'admin', rep_id: null, status: 'نشط' });
       if (!Array.isArray(db.reps)) db.reps = [];
@@ -146,12 +176,12 @@
   function renderReps(){ const rows=db.reps.map(r=>`<tr><td>${r.name}</td><td>${r.phone||'-'}</td><td>${r.email||'-'}</td><td>${r.status}</td><td>${db.customers.filter(c=>c.rep_id===r.id).length}</td><td>${db.visits.filter(v=>v.rep_id===r.id).length}</td></tr>`).join(''); setHtml('repsList', rows?`<table><thead><tr><th>المندوب</th><th>الجوال</th><th>الإيميل</th><th>الحالة</th><th>عملاء</th><th>زيارات</th></tr></thead><tbody>${rows}</tbody></table>`:'لا يوجد مناديب'); }
   function renderUsers(){ const rows=db.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td>${u.role==='admin'?'مدير':'مندوب'}</td><td>${repNameFn(u.rep_id)}</td><td>${u.status||'نشط'}</td><td>${u.password}</td></tr>`).join(''); setHtml('usersList', rows?`<table><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>المندوب المرتبط</th><th>الحالة</th><th>كلمة المرور</th></tr></thead><tbody>${rows}</tbody></table>`:'لا يوجد مستخدمين'); }
   function renderVisits(){ const visits=pageData('visits'); const rows=visits.map(v=>`<tr><td>${v.visit_date}</td><td>${customerNameFn(v.customer_id)}</td><td>${repNameFn(v.rep_id)}</td><td>${v.status}</td><td>${v.location||'-'}</td><td>${v.notes||'-'}</td></tr>`).join(''); setHtml('visitsList', rows?`<table><thead><tr><th>التاريخ</th><th>العميل</th><th>المندوب</th><th>الحالة</th><th>الموقع</th><th>ملاحظات</th></tr></thead><tbody>${rows}</tbody></table>`:'لا توجد زيارات'); const todayRows=visits.filter(v=>v.visit_date===todayISO()).map(v=>`<tr><td>${customerNameFn(v.customer_id)}</td><td>${repNameFn(v.rep_id)}</td><td>${v.status}</td><td>${v.notes||'-'}</td></tr>`).join(''); setHtml('todayVisitsTable', todayRows?`<table><thead><tr><th>العميل</th><th>المندوب</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${todayRows}</tbody></table>`:'لا توجد زيارات اليوم'); }
-  function renderOrders(){ const orders=pageData('orders'); const rows=orders.map(o=>`<tr><td>${o.order_date}</td><td>${customerNameFn(o.customer_id)}</td><td>${repNameFn(o.rep_id)}</td><td>${o.product||'-'}</td><td>${o.quantity||'-'}</td><td>${money(o.amount)}</td><td><span class="badge ${orderBadge(o.status)}">${o.status}</span></td></tr>`).join(''); setHtml('ordersList', rows?`<table><thead><tr><th>التاريخ</th><th>العميل</th><th>المندوب</th><th>الصنف</th><th>الكمية</th><th>القيمة</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>`:'لا توجد طلبات'); setHtml('latestOrders', orders.length?`<table><thead><tr><th>التاريخ</th><th>العميل</th><th>الصنف</th><th>القيمة</th><th>الحالة</th></tr></thead><tbody>${orders.slice(0,5).map(o=>`<tr><td>${o.order_date}</td><td>${customerNameFn(o.customer_id)}</td><td>${o.product||'-'}</td><td>${money(o.amount)}</td><td>${o.status}</td></tr>`).join('')}</tbody></table>`:'لا توجد طلبات'); }
+  window.renderOrders = function renderOrders(){ const orders=pageData('orders'); const rows=orders.map(o=>`<tr><td>${o.order_date}</td><td>${customerNameFn(o.customer_id)}</td><td>${repNameFn(o.rep_id)}</td><td>${o.product||'-'}</td><td>${o.quantity||'-'}</td><td>${money(o.amount)}</td><td><span class="badge ${orderBadge(o.status)}">${o.status}</span></td></tr>`).join(''); setHtml('ordersList', rows?`<table><thead><tr><th>التاريخ</th><th>العميل</th><th>المندوب</th><th>الصنف</th><th>الكمية</th><th>القيمة</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>`:'لا توجد طلبات'); setHtml('latestOrders', orders.length?`<table><thead><tr><th>التاريخ</th><th>العميل</th><th>الصنف</th><th>القيمة</th><th>الحالة</th></tr></thead><tbody>${orders.slice(0,5).map(o=>`<tr><td>${o.order_date}</td><td>${customerNameFn(o.customer_id)}</td><td>${o.product||'-'}</td><td>${money(o.amount)}</td><td>${o.status}</td></tr>`).join('')}</tbody></table>`:'لا توجد طلبات'); }
   function renderAlerts(){ const late=pageData('customers').filter(c=>customerStatus(c).d>=30); const html=late.map(c=>`<div class="list-item"><strong>${c.name}</strong><br>متأخر ${customerStatus(c).d} يوم — المندوب: ${repNameFn(c.rep_id)}</div>`).join(''); setHtml('quickAlerts',html||'<div class="list-item">لا يوجد عملاء متأخرين حالياً</div>'); setHtml('alertsList',html||'<div class="list-item">لا توجد تنبيهات</div>'); }
   function renderTopReps(){ const ranked=db.reps.map(r=>({name:r.name,count:db.visits.filter(v=>v.rep_id===r.id).length})).sort((a,b)=>b.count-a.count).slice(0,5); setHtml('topReps', ranked.map((r,i)=>`<div class="rank-item"><b>${i+1}. ${r.name}</b><span>${r.count} زيارة</span></div>`).join('')||'لا يوجد بيانات'); }
   function render(){ renderSelects(); renderStats(); window.renderCustomers(); renderReps(); renderUsers(); renderVisits(); renderOrders(); renderAlerts(); renderTopReps(); }
 
-  async function insertData(table,row){ if(supabase){ try{ const {error}=await supabase.from(table).insert(row); if(!error) return true; console.warn(error);}catch(err){console.warn(err);} } row.id=row.id||newId(); db[table].unshift(row); saveLocalData(); return true; }
+  window.insertData = async function insertData(table,row){ if(supabase){ try{ const {error}=await supabase.from(table).insert(row); if(!error) return true; console.warn(error);}catch(err){console.warn(err);} } row.id=row.id||newId(); db[table].unshift(row); saveLocalData(); return true; }
   function bindForms(){
     $('repForm') && ($('repForm').onsubmit=async e=>{e.preventDefault(); const id=newId(); const row={id,name:$('repName').value.trim(),phone:$('repPhone').value.trim(),email:$('repEmail').value.trim(),status:$('repStatus').value}; await insertData('reps',row); e.target.reset(); refreshAll();});
     $('userForm') && ($('userForm').onsubmit=async e=>{e.preventDefault(); const role=$('userRole').value; const row={id:newId(),name:$('userName').value.trim(),email:$('userEmail').value.trim().toLowerCase(),password:$('userPassword').value.trim(),role,rep_id:role==='rep'?$('userRep').value:null,status:'نشط'}; if(!row.email||!row.password) return alert('أدخل البريد وكلمة المرور'); if(row.role==='rep'&&!row.rep_id) return alert('اختر المندوب المرتبط بالحساب'); if(db.users.some(u=>String(u.email).toLowerCase()===row.email)) return alert('هذا البريد مستخدم من قبل'); await insertData('users',row); e.target.reset(); refreshAll(); alert('تم إنشاء الحساب. يمكن للمندوب الدخول الآن بالبريد وكلمة المرور.');});
@@ -165,4 +195,148 @@
   window.seedDemoData=function(){ if(!isAdmin()) return; loadLocalData(); if(!db.customers.length){ db.customers.push({id:newId(),name:'عميل تجريبي',phone:'0500000000',city:'جدة',activity:'تغليف',location:'',rep_id:'rep-demo-1',notes:'بيانات تجربة'}); } saveLocalData(); refreshAll(); };
 
   bindForms(); loadLocalData(); if(currentUser) showApp(); else showLogin();
+})();
+
+
+
+/* JMS plastic order fields patch */
+(function(){
+  function byId(id){ return document.getElementById(id); }
+  function v(id){ return (byId(id)?.value || '').trim(); }
+
+  function addPlasticFieldsToOrderForm(){
+    const form = byId('orderForm');
+    if(!form || byId('orderWidth')) return;
+
+    const submitBtn = form.querySelector('button[type="submit"], .submit, button');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'plastic-order-fields';
+    wrapper.innerHTML = `
+      <div class="form-section-title">بيانات طلب التصنيع</div>
+      <div class="grid-4">
+        <label>العرض / المقاس
+          <input id="orderWidth" type="number" step="0.01" placeholder="مثال: 65">
+        </label>
+        <label>الطول
+          <input id="orderLength" type="number" step="0.01" placeholder="مثال: 95">
+        </label>
+        <label>وحدة المقاس
+          <select id="orderSizeUnit">
+            <option value="cm">سم</option>
+            <option value="mm">مم</option>
+          </select>
+        </label>
+        <label>السماكة
+          <input id="orderThickness" type="number" step="0.01" placeholder="مثال: 75">
+        </label>
+      </div>
+      <div class="grid-4">
+        <label>وحدة السماكة
+          <select id="orderThicknessUnit">
+            <option value="micron">ميكرون</option>
+            <option value="mm">مم</option>
+          </select>
+        </label>
+        <label>اللون
+          <input id="orderColor" placeholder="شفاف / أبيض / أسود / مطبوع">
+        </label>
+        <label>النوع
+          <select id="orderBagType">
+            <option value="أكياس رول">أكياس رول</option>
+            <option value="أكياس شيت">أكياس شيت</option>
+            <option value="أكياس تي شيرت">أكياس تي شيرت</option>
+            <option value="شرنك">شرنك</option>
+            <option value="فيلم">فيلم</option>
+            <option value="أكياس نفايات">أكياس نفايات</option>
+            <option value="أخرى">أخرى</option>
+          </select>
+        </label>
+        <label>المادة
+          <select id="orderMaterial">
+            <option value="HDPE">HDPE</option>
+            <option value="LDPE">LDPE</option>
+            <option value="LLDPE">LLDPE</option>
+            <option value="HDPE/LDPE">HDPE/LDPE</option>
+            <option value="حسب الخلطة">حسب الخلطة</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid-3">
+        <label>الطباعة
+          <select id="orderPrint">
+            <option value="بدون طباعة">بدون طباعة</option>
+            <option value="طباعة وجه واحد">طباعة وجه واحد</option>
+            <option value="طباعة وجهين">طباعة وجهين</option>
+          </select>
+        </label>
+        <label>عدد الألوان
+          <input id="orderPrintColors" type="number" min="0" placeholder="مثال: 2">
+        </label>
+        <label>ملاحظات فنية
+          <input id="orderSpecsNotes" placeholder="مثال: تخريم / لحام / رول / كرتون">
+        </label>
+      </div>
+    `;
+
+    if(submitBtn) form.insertBefore(wrapper, submitBtn);
+    else form.appendChild(wrapper);
+  }
+
+  function orderSpecsHtml(o){
+    const dims = [o.width, o.length].filter(Boolean).join(' × ');
+    const sizeUnit = o.size_unit || 'سم';
+    const thickness = o.thickness ? `${o.thickness} ${o.thickness_unit || 'ميكرون'}` : '-';
+    return `
+      <div class="specs-card">
+        <b>${o.bag_type || o.product || 'طلب تصنيع'}</b>
+        <span>المقاس: ${dims ? dims + ' ' + sizeUnit : '-'}</span>
+        <span>السماكة: ${thickness}</span>
+        <span>اللون: ${o.color || '-'}</span>
+        <span>المادة: ${o.material || '-'}</span>
+        <span>الطباعة: ${o.print || '-'}</span>
+        <span>ألوان الطباعة: ${o.print_colors || '-'}</span>
+        <span>ملاحظات: ${o.specs_notes || '-'}</span>
+      </div>`;
+  }
+
+  const originalInsert = window.insertData;
+  if(typeof originalInsert === 'function'){
+    window.insertData = async function(table, row){
+      if(table === 'orders'){
+        row.width = v('orderWidth');
+        row.length = v('orderLength');
+        row.size_unit = v('orderSizeUnit') || 'cm';
+        row.thickness = v('orderThickness');
+        row.thickness_unit = v('orderThicknessUnit') || 'micron';
+        row.color = v('orderColor');
+        row.bag_type = v('orderBagType');
+        row.material = v('orderMaterial');
+        row.print = v('orderPrint');
+        row.print_colors = v('orderPrintColors');
+        row.specs_notes = v('orderSpecsNotes');
+        if(!row.product) row.product = row.bag_type || 'طلب تصنيع';
+      }
+      return originalInsert(table, row);
+    }
+  }
+
+  const originalRenderOrders = window.renderOrders;
+  if(typeof originalRenderOrders === 'function'){
+    window.renderOrders = function(){
+      originalRenderOrders();
+      const list = byId('ordersList');
+      if(list && window.db && Array.isArray(window.db.orders)){
+        const cards = window.db.orders.map(o => orderSpecsHtml(o)).join('');
+        const box = document.createElement('div');
+        box.className = 'order-specs-list';
+        box.innerHTML = cards || '<div class="list-item">لا توجد طلبات تصنيع</div>';
+        if(!list.querySelector('.order-specs-list')) list.appendChild(box);
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    addPlasticFieldsToOrderForm();
+    setTimeout(addPlasticFieldsToOrderForm, 800);
+  });
 })();

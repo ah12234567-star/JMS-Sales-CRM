@@ -20,7 +20,19 @@
     <form id="loginForm" class="login-form">
       <label>البريد الإلكتروني</label>
       <input id="loginEmail" type="email" value="admin@jms.local" required>
-      <label>كلمة المرور</label>
+      
+        <div class="role-switch" aria-label="نوع الدخول">
+          <label class="role-option">
+            <input type="radio" name="loginRole" value="admin" checked>
+            مدير النظام
+          </label>
+          <label class="role-option">
+            <input type="radio" name="loginRole" value="rep">
+            مندوب
+          </label>
+        </div>
+        <div class="role-hint" id="roleHint">دخول المدير: admin@jms.local / 123456</div>
+<label>كلمة المرور</label>
       <input id="loginPassword" type="password" value="123456" required>
       <button class="primary full" type="submit">دخول النظام</button>
     </form>
