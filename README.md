@@ -1,5 +1,3 @@
 # JMS Sales CRM
 
-JMS Sales CRM System
-
-This project is under development.
+iPhone Ready CRM for Jeddah Model Industrial Co.
