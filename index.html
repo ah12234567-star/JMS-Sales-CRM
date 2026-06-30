@@ -56,6 +56,7 @@
       <button class="nav" data-page="customers">العملاء</button>
       <button class="nav" data-page="visits">الزيارات</button>
       <button class="nav" data-page="orders">طلبات التصنيع</button>
+      <button class="nav" data-page="quotes">عروض الأسعار</button>
       <button class="nav" data-page="routes">المسارات</button>
       <button class="nav" data-page="alerts">تنبيهات 30 يوم</button>
       <button class="nav admin-only" data-page="users">المستخدمين</button>
@@ -239,6 +240,54 @@
         <div id="ordersList"></div>
       </div>
     </section>
+
+
+    <section id="quotes" class="page">
+      <div class="page-head with-action">
+        <div>
+          <h2>عروض الأسعار</h2>
+          <p>المندوب ينشئ العرض، والمدير يعتمد أو يرفض، وبعد الاعتماد فقط يمكن إرساله للعميل</p>
+        </div>
+        <button class="primary small" onclick="openQuoteForm()">إنشاء عرض سعر</button>
+      </div>
+
+      <div class="stats quote-stats">
+        <div class="stat"><span>كل العروض</span><b id="quotesTotal">0</b><small>عرض</small></div>
+        <div class="stat danger-card"><span>بانتظار الاعتماد</span><b id="quotesPending">0</b><small>عرض</small></div>
+        <div class="stat"><span>معتمدة</span><b id="quotesApproved">0</b><small>عرض</small></div>
+        <div class="stat"><span>مرفوضة</span><b id="quotesRejected">0</b><small>عرض</small></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <b>فلترة عروض الأسعار</b>
+          <span>حسب الحالة والمندوب</span>
+        </div>
+        <div class="form-grid four">
+          <label>الحالة
+            <select id="quoteStatusFilter">
+              <option value="all">كل الحالات</option>
+              <option value="pending">بانتظار اعتماد المدير</option>
+              <option value="approved">معتمد</option>
+              <option value="rejected">مرفوض</option>
+              <option value="sent">مرسل للعميل</option>
+            </select>
+          </label>
+          <label>المندوب
+            <select id="quoteRepFilter"></select>
+          </label>
+          <label>بحث
+            <input id="quoteSearch" placeholder="اسم العميل أو رقم العرض">
+          </label>
+          <label>إجراء
+            <button class="primary small" type="button" onclick="renderQuotes()">عرض</button>
+          </label>
+        </div>
+      </div>
+
+      <div id="quotesList" class="quotes-grid"></div>
+    </section>
+
 
     <section id="routes" class="page">
       <div class="page-head with-action">

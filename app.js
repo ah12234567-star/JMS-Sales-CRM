@@ -65,7 +65,7 @@ document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   renderAll();
 });
 
-function renderAll(){renderStats();renderCustomers();renderSelects();renderVisitFilters();renderVisits();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
+function renderAll(){renderStats();renderCustomers();renderSelects();renderVisitFilters();renderVisits();renderQuotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
 function repName(id){return db.reps.find(r=>r.id===id)?.name||'-'}
 function customerName(id){return db.customers.find(c=>c.id===id)?.name||'-'}
 function lastVisit(cid){return db.visits.filter(v=>v.customer_id===cid).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||''}
@@ -279,4 +279,202 @@ function saveManualVisit(){
   }
   db.visits.unshift({id:id(),customer_id:mvCustomer.value,rep_id:mvRep.value,date:mvDate.value||today(),result:mvResult.value,arrive_time:arrive,leave_time:leave,duration,notes:mvNotes.value});
   save();closeModal();renderAll();
+}
+
+
+
+/* JMS quotations approval module */
+function ensureQuotes(){
+  db.quotes ||= [];
+  save();
+}
+function quoteStatusText(s){
+  return s==='pending'?'بانتظار اعتماد المدير':s==='approved'?'معتمد':s==='rejected'?'مرفوض':s==='sent'?'مرسل للعميل':'-';
+}
+function allowedQuotes(){
+  ensureQuotes();
+  return currentUser.role==='rep' ? db.quotes.filter(q=>q.rep_id===currentUser.id) : db.quotes;
+}
+function renderQuoteFilters(){
+  if(!window.quoteRepFilter) return;
+  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const cur=quoteRepFilter.value;
+  quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  if(cur) quoteRepFilter.value=cur;
+}
+function renderQuotes(){
+  if(!window.quotesList) return;
+  ensureQuotes();
+  renderQuoteFilters();
+
+  const all=allowedQuotes();
+  quotesTotal.textContent=all.length;
+  quotesPending.textContent=all.filter(q=>q.status==='pending').length;
+  quotesApproved.textContent=all.filter(q=>q.status==='approved').length;
+  quotesRejected.textContent=all.filter(q=>q.status==='rejected').length;
+
+  const st=quoteStatusFilter.value||'all';
+  const rep=quoteRepFilter.value||'all';
+  const qtxt=(quoteSearch.value||'').trim();
+
+  let list=all.filter(q=>{
+    if(st!=='all' && q.status!==st) return false;
+    if(rep!=='all' && q.rep_id!==rep) return false;
+    const cname=customerName(q.customer_id);
+    if(qtxt && !String(q.quote_no).includes(qtxt) && !cname.includes(qtxt)) return false;
+    return true;
+  });
+
+  quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
+}
+function quoteCard(q){
+  const canApprove=currentUser.role==='admin'||currentUser.role==='sales';
+  const canSend=q.status==='approved'||q.status==='sent';
+  const canConvert=q.status==='approved'||q.status==='sent';
+  return `<div class="quote-card">
+    <div class="quote-head">
+      <div>
+        <h3>عرض رقم ${q.quote_no}</h3>
+        <p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p>
+      </div>
+      <span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span>
+    </div>
+
+    <div class="quote-lines">
+      <div><span>المنتج</span><b>${q.product}</b></div>
+      <div><span>المقاس</span><b>${q.width} × ${q.length} ${q.size_unit}</b></div>
+      <div><span>السماكة</span><b>${q.thickness} ${q.thickness_unit}</b></div>
+      <div><span>الخامة</span><b>${q.material}</b></div>
+      <div><span>الكمية</span><b>${q.total_kg} كجم</b></div>
+      <div><span>سعر الكيلو</span><b>${q.price_kg} ريال</b></div>
+      <div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div>
+      <div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div>
+    </div>
+
+    <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
+    ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
+    ${q.approved_by?`<div class="ok-line">اعتمد بواسطة: ${q.approved_by} بتاريخ ${q.approved_at||'-'}</div>`:''}
+
+    <div class="quote-actions">
+      <button onclick="viewQuote('${q.id}')">عرض</button>
+      ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}
+      ${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}
+      ${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}
+    </div>
+  </div>`;
+}
+function openQuoteForm(){
+  ensureQuotes();
+  const cs=allowedCustomers();
+  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+    <div class="form-grid two">
+      <label>العميل<select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+      <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
+      <label>تاريخ العرض<input id="mqDate" type="date" value="${today()}"></label>
+      <label>صلاحية العرض<input id="mqValid" type="date"></label>
+    </div>
+    <div class="form-grid four">
+      <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
+      <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
+      <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
+      <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+    </div>
+    <div class="form-grid four">
+      <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+      <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+      <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
+      <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+    </div>
+    <div class="form-grid four">
+      <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
+      <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+      <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
+      <label>الإجمالي<input id="mqTotal" readonly></label>
+    </div>
+    <div class="form-grid two">
+      <label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label>
+      <label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label>
+      <label>وزن الحبة<input id="mqPiece" readonly></label>
+      <label>عدد الحبات<input id="mqPieces" readonly></label>
+    </div>
+    <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
+    <br><button class="primary" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+
+  modal.classList.remove('hidden');
+  ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(id=>{
+    const el=document.getElementById(id); if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm);}
+  });
+  calcQuoteForm();
+}
+function calcQuoteForm(){
+  if(!window.mqTotal) return;
+  let w=Number(mqWidth.value||0),l=Number(mqLength.value||0),t=Number(mqThickness.value||0);
+  if(mqSizeUnit.value==='cm'){w/=100;l/=100}else if(mqSizeUnit.value==='mm'){w/=1000;l/=1000}
+  if(mqThicknessUnit.value==='mm') t*=1000;
+  const den=DENSITY[mqMaterial.value]||.93;
+  const gram=w*l*t*den;
+  mqPiece.value=gram?gram.toFixed(2)+' جرام':'';
+  const kg=Number(mqKg.value||0);
+  const pcs=gram?Math.floor(kg/(gram/1000)):0;
+  mqPieces.value=pcs?pcs.toLocaleString('ar-SA')+' حبة':'';
+  const total=kg*Number(mqPriceKg.value||0);
+  mqTotal.value=total?total.toFixed(2):'';
+}
+function saveQuote(){
+  ensureQuotes();
+  if(!mqCustomer.value) return alert('اختر العميل');
+  const no='Q-'+String(db.quotes.length+1).padStart(5,'0');
+  db.quotes.unshift({
+    id:id(),quote_no:no,status:'pending',
+    customer_id:mqCustomer.value,rep_id:mqRep.value,date:mqDate.value||today(),valid_until:mqValid.value,
+    product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
+    width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
+    total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
+    payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,
+    created_by:currentUser.name,created_at:new Date().toISOString()
+  });
+  save();closeModal();renderAll();alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+}
+function approveQuote(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  q.status='approved'; q.approved_by=currentUser.name; q.approved_at=today();
+  save();renderQuotes();alert('تم اعتماد عرض السعر');
+}
+function rejectQuote(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  const reason=prompt('سبب الرفض');
+  if(!reason) return;
+  q.status='rejected'; q.reject_reason=reason; q.rejected_by=currentUser.name; q.rejected_at=today();
+  save();renderQuotes();alert('تم رفض العرض وإرجاعه للمندوب');
+}
+function sendQuote(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن الإرسال قبل اعتماد المدير');
+  q.status='sent'; q.sent_at=today(); save(); renderQuotes();
+  const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit}%0Aالسماكة: ${q.thickness} ${q.thickness_unit}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي: ${q.total_amount} ريال`;
+  window.open(`https://wa.me/?text=${msg}`,'_blank');
+}
+function viewQuote(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  modalBody.innerHTML=`<div class="quote-print">
+    <div class="print-head"><div><h1>عرض سعر</h1><p>شركة جدة النموذجية للصناعة</p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div>
+    <p><b>العميل:</b> ${customerName(q.customer_id)}<br><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}</p>
+    <table><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الخامة</th><th>الكمية</th><th>سعر الكيلو</th><th>الإجمالي</th></tr>
+    <tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table>
+    <p><b>شروط الدفع:</b> ${q.payment_terms||'-'}<br><b>التسليم:</b> ${q.delivery_terms||'-'}<br><b>ملاحظات:</b> ${q.notes||'-'}</p>
+    <button class="primary" onclick="window.print()">طباعة / PDF</button>
+  </div>`;
+  modal.classList.remove('hidden');
+}
+function convertQuoteToOrder(qid){
+  const q=db.quotes.find(x=>x.id===qid); if(!q) return;
+  if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن تحويل عرض غير معتمد إلى طلب');
+  db.orders.unshift({
+    id:id(),date:today(),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,
+    width:q.width,length:q.length,thickness:q.thickness,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,
+    amount:q.total_amount+' ريال',amount_value:Number(q.total_amount||0),status:'جديد',notes:'تم التحويل من عرض السعر '+q.quote_no
+  });
+  q.converted_to_order=true; q.converted_at=today();
+  save();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');
 }
