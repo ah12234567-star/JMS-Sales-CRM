@@ -51,10 +51,35 @@ loginForm.onsubmit=e=>{
 logoutBtn.onclick=()=>{sessionStorage.removeItem('jms_current_user');location.reload()};
 
 function showApp(){
-  loginView.classList.add('hidden');appView.classList.remove('hidden');
-  currentUserName.textContent=currentUser.name;currentUserRole.textContent=roleText(currentUser.role);
-  document.querySelectorAll('.admin-only').forEach(x=>x.style.display=currentUser.role==='admin'?'block':'none');
-  orderDate.value=today();
+  loginView.classList.add('hidden');
+  appView.classList.remove('hidden');
+  currentUserName.textContent=currentUser.name;
+  currentUserRole.textContent=roleText(currentUser.role);
+
+  const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
+  document.querySelectorAll('.nav').forEach(btn=>{
+    const page = btn.dataset.page;
+    const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
+    if(currentUser.role === 'rep' && !repAllowed.includes(page)){
+      btn.style.display='none';
+    } else if(btn.classList.contains('admin-only') && currentUser.role !== 'admin'){
+      btn.style.display='none';
+    } else if(btn.classList.contains('manager-only') && !['admin','sales'].includes(currentUser.role)){
+      btn.style.display='none';
+    } else {
+      btn.style.display='block';
+    }
+  });
+
+  if(currentUser.role === 'rep'){
+    document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+    const first = document.querySelector('.nav[data-page="customers"]');
+    const page = document.getElementById('customers');
+    if(first) first.classList.add('active');
+    if(page) page.classList.add('active');
+  }
+
+  if(window.orderDate) orderDate.value=today();
   renderAll();
 }
 if(currentUser) showApp();
@@ -65,7 +90,7 @@ document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   renderAll();
 });
 
-function renderAll(){renderStats();renderCustomers();renderSelects();renderVisitFilters();renderVisits();renderQuotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
+function renderAll(){renderStats();renderCustomers();renderSelects();if(typeof renderVisitFilters==='function')renderVisitFilters();if(typeof renderVisits==='function')renderVisits();if(typeof renderQuotes==='function')renderQuotes();if(typeof renderVisitNotes==='function')renderVisitNotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc()}
 function repName(id){return db.reps.find(r=>r.id===id)?.name||'-'}
 function customerName(id){return db.customers.find(c=>c.id===id)?.name||'-'}
 function lastVisit(cid){return db.visits.filter(v=>v.customer_id===cid).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||''}
@@ -478,3 +503,393 @@ function convertQuoteToOrder(qid){
   q.converted_to_order=true; q.converted_at=today();
   save();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');
 }
+
+
+
+/* JMS final fixes applied */
+(function(){
+  function safeToday(){ return (typeof today==='function') ? today() : new Date().toISOString().slice(0,10); }
+  function safeMonth(){ return safeToday().slice(0,7); }
+  function newLocalId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function saveDB(){ if(typeof save==='function') save(); }
+  function $id(x){ return document.getElementById(x); }
+
+  window.daysFrom = function(date){
+    if(!date) return null;
+    const d = new Date(date + 'T00:00:00');
+    if(isNaN(d.getTime())) return null;
+    return Math.floor((new Date(safeToday()+'T00:00:00') - d) / 86400000);
+  };
+
+  window.customerState = function(c){
+    const lv = (typeof lastVisit==='function') ? lastVisit(c.id) : '';
+    const d = daysFrom(lv);
+    if(d === null) return ['لم تتم زيارته','never-visited'];
+    if(d === 0) return ['تمت زيارته اليوم','ok'];
+    if(d >= 30) return ['متأخر '+d+' يوم','late'];
+    if(d >= 15) return ['قريب '+d+' يوم','warn'];
+    return ['منتظم منذ '+d+' يوم','ok'];
+  };
+
+  window.renderStats = function(){
+    const ord=(typeof allowedOrders==='function'?allowedOrders():db.orders||[]).filter(o=>String(o.date||'').startsWith(safeMonth()));
+    const sales=ord.reduce((s,o)=>s+Number(o.amount_value||0),0);
+    const coll=(db.collections||[]).filter(c=>String(c.date||'').startsWith(safeMonth())&&(currentUser.role!=='rep'||c.rep_id===currentUser.id)).reduce((s,c)=>s+Number(c.amount||0),0);
+    if(window.mSales) mSales.textContent=Number(sales||0).toLocaleString('ar-SA');
+    if(window.mCollected) mCollected.textContent=Number(coll||0).toLocaleString('ar-SA');
+    if(window.collectionRate) collectionRate.textContent=sales?Math.round(coll/sales*100)+'%':'0%';
+    const cs=typeof allowedCustomers==='function'?allowedCustomers():db.customers||[];
+    const late=cs.filter(c=>{const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');return d!==null && d>=30}).length;
+    if(window.lateCount) lateCount.textContent=late;
+    if(window.customersCount) customersCount.textContent=cs.length;
+    if(window.ordersCount) ordersCount.textContent=ord.length;
+    if(window.topReps){
+      topReps.innerHTML=(db.reps||[]).map(r=>({r,visits:(db.visits||[]).filter(v=>v.rep_id===r.id).length,orders:(db.orders||[]).filter(o=>o.rep_id===r.id).length})).sort((a,b)=>(b.visits+b.orders)-(a.visits+a.orders)).map(x=>`<div class="route-item"><b>${x.r.name}</b><br>زيارات: ${x.visits} · طلبات: ${x.orders}</div>`).join('')||'لا يوجد بيانات';
+    }
+    if(window.dashAlerts){
+      dashAlerts.innerHTML=cs.filter(c=>{const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');return d===null || d>=30}).slice(0,5).map(c=>{
+        const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');
+        return `<div class="alert-card">${c.name} — ${d===null?'لم تتم زيارته':('لم تتم زيارته منذ '+d+' يوم')}</div>`;
+      }).join('')||'لا توجد تنبيهات';
+    }
+  };
+
+  window.renderAlerts = function(){
+    if(!window.alertsList) return;
+    const cs=typeof allowedCustomers==='function'?allowedCustomers():db.customers||[];
+    const list=cs.filter(c=>{const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');return d===null || d>=30});
+    alertsList.innerHTML=list.map(c=>{
+      const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');
+      const txt=d===null?'لم تتم زيارته من قبل':'لم تتم زيارته منذ '+d+' يوم';
+      return `<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — ${txt}<div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`;
+    }).join('')||'<div class="panel">لا توجد تنبيهات</div>';
+  };
+
+  window.ensureQuotes = function(){ db.quotes ||= []; saveDB(); };
+  window.quoteStatusText = function(s){ return s==='pending'?'بانتظار اعتماد المدير':s==='approved'?'معتمد':s==='rejected'?'مرفوض':s==='sent'?'مرسل للعميل':'-'; };
+  window.allowedQuotes = function(){ ensureQuotes(); return currentUser.role==='rep' ? db.quotes.filter(q=>q.rep_id===currentUser.id) : db.quotes; };
+
+  window.renderQuoteFilters = function(){
+    if(!window.quoteRepFilter) return;
+    const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+    const cur=quoteRepFilter.value;
+    quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+    if(cur) quoteRepFilter.value=cur;
+  };
+
+  window.renderQuotes = function(){
+    if(!window.quotesList) return;
+    ensureQuotes(); renderQuoteFilters();
+    const all=allowedQuotes();
+    quotesTotal.textContent=all.length;
+    quotesPending.textContent=all.filter(q=>q.status==='pending').length;
+    quotesApproved.textContent=all.filter(q=>q.status==='approved').length;
+    quotesRejected.textContent=all.filter(q=>q.status==='rejected').length;
+    const st=quoteStatusFilter.value||'all', rep=quoteRepFilter.value||'all', txt=(quoteSearch.value||'').trim();
+    const list=all.filter(q=>{
+      if(st!=='all' && q.status!==st) return false;
+      if(rep!=='all' && q.rep_id!==rep) return false;
+      const cname=customerName(q.customer_id);
+      if(txt && !String(q.quote_no).includes(txt) && !cname.includes(txt)) return false;
+      return true;
+    });
+    quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
+  };
+
+  window.quoteCard=function(q){
+    const canApprove=currentUser.role==='admin'||currentUser.role==='sales';
+    const canSend=q.status==='approved'||q.status==='sent';
+    const canConvert=q.status==='approved'||q.status==='sent';
+    return `<div class="quote-card">
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
+      <div class="quote-lines"><div><span>المنتج</span><b>${q.product}</b></div><div><span>المقاس</span><b>${q.width} × ${q.length} ${q.size_unit}</b></div><div><span>السماكة</span><b>${q.thickness} ${q.thickness_unit}</b></div><div><span>الخامة</span><b>${q.material}</b></div><div><span>الكمية</span><b>${q.total_kg} كجم</b></div><div><span>سعر الكيلو</span><b>${q.price_kg} ريال</b></div><div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div><div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div></div>
+      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
+      ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
+      ${q.approved_by?`<div class="ok-line">اعتمد بواسطة: ${q.approved_by} بتاريخ ${q.approved_at||'-'}</div>`:''}
+      <div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div>
+    </div>`;
+  };
+
+  window.openQuoteForm=function(){
+    ensureQuotes();
+    const cs=typeof allowedCustomers==='function'?allowedCustomers():db.customers||[];
+    const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+    const defaultRep=currentUser.role==='rep'?currentUser.id:(reps[0]?.id||'');
+    modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+      <div class="quote-customer-mode">
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+      </div>
+      <div id="existingCustomerBox" class="form-grid two">
+        <label>العميل<select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+        <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
+      </div>
+      <div id="newCustomerBox" class="form-grid two hidden">
+        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
+        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
+        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+      </div>
+      <div class="form-grid two"><label>تاريخ العرض<input id="mqDate" type="date" value="${safeToday()}"></label><label>صلاحية العرض<input id="mqValid" type="date"></label></div>
+      <div class="form-grid four">
+        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
+        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
+        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
+        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+      </div>
+      <div class="form-grid four">
+        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
+        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+      </div>
+      <div class="form-grid four">
+        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
+        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
+        <label>الإجمالي<input id="mqTotal" readonly></label>
+      </div>
+      <div class="form-grid two"><label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label><label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label><label>وزن الحبة<input id="mqPiece" readonly></label><label>عدد الحبات<input id="mqPieces" readonly></label></div>
+      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
+      <br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+    modal.classList.remove('hidden');
+    ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{const el=$id(x);if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm);}});
+    calcQuoteForm();
+  };
+
+  window.toggleQuoteCustomerMode=function(){
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    existingCustomerBox.classList.toggle('hidden',mode!=='existing');
+    newCustomerBox.classList.toggle('hidden',mode!=='new');
+  };
+
+  window.calcQuoteForm=function(){
+    if(!window.mqTotal) return;
+    let w=Number(mqWidth.value||0),l=Number(mqLength.value||0),t=Number(mqThickness.value||0);
+    if(mqSizeUnit.value==='cm'){w/=100;l/=100}else if(mqSizeUnit.value==='mm'){w/=1000;l/=1000}
+    if(mqThicknessUnit.value==='mm') t*=1000;
+    const den=DENSITY[mqMaterial.value]||.93;
+    const gram=w*l*t*den;
+    mqPiece.value=gram?gram.toFixed(2)+' جرام':'';
+    const kg=Number(mqKg.value||0);
+    const pcs=gram?Math.floor(kg/(gram/1000)):0;
+    mqPieces.value=pcs?pcs.toLocaleString('ar-SA')+' حبة':'';
+    mqTotal.value=(kg*Number(mqPriceKg.value||0)) ? (kg*Number(mqPriceKg.value||0)).toFixed(2) : '';
+  };
+
+  window.saveQuote=function(){
+    ensureQuotes();
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    let customerId='';
+    let repId=(window.mqRep && mqRep.value) ? mqRep.value : currentUser.id;
+    if(mode==='new'){
+      const name=(mqNewCustomerName.value||'').trim();
+      if(!name) return alert('اكتب اسم العميل الجديد');
+      const newCustomer={id:newLocalId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من عرض سعر'};
+      db.customers.unshift(newCustomer);
+      customerId=newCustomer.id;
+    }else{
+      customerId=mqCustomer.value;
+      if(!customerId) return alert('اختر العميل');
+    }
+    const no='Q-'+String((db.quotes||[]).length+1).padStart(5,'0');
+    db.quotes.unshift({id:newLocalId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser.name,created_at:new Date().toISOString()});
+    saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+  };
+
+  window.approveQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;q.status='approved';q.approved_by=currentUser.name;q.approved_at=safeToday();saveDB();renderQuotes();alert('تم اعتماد عرض السعر');};
+  window.rejectQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;const reason=prompt('سبب الرفض');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=currentUser.name;q.rejected_at=safeToday();saveDB();renderQuotes();alert('تم رفض العرض');};
+  window.sendQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن الإرسال قبل اعتماد المدير');q.status='sent';q.sent_at=safeToday();saveDB();renderQuotes();const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit}%0Aالسماكة: ${q.thickness} ${q.thickness_unit}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي: ${q.total_amount} ريال`;window.open(`https://wa.me/?text=${msg}`,'_blank');};
+  window.viewQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;modalBody.innerHTML=`<div class="quote-print"><div class="print-head"><div><h1>عرض سعر</h1><p>شركة جدة النموذجية للصناعة</p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div><p><b>العميل:</b> ${customerName(q.customer_id)}<br><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}</p><table><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الخامة</th><th>الكمية</th><th>سعر الكيلو</th><th>الإجمالي</th></tr><tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table><p><b>شروط الدفع:</b> ${q.payment_terms||'-'}<br><b>التسليم:</b> ${q.delivery_terms||'-'}<br><b>ملاحظات:</b> ${q.notes||'-'}</p><button class="primary" onclick="window.print()">طباعة / PDF</button></div>`;modal.classList.remove('hidden');};
+  window.convertQuoteToOrder=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن تحويل عرض غير معتمد إلى طلب');db.orders.unshift({id:newLocalId(),date:safeToday(),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,width:q.width,length:q.length,thickness:q.thickness,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:q.total_amount+' ريال',amount_value:Number(q.total_amount||0),status:'جديد',notes:'تم التحويل من عرض السعر '+q.quote_no});q.converted_to_order=true;q.converted_at=safeToday();saveDB();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');};
+})();
+
+
+
+/* JMS visit report notes module */
+(function(){
+  function localId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function saveDb(){ if(typeof save === 'function') save(); }
+  function byId(id){ return document.getElementById(id); }
+
+  window.ensureVisitReports = function(){
+    db.visitReports ||= [];
+    saveDb();
+  };
+
+  window.noteTypeText = function(type){
+    return type==='quote'?'طلب عرض سعر':
+      type==='complaint'?'شكوى عميل':
+      type==='price'?'طلب سعر خاص':
+      type==='manager'?'طلب مقابلة المدير':
+      type==='followup'?'موعد متابعة':
+      'ملاحظة عامة';
+  };
+
+  window.noteNeedsAction = function(type){
+    return ['quote','complaint','price','manager','followup'].includes(type);
+  };
+
+  window.renderVisitNoteFilters = function(){
+    if(!window.visitNoteRepFilter) return;
+    const reps = currentUser.role === 'rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    const cur = visitNoteRepFilter.value;
+    visitNoteRepFilter.innerHTML = '<option value="all">كل المناديب</option>' + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+    if(cur) visitNoteRepFilter.value = cur;
+  };
+
+  window.renderVisitNotes = function(){
+    if(!window.visitNotesList) return;
+    ensureVisitReports();
+    renderVisitNoteFilters();
+
+    let reports = currentUser.role === 'rep' ? db.visitReports.filter(r=>r.rep_id===currentUser.id) : db.visitReports;
+    const type = visitNoteTypeFilter.value || 'all';
+    const rep = visitNoteRepFilter.value || 'all';
+    const search = (visitNoteSearch.value || '').trim();
+
+    if(type !== 'all') reports = reports.filter(r=>r.type === type);
+    if(rep !== 'all') reports = reports.filter(r=>r.rep_id === rep);
+    if(search) reports = reports.filter(r => customerName(r.customer_id).includes(search) || String(r.note||'').includes(search));
+
+    visitReportsCount.textContent = reports.length;
+    visitActionCount.textContent = reports.filter(r=>r.needs_action && r.status!=='closed').length;
+    visitQuoteReqCount.textContent = reports.filter(r=>r.type==='quote').length;
+    visitComplaintCount.textContent = reports.filter(r=>r.type==='complaint').length;
+
+    visitNotesList.innerHTML = reports.map(r=>visitNoteCard(r)).join('') || '<div class="panel">لا توجد ملاحظات زيارات</div>';
+  };
+
+  window.visitNoteCard = function(r){
+    return `<div class="visit-note-card">
+      <div class="visit-note-head">
+        <div>
+          <h3>${customerName(r.customer_id)}</h3>
+          <p>المندوب: ${repName(r.rep_id)}<br>التاريخ: ${r.date} · وقت الزيارة: ${r.arrive_time||'-'} - ${r.leave_time||'-'}</p>
+        </div>
+        <span class="note-type ${r.type}">${noteTypeText(r.type)}</span>
+      </div>
+      <div class="visit-note-body">${r.note || '-'}</div>
+      <div class="visit-note-meta">
+        <div><b>الاهتمام بالمنتج:</b><br>${r.product_interest||'-'}</div>
+        <div><b>السعر المطلوب:</b><br>${r.requested_price||'-'}</div>
+        <div><b>موعد المتابعة:</b><br>${r.followup_date||'-'}</div>
+        <div><b>الحالة:</b><br>${r.status==='closed'?'تمت المعالجة':'مفتوحة'}</div>
+      </div>
+      <div class="visit-note-actions">
+        ${r.type==='quote'?`<button class="quote" onclick="createQuoteFromVisit('${r.id}')">إنشاء عرض سعر</button>`:''}
+        ${r.followup_date?`<button class="follow" onclick="appointment('${r.customer_id}')">تحديث الموعد</button>`:''}
+        <button class="done" onclick="closeVisitReport('${r.id}')">تمت المعالجة</button>
+      </div>
+    </div>`;
+  };
+
+  window.openVisitReportForm = function(customerId){
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    modalBody.innerHTML = `<h2>تقرير زيارة: ${c.name}</h2>
+      <div class="form-grid two">
+        <label>نوع الملاحظة
+          <select id="vrType">
+            <option value="general">ملاحظة عامة</option>
+            <option value="quote">طلب عرض سعر</option>
+            <option value="complaint">شكوى عميل</option>
+            <option value="price">طلب سعر خاص</option>
+            <option value="manager">طلب مقابلة المدير</option>
+            <option value="followup">موعد متابعة</option>
+          </select>
+        </label>
+        <label>تاريخ الزيارة<input id="vrDate" type="date" value="${tdy()}"></label>
+        <label>وقت الوصول<input id="vrArrive" type="time"></label>
+        <label>وقت المغادرة<input id="vrLeave" type="time"></label>
+        <label>المنتج الذي يهتم به العميل<input id="vrProduct" placeholder="مثال: أكياس رول / شرنك"></label>
+        <label>السعر الذي طلبه العميل<input id="vrPrice" placeholder="مثال: 8.5 ريال للكيلو"></label>
+        <label>موعد المتابعة القادم<input id="vrFollowup" type="date"></label>
+      </div>
+      <br>
+      <label>ملاحظات الزيارة<textarea id="vrNote" style="width:100%;min-height:110px;border:1px solid #d8dee9;border-radius:14px;padding:12px" placeholder="اكتب تفاصيل الزيارة كاملة..."></textarea></label>
+      <br><button class="primary" type="button" onclick="saveVisitReport('${customerId}')">حفظ تقرير الزيارة</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.saveVisitReport = function(customerId){
+    ensureVisitReports();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    const repId = c.rep_id || currentUser.id;
+    const report = {
+      id: localId(),
+      customer_id: customerId,
+      rep_id: repId,
+      date: vrDate.value || tdy(),
+      arrive_time: vrArrive.value || '',
+      leave_time: vrLeave.value || '',
+      type: vrType.value,
+      note: vrNote.value || '',
+      product_interest: vrProduct.value || '',
+      requested_price: vrPrice.value || '',
+      followup_date: vrFollowup.value || '',
+      needs_action: noteNeedsAction(vrType.value),
+      status: noteNeedsAction(vrType.value) ? 'open' : 'info',
+      created_by: currentUser.name,
+      created_at: new Date().toISOString()
+    };
+    db.visitReports.unshift(report);
+
+    // also register a visit record
+    db.visits ||= [];
+    db.visits.unshift({
+      id: localId(),
+      customer_id: customerId,
+      rep_id: repId,
+      date: report.date,
+      result: noteTypeText(report.type),
+      arrive_time: report.arrive_time,
+      leave_time: report.leave_time,
+      duration: '',
+      notes: report.note
+    });
+
+    if(report.followup_date) c.next_date = report.followup_date;
+    c.notes = [c.notes, report.note].filter(Boolean).join(' | ');
+    saveDb(); closeModal(); renderAll(); alert('تم حفظ تقرير الزيارة وإرساله لمدير المبيعات');
+  };
+
+  window.closeVisitReport = function(id){
+    const r = db.visitReports.find(x=>x.id===id);
+    if(!r) return;
+    r.status = 'closed';
+    r.closed_by = currentUser.name;
+    r.closed_at = tdy();
+    saveDb(); renderVisitNotes();
+  };
+
+  window.createQuoteFromVisit = function(id){
+    const r = db.visitReports.find(x=>x.id===id);
+    if(!r) return;
+    if(typeof openQuoteForm === 'function'){
+      openQuoteForm();
+      setTimeout(()=>{
+        if(window.mqCustomer) mqCustomer.value = r.customer_id;
+        if(window.mqRep) mqRep.value = r.rep_id;
+        if(window.mqProduct && r.product_interest) mqProduct.value = r.product_interest;
+        if(window.mqPriceKg && r.requested_price) mqPriceKg.value = String(r.requested_price).replace(/[^\d.]/g,'');
+        if(window.mqNotes) mqNotes.value = 'تم إنشاء العرض من تقرير زيارة: ' + (r.note || '');
+      }, 300);
+    }
+  };
+
+  // Override visit action to open report form instead of simple visit
+  window.visit = function(customerId){
+    openVisitReportForm(customerId);
+  };
+
+  // Enhance customer cards by replacing the first button behavior through existing visit()
+  // Add a separate visible "تقرير زيارة" button if possible by overriding renderCustomers
+  const oldRenderCustomers = window.renderCustomers;
+  window.renderCustomers = function(){
+    if(typeof oldRenderCustomers === 'function') oldRenderCustomers();
+    // Existing "تمت الزيارة" button now opens report form because visit() is overridden
+  };
+})();

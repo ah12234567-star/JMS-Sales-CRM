@@ -59,6 +59,7 @@
       <button class="nav" data-page="quotes">عروض الأسعار</button>
       <button class="nav" data-page="routes">المسارات</button>
       <button class="nav" data-page="alerts">تنبيهات 30 يوم</button>
+      <button class="nav manager-only" data-page="visitNotes">ملاحظات الزيارات</button>
       <button class="nav admin-only" data-page="users">المستخدمين</button>
       <button class="nav" data-page="profile">حسابي</button>
     </nav>
@@ -248,7 +249,7 @@
           <h2>عروض الأسعار</h2>
           <p>المندوب ينشئ العرض، والمدير يعتمد أو يرفض، وبعد الاعتماد فقط يمكن إرساله للعميل</p>
         </div>
-        <button class="primary small" onclick="openQuoteForm()">إنشاء عرض سعر</button>
+        <button class="primary small" type="button" onclick="openQuoteForm()">إنشاء عرض سعر</button>
       </div>
 
       <div class="stats quote-stats">
@@ -304,6 +305,53 @@
       </div>
       <div id="alertsList"></div>
     </section>
+
+
+    <section id="visitNotes" class="page">
+      <div class="page-head">
+        <h2>ملاحظات وتقارير الزيارات</h2>
+        <p>كل ما يكتبه المندوب أثناء الزيارة يظهر هنا لمدير المبيعات ومدير النظام</p>
+      </div>
+
+      <div class="stats visit-note-stats">
+        <div class="stat"><span>تقارير الزيارات</span><b id="visitReportsCount">0</b><small>تقرير</small></div>
+        <div class="stat danger-card"><span>تحتاج إجراء</span><b id="visitActionCount">0</b><small>ملاحظة</small></div>
+        <div class="stat"><span>طلبات عروض سعر</span><b id="visitQuoteReqCount">0</b><small>طلب</small></div>
+        <div class="stat"><span>شكاوى العملاء</span><b id="visitComplaintCount">0</b><small>شكوى</small></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <b>فلترة ملاحظات الزيارات</b>
+          <span>حسب النوع والمندوب</span>
+        </div>
+        <div class="form-grid four">
+          <label>نوع الملاحظة
+            <select id="visitNoteTypeFilter">
+              <option value="all">كل الأنواع</option>
+              <option value="general">ملاحظة عامة</option>
+              <option value="quote">طلب عرض سعر</option>
+              <option value="complaint">شكوى عميل</option>
+              <option value="price">طلب سعر خاص</option>
+              <option value="manager">طلب مقابلة المدير</option>
+              <option value="followup">موعد متابعة</option>
+            </select>
+          </label>
+          <label>المندوب
+            <select id="visitNoteRepFilter"></select>
+          </label>
+          <label>بحث
+            <input id="visitNoteSearch" placeholder="اسم العميل أو نص الملاحظة">
+          </label>
+          <label>إجراء
+            <button class="primary small" type="button" onclick="renderVisitNotes()">عرض</button>
+          </label>
+        </div>
+      </div>
+
+      <div id="visitNotesList" class="visit-notes-list"></div>
+    </section>
+
 
     <section id="users" class="page">
       <div class="page-head with-action">
