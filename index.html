@@ -36,7 +36,7 @@
       <input id="loginPassword" type="password" value="123456" required>
       <button class="primary full" type="submit">دخول النظام</button>
     </form>
-    <div class="hint">المدير: admin@jms.local / 123456<br>حسابات المناديب تُنشأ من صفحة المستخدمين.</div>
+    <div class="hint">المدير: admin@jms.local / 123456<br>مندوب ياسر: yaser@jms.local / 123456<br>حسابات المناديب تُنشأ من صفحة المستخدمين.</div>
   </div>
 </div>
 
@@ -51,6 +51,7 @@
       <button class="nav-item admin-only" data-tab="users">المستخدمين</button>
       <button class="nav-item" data-tab="visits">الزيارات</button>
       <button class="nav-item" data-tab="orders">الطلبات</button>
+      <button class="nav-item" data-tab="debts">المديونية</button>
       <button class="nav-item" data-tab="alerts">تنبيهات 30 يوم</button>
       <button class="nav-item" data-tab="settings">حالة النظام</button>
     </nav>
@@ -129,6 +130,36 @@
         <button class="primary red" type="submit">حفظ الطلب</button>
       </form></div>
       <div class="panel"><h3>قائمة الطلبات</h3><div id="ordersList" class="table-wrap"></div></div>
+    </section>
+
+
+    <section id="debts" class="page">
+      <div class="debt-header panel">
+        <div>
+          <h3>مديونية المناديب</h3>
+          <p>متابعة أرصدة العملاء حسب المندوب — مستورد من ملف أعمار الديون.</p>
+        </div>
+        <div class="debt-actions">
+          <input id="debtSearch" class="search" placeholder="بحث باسم العميل أو الرمز..." oninput="renderDebts()">
+          <select id="debtRepFilter" onchange="renderDebts()"><option value="">كل المناديب</option></select>
+          <button class="secondary" onclick="exportDebtsCSV()">تصدير المديونية</button>
+        </div>
+      </div>
+
+      <div class="debt-kpis">
+        <div class="stat-card"><span>عدد العملاء</span><strong id="debtCustomerCount">0</strong><small>عميل مديونية</small></div>
+        <div class="stat-card danger-card"><span>إجمالي المديونية</span><strong id="debtTotalBalance">0</strong><small>ريال</small></div>
+        <div class="stat-card"><span>أرصدة موجبة</span><strong id="debtPositiveTotal">0</strong><small>ريال</small></div>
+        <div class="stat-card"><span>أرصدة سالبة</span><strong id="debtNegativeTotal">0</strong><small>ريال</small></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>قائمة المديونية</h3>
+          <span class="pill red-pill" id="debtRepName">ياسر الحسني</span>
+        </div>
+        <div id="debtsList" class="table-wrap"></div>
+      </div>
     </section>
 
     <section id="alerts" class="page"><div class="panel"><div class="panel-head"><h3>العملاء المتأخرون عن الزيارة</h3><button class="secondary" onclick="requestNotifications()">تفعيل إشعارات المتصفح</button></div><div id="alertsList" class="list"></div></div></section>

@@ -18,3 +18,21 @@ body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f6f8;color:#1720
 .specs-card b{font-size:16px;color:#111827}
 .specs-card span{font-size:13px;color:#475569}
 @media(max-width:800px){.grid-4,.grid-3{grid-template-columns:1fr}.plastic-order-fields input,.plastic-order-fields select{font-size:16px}}
+
+
+/* JMS weight calculator */
+.jms-calc-box{margin-top:14px;padding:14px;border:1px solid #dbe3ef;border-radius:16px;background:#f8fafc;box-shadow:0 8px 20px rgba(15,23,42,.05)}
+.jms-calc-box input[readonly]{background:#eef2ff;color:#0f172a;font-weight:800}
+.calc-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff;color:#475569;font-size:14px;line-height:1.7;border:1px dashed #cbd5e1}
+
+
+/* JMS debts aging */
+.debt-header{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.debt-header p{margin:6px 0 0;color:#64748b}
+.debt-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.debt-actions select{border:1px solid #d8dee9;border-radius:12px;padding:10px;background:#fff}
+.debt-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.high-debt-row{background:#fff7ed}
+.credit-row{background:#f0fdf4;color:#166534}
+@media(max-width:900px){.debt-kpis{grid-template-columns:1fr 1fr}.debt-actions{width:100%}.debt-actions .search,.debt-actions select,.debt-actions button{width:100%}}
+@media(max-width:600px){.debt-kpis{grid-template-columns:1fr}}
