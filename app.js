@@ -134,7 +134,7 @@
   function customerStatus(customer) { const d = daysBetween(lastVisit(customer.id)); return d >= 30 ? {t:'متأخر',c:'late',d} : d >= 20 ? {t:'قريب',c:'warn',d} : {t:'منتظم',c:'ok',d}; }
   function orderBadge(status) { return status === 'تم التسليم' ? 'done' : status === 'ملغي' ? 'cancel' : 'new'; }
 
-  async function refreshAll() {
+  window.refreshAll = async function refreshAll() {
     loadLocalData();
     if (supabase) {
       try {
@@ -611,5 +611,283 @@
     document.querySelectorAll('.nav-item').forEach(btn => {
       if(btn.dataset.tab === 'debts') btn.addEventListener('click', () => setTimeout(window.renderDebts, 50));
     });
+  });
+})();
+
+
+
+/* JMS customer debts and actions patch */
+(function(){
+  function byId(id){ return document.getElementById(id); }
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function newId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function money(n){ return Number(String(n || 0).replace(/,/g,'') || 0).toLocaleString('ar-SA'); }
+
+  function getDB(){
+    if(!window.db){
+      try { window.db = JSON.parse(localStorage.getItem('jms_crm_data') || '{}'); } catch { window.db = {}; }
+    }
+    window.db.reps ||= [{id:'rep-yaser', name:'ياسر الحسني', phone:'', email:'yaser@jms.local', status:'نشط'}];
+    window.db.customers ||= [];
+    window.db.visits ||= [];
+    window.db.orders ||= [];
+    window.db.debts ||= [];
+    window.db.appointments ||= [];
+    window.db.notes ||= [];
+    window.db.collections ||= [];
+    return window.db;
+  }
+
+  function saveDB(){
+    localStorage.setItem('jms_crm_data', JSON.stringify(getDB()));
+  }
+
+  function normalizeName(s){
+    return String(s || '').trim().replace(/\s+/g,' ');
+  }
+
+  function ensureYaserRep(){
+    const db = getDB();
+    let rep = db.reps.find(r => String(r.name || '').includes('ياسر') || r.email === 'yaser@jms.local');
+    if(!rep){
+      rep = {id:'rep-yaser', name:'ياسر الحسني', phone:'', email:'yaser@jms.local', status:'نشط'};
+      db.reps.unshift(rep);
+    }
+    return rep.id;
+  }
+
+  function debtAmount(d){
+    return Number(d.balance || d.amount || d.debt || d.total || d.remaining || d['الرصيد'] || d['المديونية'] || d['المبلغ'] || 0) || 0;
+  }
+
+  function debtCustomerName(d){
+    return normalizeName(d.customer_name || d.customer || d.name || d.client || d['العميل'] || d['اسم العميل'] || d['Customer'] || '');
+  }
+
+  function migrateDebtsToCustomers(){
+    const db = getDB();
+    const repId = ensureYaserRep();
+
+    // If previous version stored imported debts in any known key, use them.
+    const sources = [];
+    ['debts','debtRows','yaserDebts','importedDebts'].forEach(k=>{
+      if(Array.isArray(db[k])) sources.push(...db[k]);
+    });
+
+    sources.forEach((d, idx)=>{
+      const name = debtCustomerName(d) || `عميل مديونية ${idx+1}`;
+      let c = db.customers.find(x => normalizeName(x.name) === name);
+      const amount = debtAmount(d);
+      if(!c){
+        c = {
+          id: d.customer_id || `cust-debt-${idx}-${name.slice(0,10).replace(/\s/g,'-')}`,
+          name,
+          phone: d.phone || d.mobile || d['الجوال'] || '',
+          city: d.city || d['المدينة'] || '',
+          activity: d.activity || 'عميل مديونية',
+          location: d.location || '',
+          rep_id: repId,
+          notes: d.notes || d['ملاحظات'] || '',
+          debt_balance: amount,
+          debt_age: d.age || d.days || d['عمر الدين'] || '',
+          source: 'ملف مديونية ياسر'
+        };
+        db.customers.push(c);
+      } else {
+        c.rep_id ||= repId;
+        c.debt_balance = Number(c.debt_balance || 0) || amount;
+        c.source ||= 'ملف مديونية ياسر';
+      }
+    });
+
+    saveDB();
+  }
+
+  function repName(id){
+    const db = getDB();
+    return db.reps.find(r=>r.id===id)?.name || '-';
+  }
+
+  function lastVisit(customerId){
+    const db = getDB();
+    return db.visits.filter(v=>v.customer_id===customerId).sort((a,b)=>String(b.visit_date).localeCompare(String(a.visit_date)))[0]?.visit_date || '';
+  }
+
+  function daysFrom(date){
+    if(!date) return null;
+    return Math.floor((new Date(todayISO()+"T00:00:00") - new Date(date+"T00:00:00")) / 86400000);
+  }
+
+  function followStatus(c){
+    const lv = lastVisit(c.id);
+    const d = daysFrom(lv);
+    if(d === null) return {text:'لم تتم زيارة', cls:'late'};
+    if(d >= 30) return {text:`متأخر ${d} يوم`, cls:'late'};
+    if(d >= 20) return {text:`قريب ${d} يوم`, cls:'warn'};
+    return {text:`منتظم ${d} يوم`, cls:'ok'};
+  }
+
+  function actionVisit(customerId){
+    const db = getDB();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    db.visits.unshift({
+      id:newId(),
+      customer_id:customerId,
+      rep_id:c.rep_id || ensureYaserRep(),
+      visit_date:todayISO(),
+      status:'تمت الزيارة',
+      location:'',
+      notes:'زيارة ميدانية'
+    });
+    saveDB();
+    alert('تم تسجيل الزيارة');
+    renderCustomersPro();
+  }
+
+  function actionAppointment(customerId){
+    const db = getDB();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    const date = prompt('اكتب موعد المتابعة بصيغة YYYY-MM-DD', todayISO());
+    if(!date) return;
+    const note = prompt('ملاحظة الموعد', 'متابعة العميل');
+    db.appointments.unshift({id:newId(), customer_id:customerId, rep_id:c.rep_id || ensureYaserRep(), date, note: note || ''});
+    c.next_appointment = date;
+    c.follow_note = note || '';
+    saveDB();
+    alert('تم حفظ الموعد');
+    renderCustomersPro();
+  }
+
+  function actionNote(customerId){
+    const db = getDB();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    const note = prompt('اكتب ملاحظة على العميل');
+    if(!note) return;
+    db.notes.unshift({id:newId(), customer_id:customerId, rep_id:c.rep_id || ensureYaserRep(), date:todayISO(), note});
+    c.notes = [c.notes, note].filter(Boolean).join(' | ');
+    saveDB();
+    alert('تم حفظ الملاحظة');
+    renderCustomersPro();
+  }
+
+  function actionCollection(customerId){
+    const db = getDB();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    const amount = Number(prompt('كم مبلغ التحصيل؟', '0') || 0);
+    if(!amount) return;
+    db.collections.unshift({id:newId(), customer_id:customerId, rep_id:c.rep_id || ensureYaserRep(), date:todayISO(), amount});
+    c.debt_balance = Math.max(0, Number(c.debt_balance || 0) - amount);
+    saveDB();
+    alert('تم تسجيل التحصيل وتحديث المديونية');
+    renderCustomersPro();
+  }
+
+  function actionNewOrder(customerId){
+    // Try to jump to order form and preselect customer
+    const db = getDB();
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!c) return;
+    if(typeof window.goTab === 'function') window.goTab('orders');
+    setTimeout(()=>{
+      const sel = byId('orderCustomer');
+      if(sel) sel.value = customerId;
+      const rep = byId('orderRep');
+      if(rep) rep.value = c.rep_id || ensureYaserRep();
+    },300);
+    alert('تم فتح نموذج طلب جديد لهذا العميل');
+  }
+
+  window.jmsCustomerAction = function(type, customerId){
+    if(type==='visit') return actionVisit(customerId);
+    if(type==='order') return actionNewOrder(customerId);
+    if(type==='appointment') return actionAppointment(customerId);
+    if(type==='note') return actionNote(customerId);
+    if(type==='collection') return actionCollection(customerId);
+  };
+
+  function customerCard(c){
+    const st = followStatus(c);
+    const debt = Number(c.debt_balance || 0);
+    return `
+      <div class="customer-pro-card">
+        <div class="customer-pro-head">
+          <div>
+            <h3>${c.name || '-'}</h3>
+            <p>${c.phone || '-'} · ${c.city || '-'} · ${repName(c.rep_id)}</p>
+          </div>
+          <span class="badge ${st.cls}">${st.text}</span>
+        </div>
+
+        <div class="customer-pro-metrics">
+          <div><b>${money(debt)}</b><span>مديونية</span></div>
+          <div><b>${lastVisit(c.id) || '-'}</b><span>آخر زيارة</span></div>
+          <div><b>${c.next_appointment || '-'}</b><span>الموعد القادم</span></div>
+        </div>
+
+        <div class="customer-pro-note">${c.notes || c.follow_note || 'لا توجد ملاحظات'}</div>
+
+        <div class="customer-pro-actions">
+          <button onclick="jmsCustomerAction('visit','${c.id}')">تمت الزيارة</button>
+          <button onclick="jmsCustomerAction('order','${c.id}')">طلب جديد</button>
+          <button onclick="jmsCustomerAction('appointment','${c.id}')">موعد</button>
+          <button onclick="jmsCustomerAction('collection','${c.id}')">تحصيل</button>
+          <button onclick="jmsCustomerAction('note','${c.id}')">ملاحظة</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCustomersPro(){
+    migrateDebtsToCustomers();
+    const db = getDB();
+    const list = byId('customersList') || byId('customersTable') || document.querySelector('#customers .table-wrap') || document.querySelector('#customers');
+    if(!list) return;
+
+    const q = (byId('customerSearch')?.value || '').trim();
+    const customers = db.customers.filter(c => !q || String(c.name||'').includes(q) || String(c.phone||'').includes(q) || String(c.city||'').includes(q));
+
+    list.innerHTML = `
+      <div class="customers-pro-toolbar">
+        <div>
+          <h2>العملاء والمتابعة</h2>
+          <p>كل عملاء المديونية يظهرون هنا مع إجراءات المتابعة.</p>
+        </div>
+        <div class="customers-pro-total">
+          <b>${money(customers.reduce((s,c)=>s+(Number(c.debt_balance||0)||0),0))}</b>
+          <span>إجمالي المديونية</span>
+        </div>
+      </div>
+      <div class="customers-pro-grid">
+        ${customers.map(customerCard).join('') || '<div class="list-item">لا يوجد عملاء</div>'}
+      </div>
+    `;
+  }
+
+  const originalRefresh = window.refreshAll;
+  if(typeof originalRefresh === 'function'){
+    window.refreshAll = async function(){
+      const res = await originalRefresh.apply(this, arguments);
+      migrateDebtsToCustomers();
+      renderCustomersPro();
+      return res;
+    }
+  }
+
+  const originalRenderCustomers = window.renderCustomers;
+  if(typeof originalRenderCustomers === 'function'){
+    window.renderCustomers = function(){
+      migrateDebtsToCustomers();
+      renderCustomersPro();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    migrateDebtsToCustomers();
+    setTimeout(renderCustomersPro, 500);
+    setTimeout(renderCustomersPro, 1500);
   });
 })();
