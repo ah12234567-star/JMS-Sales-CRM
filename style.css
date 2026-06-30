@@ -99,3 +99,207 @@
 .visit-report-box{border:2px solid #e5e7eb;border-radius:16px;padding:14px;margin-top:14px;background:#fff}
 .visit-report-box h3{margin:0 0 12px}
 @media(max-width:900px){.visit-note-stats{grid-template-columns:1fr 1fr}.visit-note-meta{grid-template-columns:1fr}}
+
+
+/* Professional quotation print layout */
+.quote-print-pro{
+  background:#fff;
+  color:#0f172a;
+  width:900px;
+  max-width:100%;
+  margin:auto;
+  padding:0;
+  border-radius:18px;
+  overflow:hidden;
+  direction:rtl;
+}
+.quote-doc{
+  padding:34px;
+  background:#fff;
+}
+.quote-doc-header{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:24px;
+  align-items:center;
+  border-bottom:4px solid #111827;
+  padding-bottom:18px;
+}
+.quote-company{
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+.quote-company img{
+  width:76px;
+  height:76px;
+  border-radius:18px;
+  background:#111827;
+}
+.quote-company h1{
+  margin:0;
+  font-size:28px;
+  color:#111827;
+}
+.quote-company p{
+  margin:6px 0 0;
+  color:#64748b;
+}
+.quote-title-box{
+  text-align:left;
+  min-width:190px;
+}
+.quote-title-box h2{
+  margin:0 0 10px;
+  font-size:38px;
+  color:#b91c1c;
+}
+.quote-title-box div{
+  color:#334155;
+  line-height:1.9;
+  font-weight:700;
+}
+.quote-info-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin:22px 0;
+}
+.quote-info-card{
+  border:1px solid #e5e7eb;
+  border-radius:18px;
+  padding:16px;
+  background:#f8fafc;
+}
+.quote-info-card h3{
+  margin:0 0 12px;
+  font-size:18px;
+  color:#111827;
+}
+.quote-info-card p{
+  margin:0;
+  line-height:2;
+  color:#334155;
+}
+.quote-products-table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  margin-top:18px;
+  overflow:hidden;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+}
+.quote-products-table th{
+  background:#111827;
+  color:#fff;
+  padding:12px 8px;
+  font-size:13px;
+  text-align:center;
+}
+.quote-products-table td{
+  padding:12px 8px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:center;
+  font-size:13px;
+}
+.quote-products-table tr:last-child td{
+  border-bottom:0;
+}
+.quote-summary{
+  display:grid;
+  grid-template-columns:1fr 320px;
+  gap:18px;
+  margin-top:20px;
+}
+.quote-terms{
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:16px;
+  background:#fff;
+}
+.quote-terms h3{
+  margin:0 0 10px;
+}
+.quote-terms ul{
+  margin:0;
+  padding-right:20px;
+  color:#334155;
+  line-height:2;
+}
+.quote-totals{
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  overflow:hidden;
+}
+.quote-total-row{
+  display:flex;
+  justify-content:space-between;
+  padding:13px 16px;
+  border-bottom:1px solid #e5e7eb;
+  background:#f8fafc;
+}
+.quote-total-row.final{
+  background:#111827;
+  color:#fff;
+  font-size:18px;
+  font-weight:900;
+}
+.quote-footer{
+  display:grid;
+  grid-template-columns:1fr 1fr 140px;
+  gap:16px;
+  margin-top:28px;
+  align-items:end;
+}
+.quote-sign{
+  border-top:2px solid #111827;
+  padding-top:10px;
+  text-align:center;
+  color:#334155;
+  font-weight:800;
+}
+.quote-qr{
+  border:1px dashed #94a3b8;
+  border-radius:14px;
+  height:120px;
+  display:grid;
+  place-items:center;
+  color:#64748b;
+  font-size:13px;
+  text-align:center;
+}
+.quote-actions-print{
+  display:flex;
+  gap:10px;
+  padding:16px;
+  background:#f8fafc;
+  border-top:1px solid #e5e7eb;
+  flex-wrap:wrap;
+}
+.quote-actions-print button{
+  border:0;
+  border-radius:12px;
+  padding:11px 14px;
+  background:#111827;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+}
+.quote-actions-print .whatsapp{background:#166534}
+.quote-actions-print .close{background:#64748b}
+@media print{
+  body *{visibility:hidden!important}
+  .quote-print-pro,.quote-print-pro *{visibility:visible!important}
+  .quote-print-pro{position:absolute;inset:0;width:100%;border-radius:0}
+  .quote-actions-print{display:none!important}
+  .modal{position:absolute!important;inset:0!important;background:#fff!important;padding:0!important}
+  .modal-card{width:100%!important;max-width:100%!important;border-radius:0!important;padding:0!important;box-shadow:none!important}
+  .modal-close{display:none!important}
+}
+@media(max-width:900px){
+  .quote-doc{padding:18px}
+  .quote-doc-header,.quote-info-grid,.quote-summary,.quote-footer{grid-template-columns:1fr}
+  .quote-title-box{text-align:right}
+  .quote-products-table{font-size:12px}
+}

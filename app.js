@@ -893,3 +893,162 @@ function convertQuoteToOrder(qid){
     // Existing "تمت الزيارة" button now opens report form because visit() is overridden
   };
 })();
+
+
+
+/* Professional quotation document override */
+(function(){
+  function num(n){ return Number(n||0); }
+  function fmt(n){ return num(n).toLocaleString('ar-SA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function customerObj(id){ return (db.customers||[]).find(c=>c.id===id) || {}; }
+  function vatAmount(total){ return total * 0.15; }
+
+  window.viewQuote = function(qid){
+    const q = (db.quotes||[]).find(x=>x.id===qid);
+    if(!q) return;
+
+    const c = customerObj(q.customer_id);
+    const subtotal = num(q.total_amount);
+    const vat = vatAmount(subtotal);
+    const grand = subtotal + vat;
+    const verifyText = `JMS-${q.quote_no}`;
+
+    modalBody.innerHTML = `
+      <div class="quote-print-pro">
+        <div class="quote-doc">
+          <div class="quote-doc-header">
+            <div class="quote-company">
+              <img src="assets/jms-logo.svg" alt="JMS">
+              <div>
+                <h1>شركة جدة النموذجية للصناعة</h1>
+                <p>Jeddah Model Industrial Company</p>
+                <p>عروض أسعار المنتجات البلاستيكية والتغليف</p>
+              </div>
+            </div>
+            <div class="quote-title-box">
+              <h2>عرض سعر</h2>
+              <div>رقم العرض: ${q.quote_no}</div>
+              <div>تاريخ الإصدار: ${q.date || '-'}</div>
+              <div>صالح حتى: ${q.valid_until || '-'}</div>
+            </div>
+          </div>
+
+          <div class="quote-info-grid">
+            <div class="quote-info-card">
+              <h3>بيانات العميل</h3>
+              <p>
+                <b>اسم العميل:</b> ${customerName(q.customer_id)}<br>
+                <b>الجوال:</b> ${c.phone || '-'}<br>
+                <b>المدينة:</b> ${c.city || '-'}<br>
+                <b>العنوان:</b> ${c.location || c.district || '-'}
+              </p>
+            </div>
+            <div class="quote-info-card">
+              <h3>بيانات العرض</h3>
+              <p>
+                <b>المندوب:</b> ${repName(q.rep_id)}<br>
+                <b>الحالة:</b> ${quoteStatusText(q.status)}<br>
+                <b>شروط الدفع:</b> ${q.payment_terms || '-'}<br>
+                <b>مدة التسليم:</b> ${q.delivery_terms || '-'}
+              </p>
+            </div>
+          </div>
+
+          <table class="quote-products-table">
+            <thead>
+              <tr>
+                <th>المنتج</th>
+                <th>المقاس</th>
+                <th>السماكة</th>
+                <th>اللون</th>
+                <th>الخامة</th>
+                <th>وزن الحبة</th>
+                <th>عدد الحبات</th>
+                <th>الكمية كجم</th>
+                <th>سعر الكيلو</th>
+                <th>الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${q.product || '-'}</td>
+                <td>${q.width || '-'} × ${q.length || '-'} ${q.size_unit || ''}</td>
+                <td>${q.thickness || '-'} ${q.thickness_unit || ''}</td>
+                <td>${q.color || '-'}</td>
+                <td>${q.material || '-'}</td>
+                <td>${q.piece_weight || '-'}</td>
+                <td>${q.pieces || '-'}</td>
+                <td>${q.total_kg || '-'}</td>
+                <td>${q.price_kg || '-'} ريال</td>
+                <td>${fmt(subtotal)} ريال</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="quote-summary">
+            <div class="quote-terms">
+              <h3>الشروط والملاحظات</h3>
+              <ul>
+                <li>الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
+                <li>مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
+                <li>مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
+                <li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
+                <li>${q.notes || 'لا توجد ملاحظات إضافية.'}</li>
+              </ul>
+            </div>
+            <div class="quote-totals">
+              <div class="quote-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div>
+              <div class="quote-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div>
+              <div class="quote-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div>
+            </div>
+          </div>
+
+          <div class="quote-footer">
+            <div class="quote-sign">اعتماد مدير المبيعات</div>
+            <div class="quote-sign">ختم الشركة</div>
+            <div class="quote-qr">
+              رمز التحقق<br>
+              ${verifyText}<br>
+              QR
+            </div>
+          </div>
+        </div>
+
+        <div class="quote-actions-print">
+          <button onclick="window.print()">طباعة / حفظ PDF</button>
+          <button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>
+          <button onclick="convertQuoteToOrder('${q.id}')">تحويل إلى طلب</button>
+          <button class="close" onclick="closeModal()">إغلاق</button>
+        </div>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  };
+
+  window.sendQuote = function(qid){
+    const q = (db.quotes||[]).find(x=>x.id===qid);
+    if(!q) return;
+    if(q.status !== 'approved' && q.status !== 'sent'){
+      alert('لا يمكن إرسال العرض قبل اعتماد المدير');
+      return;
+    }
+    q.status = 'sent';
+    q.sent_at = (typeof today==='function') ? today() : new Date().toISOString().slice(0,10);
+    if(typeof save === 'function') save();
+    if(typeof renderQuotes === 'function') renderQuotes();
+
+    const subtotal = num(q.total_amount);
+    const grand = subtotal + vatAmount(subtotal);
+    const msg =
+      `عرض سعر من شركة جدة النموذجية للصناعة%0A`+
+      `رقم العرض: ${q.quote_no}%0A`+
+      `العميل: ${customerName(q.customer_id)}%0A`+
+      `المنتج: ${q.product}%0A`+
+      `المقاس: ${q.width} × ${q.length} ${q.size_unit}%0A`+
+      `السماكة: ${q.thickness} ${q.thickness_unit}%0A`+
+      `الخامة: ${q.material}%0A`+
+      `الكمية: ${q.total_kg} كجم%0A`+
+      `الإجمالي شامل الضريبة: ${fmt(grand)} ريال`;
+    window.open(`https://wa.me/?text=${msg}`,'_blank');
+  };
+})();
