@@ -1052,3 +1052,295 @@ function convertQuoteToOrder(qid){
     window.open(`https://wa.me/?text=${msg}`,'_blank');
   };
 })();
+
+
+
+/* Searchable customer picker override */
+(function(){
+  function localId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function saveDb(){ if(typeof save === 'function') save(); }
+  function allowedCs(){ return (typeof allowedCustomers === 'function') ? allowedCustomers() : (db.customers||[]); }
+  function safeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  window.renderQuoteCustomerSearch = function(){
+    if(!window.mqCustomerSearchResults || !window.mqCustomerSearch) return;
+    const q = (mqCustomerSearch.value || '').trim();
+    const list = allowedCs().filter(c=>{
+      const txt = `${c.name||''} ${c.phone||''} ${c.city||''} ${c.district||''}`;
+      return !q || txt.includes(q);
+    }).slice(0,80);
+
+    mqCustomerSearchResults.innerHTML = list.map(c=>`
+      <button type="button" onclick="selectQuoteCustomer('${c.id}')">
+        ${safeHtml(c.name)}
+        <small>${safeHtml(c.phone || '-')} · ${safeHtml(c.city || '-')} · ${safeHtml(repName(c.rep_id))}</small>
+      </button>
+    `).join('') || `<button type="button" disabled>لا يوجد عميل بهذا الاسم</button>`;
+
+    mqCustomerSearchResults.classList.add('active');
+  };
+
+  window.selectQuoteCustomer = function(customerId){
+    const c = (db.customers||[]).find(x=>x.id===customerId);
+    if(!c) return;
+    mqCustomer.value = customerId;
+    mqCustomerSearch.value = c.name;
+    selectedQuoteCustomer.textContent = 'تم اختيار العميل: ' + c.name;
+    selectedQuoteCustomer.classList.add('active');
+    mqCustomerSearchResults.classList.remove('active');
+    if(window.mqRep && c.rep_id) mqRep.value = c.rep_id;
+  };
+
+  const previousOpenQuoteForm = window.openQuoteForm;
+  window.openQuoteForm = function(){
+    if(typeof ensureQuotes === 'function') ensureQuotes();
+    const cs = allowedCs();
+    const reps = currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+    const defaultRep=currentUser.role==='rep'?currentUser.id:(reps[0]?.id||'');
+
+    modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+      <div class="quote-customer-mode">
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+      </div>
+
+      <div id="existingCustomerBox" class="form-grid two">
+        <label>بحث باسم العميل
+          <div class="customer-search-picker">
+            <input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()">
+            <div id="mqCustomerSearchResults" class="customer-search-results"></div>
+            <div id="selectedQuoteCustomer" class="selected-customer-pill"></div>
+          </div>
+          <input id="mqCustomer" type="hidden" value="">
+        </label>
+        <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
+      </div>
+
+      <div id="newCustomerBox" class="form-grid two hidden">
+        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
+        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
+        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+      </div>
+
+      <div class="form-grid two"><label>تاريخ العرض<input id="mqDate" type="date" value="${tdy()}"></label><label>صلاحية العرض<input id="mqValid" type="date"></label></div>
+      <div class="form-grid four">
+        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
+        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
+        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
+        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+      </div>
+      <div class="form-grid four">
+        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
+        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+      </div>
+      <div class="form-grid four">
+        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
+        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
+        <label>الإجمالي<input id="mqTotal" readonly></label>
+      </div>
+      <div class="form-grid two"><label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label><label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label><label>وزن الحبة<input id="mqPiece" readonly></label><label>عدد الحبات<input id="mqPieces" readonly></label></div>
+      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
+      <br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+
+    modal.classList.remove('hidden');
+
+    ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{
+      const el=document.getElementById(x);
+      if(el){ el.addEventListener('input',calcQuoteForm); el.addEventListener('change',calcQuoteForm); }
+    });
+
+    // select first customer only if user doesn't search
+    if(cs[0]) {
+      mqCustomer.value = cs[0].id;
+      selectedQuoteCustomer.textContent = 'العميل الافتراضي: ' + cs[0].name;
+      selectedQuoteCustomer.classList.add('active');
+    }
+
+    if(typeof calcQuoteForm === 'function') calcQuoteForm();
+
+    document.addEventListener('click', function closePicker(e){
+      if(!document.getElementById('existingCustomerBox')) {
+        document.removeEventListener('click', closePicker);
+        return;
+      }
+      const box = document.querySelector('.customer-search-picker');
+      if(box && !box.contains(e.target) && window.mqCustomerSearchResults){
+        mqCustomerSearchResults.classList.remove('active');
+      }
+    });
+  };
+
+  window.saveQuote = function(){
+    if(typeof ensureQuotes === 'function') ensureQuotes();
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    let customerId='';
+    let repId=(window.mqRep && mqRep.value) ? mqRep.value : currentUser.id;
+
+    if(mode==='new'){
+      const name=(mqNewCustomerName.value||'').trim();
+      if(!name) return alert('اكتب اسم العميل الجديد');
+      const newCustomer={id:localId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من عرض سعر'};
+      db.customers.unshift(newCustomer);
+      customerId=newCustomer.id;
+    }else{
+      customerId=mqCustomer.value;
+      if(!customerId) return alert('اكتب اسم العميل واختره من نتائج البحث');
+    }
+
+    const no='Q-'+String((db.quotes||[]).length+1).padStart(5,'0');
+    db.quotes ||= [];
+    db.quotes.unshift({
+      id:localId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||tdy(),valid_until:mqValid.value,
+      product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
+      width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
+      total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
+      payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser.name,created_at:new Date().toISOString()
+    });
+    saveDb();
+    closeModal();
+    renderAll();
+    alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+  };
+})();
+
+
+
+/* Final quotation logo and PDF action override */
+(function(){
+  function num(n){ return Number(n||0); }
+  function fmt(n){ return num(n).toLocaleString('ar-SA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function customerObj(id){ return (db.customers||[]).find(c=>c.id===id) || {}; }
+  function vatAmount(total){ return total * 0.15; }
+
+  window.downloadQuotePDF = function(){
+    window.print();
+  };
+
+  window.viewQuote = function(qid){
+    const q = (db.quotes||[]).find(x=>x.id===qid);
+    if(!q) return;
+
+    const c = customerObj(q.customer_id);
+    const subtotal = num(q.total_amount);
+    const vat = vatAmount(subtotal);
+    const grand = subtotal + vat;
+    const verifyText = `JMS-${q.quote_no}`;
+
+    modalBody.innerHTML = `
+      <div class="quote-print-pro">
+        <div class="quote-doc">
+          <div class="quote-doc-header">
+            <div class="quote-company">
+              <img class="jms-real-logo" src="assets/jeddah-model-logo.jpeg" alt="Jeddah Model Industrial Co. Ltd">
+              <div>
+                <h1>شركة جدة النموذجية للصناعة</h1>
+                <p>Jeddah Model Industrial Co. Ltd</p>
+                <p>عروض أسعار المنتجات البلاستيكية والتغليف</p>
+              </div>
+            </div>
+            <div class="quote-title-box">
+              <h2>عرض سعر</h2>
+              <div>رقم العرض: ${q.quote_no}</div>
+              <div>تاريخ الإصدار: ${q.date || '-'}</div>
+              <div>صالح حتى: ${q.valid_until || '-'}</div>
+            </div>
+          </div>
+
+          <div class="quote-info-grid">
+            <div class="quote-info-card">
+              <h3>بيانات العميل</h3>
+              <p>
+                <b>اسم العميل:</b> ${customerName(q.customer_id)}<br>
+                <b>الجوال:</b> ${c.phone || '-'}<br>
+                <b>المدينة:</b> ${c.city || '-'}<br>
+                <b>العنوان:</b> ${c.location || c.district || '-'}
+              </p>
+            </div>
+            <div class="quote-info-card">
+              <h3>بيانات العرض</h3>
+              <p>
+                <b>المندوب:</b> ${repName(q.rep_id)}<br>
+                <b>الحالة:</b> ${quoteStatusText(q.status)}<br>
+                <b>شروط الدفع:</b> ${q.payment_terms || '-'}<br>
+                <b>مدة التسليم:</b> ${q.delivery_terms || '-'}
+              </p>
+            </div>
+          </div>
+
+          <table class="quote-products-table">
+            <thead>
+              <tr>
+                <th>المنتج</th>
+                <th>المقاس</th>
+                <th>السماكة</th>
+                <th>اللون</th>
+                <th>الخامة</th>
+                <th>وزن الحبة</th>
+                <th>عدد الحبات</th>
+                <th>الكمية كجم</th>
+                <th>سعر الكيلو</th>
+                <th>الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${q.product || '-'}</td>
+                <td>${q.width || '-'} × ${q.length || '-'} ${q.size_unit || ''}</td>
+                <td>${q.thickness || '-'} ${q.thickness_unit || ''}</td>
+                <td>${q.color || '-'}</td>
+                <td>${q.material || '-'}</td>
+                <td>${q.piece_weight || '-'}</td>
+                <td>${q.pieces || '-'}</td>
+                <td>${q.total_kg || '-'}</td>
+                <td>${q.price_kg || '-'} ريال</td>
+                <td>${fmt(subtotal)} ريال</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="quote-summary">
+            <div class="quote-terms">
+              <h3>الشروط والملاحظات</h3>
+              <ul>
+                <li>الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
+                <li>مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
+                <li>مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
+                <li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
+                <li>${q.notes || 'لا توجد ملاحظات إضافية.'}</li>
+              </ul>
+            </div>
+            <div class="quote-totals">
+              <div class="quote-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div>
+              <div class="quote-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div>
+              <div class="quote-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div>
+            </div>
+          </div>
+
+          <div class="quote-footer">
+            <div class="quote-sign">اعتماد مدير المبيعات</div>
+            <div class="quote-sign">ختم الشركة</div>
+            <div class="quote-qr">
+              رمز التحقق<br>
+              ${verifyText}<br>
+              QR
+            </div>
+          </div>
+        </div>
+
+        <div class="quote-actions-print">
+          <button class="pdf" onclick="downloadQuotePDF()">تحميل PDF</button>
+          <button onclick="window.print()">طباعة</button>
+          <button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>
+          <button onclick="convertQuoteToOrder('${q.id}')">تحويل إلى طلب</button>
+          <button class="close" onclick="closeModal()">إغلاق</button>
+        </div>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  };
+})();
