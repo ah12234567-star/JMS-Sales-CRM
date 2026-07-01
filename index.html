@@ -54,7 +54,8 @@
 
     <nav>
       <button class="nav active" data-page="dashboard">لوحة التحكم</button>
-      <button class="nav" data-page="customers">العملاء</button>
+      <button class="nav manager-only" data-page="repsControl">المناديب</button>
+        <button class="nav" data-page="customers">العملاء</button>
       <button class="nav" data-page="visits">الزيارات</button>
       <button class="nav" data-page="orders">طلبات التصنيع</button>
       <button class="nav" data-page="quotes">عروض الأسعار</button>
@@ -95,7 +96,56 @@
       </div>
     </section>
 
-    <section id="customers" class="page">
+    
+      <section id="repsControl" class="page">
+        <div class="page-head with-action">
+          <div>
+            <h1>إدارة المناديب</h1>
+            <p>حضور المناديب، حالة الدوام، آخر موقع، والزيارات اليومية</p>
+          </div>
+          <div class="head-actions">
+            <button class="primary" onclick="openRepForm()">إضافة مندوب</button>
+            <button class="primary secondary" onclick="renderRepsControl()">تحديث</button>
+          </div>
+        </div>
+
+        <div class="stats reps-stats">
+          <div class="stat"><span>عدد المناديب</span><b id="repsTotal">0</b><small>مندوب</small></div>
+          <div class="stat"><span>على الدوام</span><b id="repsOnDuty">0</b><small>مندوب</small></div>
+          <div class="stat"><span>في زيارة</span><b id="repsInVisit">0</b><small>مندوب</small></div>
+          <div class="stat danger-card"><span>خارج الدوام</span><b id="repsOffDuty">0</b><small>مندوب</small></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <b>لوحة المناديب</b>
+            <span>متابعة مباشرة حسب آخر تحديث</span>
+          </div>
+          <div class="form-grid four">
+            <label>بحث
+              <input id="repSearch" placeholder="اسم المندوب أو المنطقة" oninput="renderRepsControl()">
+            </label>
+            <label>الحالة
+              <select id="repStatusFilter" onchange="renderRepsControl()">
+                <option value="all">كل الحالات</option>
+                <option value="on_duty">على الدوام</option>
+                <option value="in_visit">في زيارة</option>
+                <option value="off_duty">خارج الدوام</option>
+              </select>
+            </label>
+            <label>المنطقة
+              <input id="repAreaFilter" placeholder="مثال: جدة" oninput="renderRepsControl()">
+            </label>
+            <label>إجراء
+              <button class="primary small" type="button" onclick="renderRepsControl()">عرض</button>
+            </label>
+          </div>
+        </div>
+
+        <div id="repsControlGrid" class="reps-control-grid"></div>
+      </section>
+
+      <section id="customers" class="page">
       <div class="page-head with-action">
         <div><h2>العملاء</h2><p>بطاقة العميل، آخر زيارة، المندوب، وخيارات المتابعة</p></div>
         <button class="primary small" onclick="openCustomerForm()">إضافة عميل</button>

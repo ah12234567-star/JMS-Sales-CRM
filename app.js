@@ -2465,3 +2465,263 @@ function convertQuoteToOrder(qid){
   window.sendQuote = function(qid){ const q=db.quotes.find(x=>x.id===qid); if(!q) return; const missing = ['customer_id','product','width','length','thickness','material','total_kg','price_kg','piece_weight','pieces','total_amount'].some(k=>!q[k] || Number(q[k])===0); if(missing) return alert('لا يمكن إرسال عرض ناقص. اضغط تعديل وعبئ الخانات الأساسية.'); if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن الإرسال قبل اعتماد المدير'); if(typeof oldSend==='function') oldSend(qid); };
   setTimeout(()=>{ if(window.quotesList) renderQuotes(); }, 300);
 })();
+
+
+
+/* CRM 3.0 Representatives Phase 1 */
+(function(){
+  function ensureRepData(){
+    db.reps ||= [];
+    db.users ||= [];
+    db.repAttendance ||= [];
+    db.repLocations ||= [];
+    db.repTargets ||= [];
+    db.repStatus ||= {};
+    db.visits ||= [];
+    db.quotes ||= [];
+    db.orders ||= [];
+  }
+  function rid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function nowIso(){ return new Date().toISOString(); }
+  function timeOnly(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
+  function roleIsManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function repObj(repId){ return db.reps.find(r=>r.id===repId) || db.users.find(u=>u.id===repId) || {}; }
+  function statusText(s){ return s==='on_duty'?'على الدوام':s==='in_visit'?'في زيارة':'خارج الدوام'; }
+  function todayVisits(repId){ return db.visits.filter(v=>v.rep_id===repId && String(v.date||v.visit_date||'').startsWith(tdy())).length; }
+  function todayQuotes(repId){ return (db.quotes||[]).filter(q=>q.rep_id===repId && String(q.date||q.quote_date||q.created_at||'').startsWith(tdy())).length; }
+  function todayOrders(repId){ return (db.orders||[]).filter(o=>o.rep_id===repId && String(o.date||o.order_date||'').startsWith(tdy())).length; }
+  function currentAttendance(repId){
+    return (db.repAttendance||[]).find(a=>a.rep_id===repId && a.date===tdy() && !a.end_at);
+  }
+  function lastLocation(repId){
+    return (db.repLocations||[]).filter(x=>x.rep_id===repId).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
+  }
+  function setRepStatus(repId,status){
+    db.repStatus ||= {};
+    db.repStatus[repId] = {status, updated_at: nowIso()};
+  }
+  function getRepStatus(repId){
+    const s = db.repStatus?.[repId]?.status;
+    if(s) return s;
+    return currentAttendance(repId) ? 'on_duty' : 'off_duty';
+  }
+  function saveAndRender(){
+    if(typeof save === 'function') save();
+    if(typeof renderAll === 'function') renderAll();
+  }
+  function getGeo(callback){
+    if(!navigator.geolocation){
+      callback(null, 'المتصفح لا يدعم تحديد الموقع');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => callback({lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy}, null),
+      err => callback(null, 'لم يتم السماح بتحديد الموقع أو حدث خطأ'),
+      {enableHighAccuracy:true, timeout:12000, maximumAge:30000}
+    );
+  }
+
+  window.openRepForm = function(){
+    if(!roleIsManager()) return alert('إضافة المناديب للمدير فقط');
+    modalBody.innerHTML = `<h2>إضافة مندوب</h2>
+      <div class="form-grid two">
+        <label>اسم المندوب<input id="mrName" placeholder="اسم المندوب"></label>
+        <label>الجوال<input id="mrPhone" placeholder="05xxxxxxxx"></label>
+        <label>الإيميل<input id="mrEmail" placeholder="rep@jms.local"></label>
+        <label>كلمة المرور<input id="mrPass" value="123456"></label>
+        <label>السيارة<input id="mrCar" placeholder="مثال: تويوتا رايز"></label>
+        <label>المنطقة<input id="mrArea" value="جدة"></label>
+        <label>الهدف الشهري<input id="mrTarget" type="number" placeholder="مثال: 100000"></label>
+        <label>الحالة
+          <select id="mrStatus"><option value="active">نشط</option><option value="disabled">موقوف</option></select>
+        </label>
+      </div>
+      <br><button class="primary" onclick="saveRep()">حفظ المندوب</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.saveRep = function(){
+    const name=(mrName.value||'').trim();
+    if(!name) return alert('اكتب اسم المندوب');
+    const repId='rep-'+Date.now();
+    const rep={id:repId,name,phone:mrPhone.value||'',email:mrEmail.value||('rep'+Date.now()+'@jms.local'),password:mrPass.value||'123456',role:'rep',status:mrStatus.value||'active',car:mrCar.value||'',area:mrArea.value||'جدة',monthly_target:Number(mrTarget.value||0)};
+    db.reps ||= [];
+    db.users ||= [];
+    db.reps.push(rep);
+    db.users.push({...rep});
+    setRepStatus(repId,'off_duty');
+    if(typeof save==='function') save();
+    closeModal();
+    renderAll();
+    alert('تم إضافة المندوب');
+  };
+
+  window.startRepWork = function(repId){
+    ensureRepData();
+    const active=currentAttendance(repId);
+    if(active) return alert('المندوب بدأ الدوام مسبقًا');
+    getGeo((geo,err)=>{
+      const att={id:rid(),rep_id:repId,date:tdy(),start_at:nowIso(),start_lat:geo?.lat||null,start_lng:geo?.lng||null,start_accuracy:geo?.accuracy||null};
+      db.repAttendance.unshift(att);
+      if(geo){
+        db.repLocations.unshift({id:rid(),rep_id:repId,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'start_work',created_at:nowIso()});
+      }
+      setRepStatus(repId,'on_duty');
+      saveAndRender();
+      alert(err ? 'تم بدء الدوام بدون موقع: '+err : 'تم بدء الدوام وتسجيل الموقع');
+    });
+  };
+
+  window.endRepWork = function(repId){
+    ensureRepData();
+    const att=currentAttendance(repId);
+    if(!att) return alert('لا يوجد دوام مفتوح لهذا المندوب');
+    getGeo((geo,err)=>{
+      att.end_at=nowIso();
+      att.end_lat=geo?.lat||null;
+      att.end_lng=geo?.lng||null;
+      att.end_accuracy=geo?.accuracy||null;
+      if(geo){
+        db.repLocations.unshift({id:rid(),rep_id:repId,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'end_work',created_at:nowIso()});
+      }
+      setRepStatus(repId,'off_duty');
+      saveAndRender();
+      alert('تم إنهاء الدوام');
+    });
+  };
+
+  window.updateRepLocation = function(repId){
+    ensureRepData();
+    getGeo((geo,err)=>{
+      if(!geo) return alert(err || 'تعذر تحديد الموقع');
+      db.repLocations.unshift({id:rid(),rep_id:repId,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'manual_update',created_at:nowIso()});
+      if(currentAttendance(repId)) setRepStatus(repId,'on_duty');
+      saveAndRender();
+      alert('تم تحديث موقع المندوب');
+    });
+  };
+
+  window.markRepInVisit = function(repId){
+    ensureRepData();
+    if(!currentAttendance(repId)) return alert('يجب بدء الدوام أولًا');
+    setRepStatus(repId,'in_visit');
+    updateRepLocation(repId);
+  };
+
+  window.markRepBackOnDuty = function(repId){
+    ensureRepData();
+    if(!currentAttendance(repId)) return alert('لا يوجد دوام مفتوح');
+    setRepStatus(repId,'on_duty');
+    if(typeof save==='function') save();
+    renderAll();
+  };
+
+  window.openRepLocation = function(repId){
+    const loc=lastLocation(repId);
+    if(!loc) return alert('لا يوجد موقع محفوظ لهذا المندوب');
+    window.open(`https://www.google.com/maps?q=${loc.lat},${loc.lng}`,'_blank');
+  };
+
+  window.renderRepsControl = function(){
+    if(!window.repsControlGrid) return;
+    ensureRepData();
+    const reps = db.reps || [];
+    const q=(window.repSearch?.value||'').trim();
+    const sf=window.repStatusFilter?.value||'all';
+    const area=(window.repAreaFilter?.value||'').trim();
+
+    let list=reps.filter(r=>{
+      const s=getRepStatus(r.id);
+      if(sf!=='all' && s!==sf) return false;
+      if(q && !(`${r.name||''} ${r.area||''} ${r.phone||''}`).includes(q)) return false;
+      if(area && !String(r.area||'').includes(area)) return false;
+      return true;
+    });
+
+    const total=reps.length;
+    const on=reps.filter(r=>getRepStatus(r.id)==='on_duty').length;
+    const inv=reps.filter(r=>getRepStatus(r.id)==='in_visit').length;
+    const off=reps.filter(r=>getRepStatus(r.id)==='off_duty').length;
+    if(window.repsTotal) repsTotal.textContent=total;
+    if(window.repsOnDuty) repsOnDuty.textContent=on;
+    if(window.repsInVisit) repsInVisit.textContent=inv;
+    if(window.repsOffDuty) repsOffDuty.textContent=off;
+
+    repsControlGrid.innerHTML = list.map(r=>{
+      const status=getRepStatus(r.id);
+      const loc=lastLocation(r.id);
+      const att=currentAttendance(r.id);
+      const canSelf=currentUser?.id===r.id || currentUser?.email===r.email;
+      const canControl=roleIsManager() || canSelf;
+      return `<div class="rep-card">
+        <div class="rep-card-head">
+          <div>
+            <h3>${r.name||'-'}</h3>
+            <p>${r.phone||'-'} · ${r.area||'جدة'}<br>${r.car?('السيارة: '+r.car):''}</p>
+          </div>
+          <span class="rep-status ${status}">${statusText(status)}</span>
+        </div>
+        <div class="rep-metrics">
+          <div><b>${todayVisits(r.id)}</b><span>زيارات اليوم</span></div>
+          <div><b>${todayQuotes(r.id)}</b><span>عروض اليوم</span></div>
+          <div><b>${todayOrders(r.id)}</b><span>طلبات اليوم</span></div>
+        </div>
+        <div class="rep-location-box">
+          <b>الدوام:</b> ${att?('بدأ '+timeOnly(att.start_at)):'خارج الدوام'}<br>
+          <b>آخر موقع:</b> ${loc?`${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}`:'لا يوجد'}<br>
+          <b>آخر تحديث:</b> ${loc?timeOnly(loc.created_at):'-'}
+          ${loc?`<br><a class="rep-map-link" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank">فتح على خرائط Google</a>`:''}
+        </div>
+        <div class="rep-actions">
+          ${canControl?`<button class="start" onclick="startRepWork('${r.id}')">بدء الدوام</button>`:''}
+          ${canControl?`<button class="stop" onclick="endRepWork('${r.id}')">إنهاء الدوام</button>`:''}
+          ${canControl?`<button class="loc" onclick="updateRepLocation('${r.id}')">تحديث الموقع</button>`:''}
+          ${canControl?`<button class="visit" onclick="markRepInVisit('${r.id}')">في زيارة</button>`:''}
+          ${canControl?`<button onclick="markRepBackOnDuty('${r.id}')">رجوع للطريق</button>`:''}
+          <button onclick="openRepLocation('${r.id}')">عرض الموقع</button>
+        </div>
+      </div>`;
+    }).join('') || '<div class="panel">لا يوجد مناديب</div>';
+  };
+
+  // Add quick self panel on customers page for reps
+  const oldRenderCustomers = window.renderCustomers;
+  window.renderCustomers = function(){
+    if(typeof oldRenderCustomers === 'function') oldRenderCustomers();
+    if(currentUser?.role==='rep' && window.customersGrid && !document.getElementById('repSelfPanel')){
+      const status=getRepStatus(currentUser.id);
+      const panel=document.createElement('div');
+      panel.id='repSelfPanel';
+      panel.className='rep-self-panel';
+      panel.innerHTML=`<b>لوحة المندوب السريعة</b><br>
+        الحالة الحالية: ${statusText(status)}
+        <div class="rep-actions">
+          <button class="start" onclick="startRepWork('${currentUser.id}')">بدء الدوام</button>
+          <button class="stop" onclick="endRepWork('${currentUser.id}')">إنهاء الدوام</button>
+          <button class="loc" onclick="updateRepLocation('${currentUser.id}')">تحديث موقعي</button>
+          <button class="visit" onclick="markRepInVisit('${currentUser.id}')">أنا في زيارة</button>
+        </div>`;
+      customersGrid.parentNode.insertBefore(panel, customersGrid);
+    }
+  };
+
+  // Make reps page accessible to managers and reps
+  const oldShowApp = window.showApp;
+  if(typeof oldShowApp === 'function'){
+    window.showApp = function(){
+      oldShowApp();
+      document.querySelectorAll('.nav').forEach(btn=>{
+        if(btn.dataset.page==='repsControl'){
+          btn.style.display = (currentUser?.role==='admin'||currentUser?.role==='sales'||currentUser?.role==='rep') ? 'block' : 'none';
+        }
+      });
+    };
+  }
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    renderRepsControl();
+  };
+})();

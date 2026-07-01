@@ -58,3 +58,42 @@ create policy "public read orders" on jms_orders for select using (true);
 create policy "public write orders" on jms_orders for all using (true) with check (true);
 create policy "public read collections" on jms_collections for select using (true);
 create policy "public write collections" on jms_collections for all using (true) with check (true);
+
+
+
+-- CRM 3.0 Representatives Phase 1 optional cloud tables
+create table if not exists jms_rep_attendance (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
+create table if not exists jms_rep_locations (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
+create table if not exists jms_rep_targets (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table jms_rep_attendance enable row level security;
+alter table jms_rep_locations enable row level security;
+alter table jms_rep_targets enable row level security;
+
+drop policy if exists "public read rep attendance" on jms_rep_attendance;
+drop policy if exists "public write rep attendance" on jms_rep_attendance;
+drop policy if exists "public read rep locations" on jms_rep_locations;
+drop policy if exists "public write rep locations" on jms_rep_locations;
+drop policy if exists "public read rep targets" on jms_rep_targets;
+drop policy if exists "public write rep targets" on jms_rep_targets;
+
+create policy "public read rep attendance" on jms_rep_attendance for select using (true);
+create policy "public write rep attendance" on jms_rep_attendance for all using (true) with check (true);
+create policy "public read rep locations" on jms_rep_locations for select using (true);
+create policy "public write rep locations" on jms_rep_locations for all using (true) with check (true);
+create policy "public read rep targets" on jms_rep_targets for select using (true);
+create policy "public write rep targets" on jms_rep_targets for all using (true) with check (true);
