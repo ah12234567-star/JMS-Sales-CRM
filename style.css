@@ -402,3 +402,9 @@
 @page{size:A4;margin:0}
 @media print{html,body{width:210mm!important;min-height:297mm!important;background:#fff!important}body *{visibility:hidden!important}.quote-print-shell,.quote-print-shell *{visibility:visible!important}.quote-print-shell{position:absolute!important;inset:0!important;width:210mm!important;background:#fff!important;border-radius:0!important;overflow:visible!important}.quote-toolbar,.modal-close{display:none!important}.quote-a4{width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;box-shadow:none!important;border-radius:0!important}.modal{position:absolute!important;inset:0!important;background:#fff!important;padding:0!important}.modal-card{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:visible!important}}
 @media(max-width:900px){.quote-a4{width:100%;min-height:auto;padding:20px}.quote-a4-head,.quote-a4-grid,.quote-a4-summary,.quote-a4-approval{grid-template-columns:1fr}.quote-a4-title{text-align:right}.quote-a4-table{table-layout:auto}.quote-a4-logo{width:140px!important;height:110px!important}.quote-customer-mode{grid-template-columns:1fr}}
+
+
+.cloud-sync-status{position:fixed;left:14px;bottom:14px;z-index:9999;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:900;box-shadow:0 10px 28px rgba(15,23,42,.18)}
+.cloud-sync-status.local{background:#fef3c7;color:#92400e}
+.cloud-sync-status.cloud{background:#dcfce7;color:#166534}
+.cloud-sync-status.error{background:#fee2e2;color:#991b1b}

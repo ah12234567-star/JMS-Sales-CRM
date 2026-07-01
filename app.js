@@ -1470,3 +1470,159 @@ function convertQuoteToOrder(qid){
     modalBody.innerHTML=`<div class="quote-print-shell"><div class="quote-toolbar"><button class="pdf" onclick="downloadQuotePDF()">حفظ PDF / طباعة</button>${['approved','sent','accepted'].includes(q.status)?`<button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>`:''}${q.status==='sent'?`<button onclick="acceptQuote('${q.id}')">العميل وافق</button><button onclick="cancelQuote('${q.id}')">إلغاء العرض</button>`:''}<button onclick="closeModal()">إغلاق</button></div><div class="quote-a4"><div class="quote-a4-head"><img class="quote-a4-logo" src="${JMS_LOGO_DATA}" alt="JMS"><div class="quote-a4-company"><h1>شركة جدة النموذجية للصناعة</h1><p>Jeddah Model Industrial Co. Ltd</p><p>عروض أسعار المنتجات البلاستيكية والتغليف</p></div><div class="quote-a4-title"><h2>عرض سعر</h2><p>رقم العرض: ${safe(q.quote_no)}</p><p>تاريخ الإصدار: ${safe(q.date)}</p><p>صالح حتى: ${safe(q.valid_until)}</p></div></div><div class="quote-a4-grid"><div class="quote-a4-card"><h3>بيانات العميل</h3><p><b>اسم العميل:</b> ${customerName(q.customer_id)}<br><b>الجوال:</b> ${safe(c.phone)}<br><b>المدينة:</b> ${safe(c.city)}<br><b>العنوان:</b> ${safe(c.location||c.district)}</p></div><div class="quote-a4-card"><h3>بيانات العرض</h3><p><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}<br><b>شروط الدفع:</b> ${safe(q.payment_terms)}<br><b>مدة التسليم:</b> ${safe(q.delivery_terms)}</p></div></div><table class="quote-a4-table"><thead><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>اللون</th><th>الخامة</th><th>وزن الحبة</th><th>عدد الحبات</th><th>الكمية كجم</th><th>سعر الكيلو</th><th>الإجمالي</th></tr></thead><tbody><tr><td>${safe(q.product)}</td><td>${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}</td><td>${safe(q.thickness)} ${safe(q.thickness_unit)}</td><td>${safe(q.color)}</td><td>${safe(q.material)}</td><td>${safe(q.piece_weight)}</td><td>${safe(q.pieces)}</td><td>${safe(q.total_kg)}</td><td>${safe(q.price_kg)} ريال</td><td>${fmt(subtotal)} ريال</td></tr></tbody></table><div class="quote-a4-summary"><div class="quote-a4-terms"><h3>الشروط والملاحظات</h3><ul><li>الأسعار حسب المواصفات الموضحة في هذا العرض.</li><li>صلاحية العرض حتى التاريخ الموضح أعلاه.</li><li>التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li><li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li><li>${q.notes||'لا توجد ملاحظات إضافية.'}</li></ul></div><div class="quote-a4-total"><div class="quote-a4-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div><div class="quote-a4-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div><div class="quote-a4-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div></div></div><div class="quote-a4-approval"><div class="quote-a4-sign"><b>توقيع العميل</b><div class="quote-a4-line">الاسم والتوقيع</div></div><div class="quote-a4-sign"><b>اعتماد المندوب</b><div class="quote-a4-line">${repName(q.rep_id)}</div></div><div class="quote-a4-sign"><b>اعتماد مدير المبيعات</b><div class="quote-a4-line">التوقيع</div></div><div class="quote-a4-sign"><b>ختم الشركة</b><div class="quote-a4-line">الختم</div></div></div><div class="quote-a4-footer"><span>شركة جدة النموذجية للصناعة</span><span>رقم العرض: ${safe(q.quote_no)}</span><span>العرض لا يعتبر طلبًا نهائيًا إلا بعد الاعتماد.</span></div></div></div>`; modal.classList.remove('hidden');
   };
 })();
+
+
+
+/* JMS cloud sync patch: makes quotes visible on laptop and mobile */
+(function(){
+  const tableMap = {
+    customers: "jms_customers",
+    quotes: "jms_quotes",
+    visits: "jms_visits",
+    orders: "jms_orders",
+    collections: "jms_collections"
+  };
+
+  let cloudClient = null;
+  let cloudReady = false;
+  let syncBusy = false;
+
+  function showCloudStatus(kind, text){
+    let el = document.getElementById("cloudSyncStatus");
+    if(!el){
+      el = document.createElement("div");
+      el.id = "cloudSyncStatus";
+      document.body.appendChild(el);
+    }
+    el.className = "cloud-sync-status " + kind;
+    el.textContent = text;
+  }
+
+  function configReady(){
+    return window.JMS_CLOUD &&
+      window.JMS_CLOUD.ENABLED === true &&
+      window.JMS_CLOUD.SUPABASE_URL &&
+      window.JMS_CLOUD.SUPABASE_ANON_KEY &&
+      !String(window.JMS_CLOUD.SUPABASE_URL).includes("PUT_");
+  }
+
+  window.jmsCloudEnabled = function(){
+    return cloudReady && cloudClient;
+  };
+
+  window.initJmsCloud = async function(){
+    if(!configReady()){
+      showCloudStatus("local", "محلي فقط - لا توجد مزامنة");
+      return false;
+    }
+    try{
+      cloudClient = supabase.createClient(window.JMS_CLOUD.SUPABASE_URL, window.JMS_CLOUD.SUPABASE_ANON_KEY);
+      cloudReady = true;
+      showCloudStatus("cloud", "مزامنة سحابية مفعلة");
+      await pullCloudData();
+      await pushCloudData();
+      return true;
+    }catch(e){
+      console.error(e);
+      showCloudStatus("error", "خطأ في المزامنة");
+      return false;
+    }
+  };
+
+  function getDb(){
+    if(window.db) return window.db;
+    try { return JSON.parse(localStorage.getItem("jms_db") || localStorage.getItem("JMS_DB") || "{}"); }
+    catch(e){ return {}; }
+  }
+
+  function setDb(next){
+    if(window.db) Object.assign(window.db, next);
+    try{
+      localStorage.setItem("jms_db", JSON.stringify(window.db || next));
+    }catch(e){}
+  }
+
+  async function pullList(key){
+    const table = tableMap[key];
+    if(!table || !cloudClient) return [];
+    const {data, error} = await cloudClient.from(table).select("id,data,updated_at").order("updated_at", {ascending:false});
+    if(error) throw error;
+    return (data || []).map(r => ({...r.data, id: r.data.id || r.id, _cloud_updated_at: r.updated_at}));
+  }
+
+  window.pullCloudData = async function(){
+    if(!cloudReady || syncBusy) return;
+    syncBusy = true;
+    try{
+      const current = getDb();
+      const next = {...current};
+      for(const key of Object.keys(tableMap)){
+        const list = await pullList(key);
+        if(list.length){
+          const localList = Array.isArray(current[key]) ? current[key] : [];
+          const merged = new Map();
+          localList.forEach(x => merged.set(String(x.id), x));
+          list.forEach(x => merged.set(String(x.id), x));
+          next[key] = Array.from(merged.values());
+        }
+      }
+      setDb(next);
+      if(typeof save === "function") save();
+      if(typeof renderAll === "function") renderAll();
+      showCloudStatus("cloud", "تمت المزامنة");
+    }catch(e){
+      console.error(e);
+      showCloudStatus("error", "فشل جلب البيانات");
+    }finally{
+      syncBusy = false;
+    }
+  };
+
+  async function upsertList(key){
+    const table = tableMap[key];
+    if(!table || !cloudClient) return;
+    const db = getDb();
+    const list = Array.isArray(db[key]) ? db[key] : [];
+    if(!list.length) return;
+    const rows = list.filter(x => x && x.id).map(x => ({
+      id: String(x.id),
+      data: x,
+      updated_at: new Date().toISOString()
+    }));
+    if(!rows.length) return;
+    const {error} = await cloudClient.from(table).upsert(rows, {onConflict:"id"});
+    if(error) throw error;
+  }
+
+  window.pushCloudData = async function(){
+    if(!cloudReady || syncBusy) return;
+    syncBusy = true;
+    try{
+      for(const key of Object.keys(tableMap)){
+        await upsertList(key);
+      }
+      showCloudStatus("cloud", "تم حفظ البيانات سحابيًا");
+    }catch(e){
+      console.error(e);
+      showCloudStatus("error", "فشل حفظ البيانات");
+    }finally{
+      syncBusy = false;
+    }
+  };
+
+  const oldSave = window.save;
+  window.save = function(){
+    if(typeof oldSave === "function") oldSave.apply(this, arguments);
+    if(cloudReady) setTimeout(() => pushCloudData(), 80);
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === "function") oldRenderAll.apply(this, arguments);
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => initJmsCloud(), 500);
+    setInterval(() => { if(cloudReady) pullCloudData(); }, 30000);
+  });
+})();

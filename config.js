@@ -1,7 +1,8 @@
-window.JMS_CONFIG = {
-  SUPABASE_URL: "PUT_YOUR_SUPABASE_URL_HERE",
-  SUPABASE_ANON_KEY: "PUT_YOUR_SUPABASE_ANON_KEY_HERE",
-  COMPANY_NAME_AR: "شركة جدة النموذجية للصناعة",
-  COMPANY_NAME_EN: "Jeddah Model Industrial Co. Ltd",
-  VAT_RATE: 0.15
+// JMS Factory CRM - Supabase Cloud Sync Enabled
+// هذه البيانات تربط النظام بقاعدة Supabase حتى تظهر البيانات على اللابتوب والجوال
+
+window.JMS_CLOUD = {
+  SUPABASE_URL: "https://jvwjwakkimnveveglxwa.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_jN3PnVaj7uarVnJRvBmx-g_zIKhl1UP",
+  ENABLED: true
 };
