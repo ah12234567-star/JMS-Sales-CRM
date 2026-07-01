@@ -1,390 +1,115 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>JMS Factory CRM</title>
-<meta name="theme-color" content="#111827">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="JMS CRM">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="assets/jms-logo.svg">
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>JMS Factory CRM</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<section id="loginView" class="login-page">
-  <div class="login-card">
-    <img src="assets/jms-logo.svg" class="login-logo">
-    <h1>JMS Factory CRM</h1>
-    <p>شركة جدة النموذجية للصناعة</p>
-
-    <div class="role-switch">
-      <label><input type="radio" name="loginRole" value="admin" checked><span>مدير النظام</span></label>
-      <label><input type="radio" name="loginRole" value="sales"><span>مدير مبيعات</span></label>
-      <label><input type="radio" name="loginRole" value="rep"><span>مندوب</span></label>
+  <div id="login" class="login-screen">
+    <div class="login-card">
+      <img src="assets/jeddah-model-logo.jpeg" class="login-logo" alt="JMS">
+      <h1>JMS Factory CRM</h1>
+      <p>نظام حقيقي لإدارة العملاء والمناديب والزيارات والطلبات والتحصيل</p>
+      <label>البريد الإلكتروني<input id="loginEmail" value="admin@jms.local"></label>
+      <label>كلمة المرور<input id="loginPassword" type="password" value="123456"></label>
+      <button onclick="login()">دخول النظام</button>
+      <small>تجريبي: admin@jms.local / 123456</small>
     </div>
-
-    <form id="loginForm">
-      <label>البريد الإلكتروني</label>
-      <input id="loginEmail" type="email" value="admin@jms.local">
-      <label>كلمة المرور</label>
-      <input id="loginPassword" type="password" value="123456">
-      <button class="primary full" type="submit">دخول النظام</button>
-      <div id="loginHint" class="hint">مدير النظام: admin@jms.local / 123456</div>
-    </form>
   </div>
-</section>
 
-<section id="appView" class="app hidden">
-  <aside class="sidebar">
-    <div class="brand">
-      <img src="assets/jms-logo.svg">
-      <div>
-        <b>JMS Factory CRM</b>
-        <span>إدارة العملاء والمناديب والإنتاج</span>
+  <div id="app" class="app hidden">
+    <aside>
+      <div class="brand">
+        <img src="assets/jeddah-model-logo.jpeg" alt="JMS">
+        <div><h2>JMS Factory CRM</h2><p>شركة جدة النموذجية للصناعة</p></div>
       </div>
-    </div>
+      <div class="user-box"><span>المستخدم الحالي</span><b id="currentUserName">-</b><small id="currentUserRole">-</small></div>
+      <nav>
+        <button class="nav active" data-page="dashboard">لوحة التحكم</button>
+        <button class="nav" data-page="customers">العملاء</button>
+        <button class="nav" data-page="visits">الزيارات</button>
+        <button class="nav" data-page="orders">طلبات التصنيع</button>
+        <button class="nav" data-page="quotes">عروض الأسعار</button>
+        <button class="nav" data-page="collections">التحصيل</button>
+        <button class="nav admin-only" data-page="users">المستخدمون</button>
+        <button class="logout" onclick="logout()">تسجيل الخروج</button>
+      </nav>
+    </aside>
 
-    <div class="user-box">
-      <small>المستخدم الحالي</small>
-      <b id="currentUserName">-</b>
-      <span id="currentUserRole">-</span>
-    </div>
-
-    <nav>
-      <button class="nav active" data-page="dashboard">لوحة التحكم</button>
-      <button class="nav" data-page="customers">العملاء</button>
-      <button class="nav" data-page="visits">الزيارات</button>
-      <button class="nav" data-page="orders">طلبات التصنيع</button>
-      <button class="nav" data-page="quotes">عروض الأسعار</button>
-      <button class="nav" data-page="routes">المسارات</button>
-      <button class="nav" data-page="alerts">تنبيهات 30 يوم</button>
-      <button class="nav manager-only" data-page="visitNotes">ملاحظات الزيارات</button>
-      <button class="nav admin-only" data-page="users">المستخدمين</button>
-      <button class="nav" data-page="profile">حسابي</button>
-    </nav>
-
-    <button id="logoutBtn" class="danger">تسجيل الخروج</button>
-  </aside>
-
-  <main class="main">
-    <section id="dashboard" class="page active">
-      <div class="page-head">
-        <h2>لوحة التحكم</h2>
-        <p>مؤشرات المبيعات والتحصيل والزيارات والتنبيهات</p>
-      </div>
-      <div class="stats">
-        <div class="stat"><span>مبيعات الشهر</span><b id="mSales">0</b><small>ريال</small></div>
-        <div class="stat"><span>تحصيل الشهر</span><b id="mCollected">0</b><small>ريال</small></div>
-        <div class="stat"><span>نسبة التحصيل</span><b id="collectionRate">0%</b><small>من المبيعات</small></div>
-        <div class="stat danger-card"><span>تنبيهات 30 يوم</span><b id="lateCount">0</b><small>عميل</small></div>
-        <div class="stat"><span>عملاء النظام</span><b id="customersCount">0</b><small>عميل</small></div>
-        <div class="stat"><span>طلبات الشهر</span><b id="ordersCount">0</b><small>طلب</small></div>
-      </div>
-
-      <div class="grid2">
-        <div class="panel">
-          <div class="panel-head"><b>أفضل المناديب</b><span>حسب الزيارات والطلبات</span></div>
-          <div id="topReps"></div>
+    <main>
+      <section id="dashboard" class="page active">
+        <div class="page-head"><h1>لوحة التحكم</h1><p>متابعة العملاء، الزيارات، الطلبات والتحصيل</p></div>
+        <div class="stats">
+          <div class="stat"><span>العملاء</span><b id="statCustomers">0</b><small>عميل</small></div>
+          <div class="stat"><span>زيارات الشهر</span><b id="statVisits">0</b><small>زيارة</small></div>
+          <div class="stat"><span>طلبات الشهر</span><b id="statOrders">0</b><small>طلب</small></div>
+          <div class="stat"><span>مبيعات الشهر</span><b id="statSales">0</b><small>ريال</small></div>
+          <div class="stat"><span>تحصيل الشهر</span><b id="statCollections">0</b><small>ريال</small></div>
+          <div class="stat danger"><span>لم يزروا +30 يوم</span><b id="statLate">0</b><small>عميل</small></div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><b>أهم التنبيهات</b><span>عملاء لم تتم زيارتهم</span></div>
-          <div id="dashAlerts"></div>
+        <div class="grid2">
+          <div class="panel"><div class="panel-head"><b>تنبيهات الزيارة</b><span>عملاء متأخرون</span></div><div id="lateCustomers"></div></div>
+          <div class="panel"><div class="panel-head"><b>آخر ملاحظات المناديب</b><span>تحتاج متابعة</span></div><div id="recentVisitNotes"></div></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="customers" class="page">
-      <div class="page-head with-action">
-        <div><h2>العملاء</h2><p>بطاقة العميل، آخر زيارة، المندوب، وخيارات المتابعة</p></div>
-        <button class="primary small" onclick="openCustomerForm()">إضافة عميل</button>
-      </div>
-      <input id="customerSearch" class="search" placeholder="بحث باسم العميل أو الجوال أو المدينة">
-      <div id="customersGrid" class="customer-grid"></div>
-    </section>
+      <section id="customers" class="page">
+        <div class="page-head with-action"><div><h1>العملاء</h1><p>إضافة وتعديل العملاء وربط كل عميل بمندوب</p></div><button class="primary" onclick="openCustomerForm()">إضافة عميل</button></div>
+        <div class="panel filters"><input id="customerSearch" placeholder="بحث باسم العميل أو الجوال أو المدينة" oninput="renderCustomers()"></div>
+        <div id="customersList" class="cards"></div>
+      </section>
 
+      <section id="visits" class="page">
+        <div class="page-head"><h1>الزيارات</h1><p>تسجيل تقرير زيارة وملاحظات المندوب</p></div>
+        <div id="visitsList" class="cards"></div>
+      </section>
 
-    <section id="visits" class="page">
-      <div class="page-head with-action">
-        <div>
-          <h2>الزيارات</h2>
-          <p>اعرف من زار، ومين ما زار، وتقرير كل مندوب حسب الفترة</p>
-        </div>
-        <button class="primary small" onclick="openVisitForm()">تسجيل زيارة يدوي</button>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <b>فلترة الزيارات</b>
-          <span>اختر الفترة والمندوب</span>
-        </div>
-        <div class="form-grid four">
-          <label>من تاريخ
-            <input id="visitFrom" type="date">
-          </label>
-          <label>إلى تاريخ
-            <input id="visitTo" type="date">
-          </label>
-          <label>المندوب
-            <select id="visitRepFilter"></select>
-          </label>
-          <label>نوع التقرير
-            <select id="visitReportType">
-              <option value="visited">العملاء الذين تمت زيارتهم</option>
-              <option value="notvisited">العملاء الذين لم تتم زيارتهم</option>
-              <option value="late30">أكثر من 30 يوم بدون زيارة</option>
-              <option value="summary">ملخص المناديب</option>
-            </select>
-          </label>
-        </div>
-        <div class="actions-row">
-          <button class="primary small" type="button" onclick="renderVisits()">عرض التقرير</button>
-          <button class="secondary" type="button" onclick="setVisitQuickRange('today')">اليوم</button>
-          <button class="secondary" type="button" onclick="setVisitQuickRange('week')">هذا الأسبوع</button>
-          <button class="secondary" type="button" onclick="setVisitQuickRange('month')">هذا الشهر</button>
-        </div>
-      </div>
-
-      <div class="stats visit-stats">
-        <div class="stat"><span>زيارات الفترة</span><b id="visitsPeriodCount">0</b><small>زيارة</small></div>
-        <div class="stat"><span>عملاء تمت زيارتهم</span><b id="visitedCustomersCount">0</b><small>عميل</small></div>
-        <div class="stat danger-card"><span>لم تتم زيارتهم</span><b id="notVisitedCustomersCount">0</b><small>عميل</small></div>
-        <div class="stat danger-card"><span>متأخرين +30 يوم</span><b id="late30CustomersCount">0</b><small>عميل</small></div>
-      </div>
-
-      <div class="grid2">
-        <div class="panel">
-          <div class="panel-head"><b>سجل الزيارات</b><span>حسب الفترة المختارة</span></div>
-          <div id="visitsList"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><b>العملاء بدون زيارة</b><span>حسب الفترة المختارة</span></div>
-          <div id="notVisitedList"></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><b>تقرير المناديب</b><span>زيارات، طلبات، عملاء بدون زيارة</span></div>
-        <div id="repVisitSummary"></div>
-      </div>
-    </section>
+      <section id="orders" class="page">
+        <div class="page-head with-action"><div><h1>طلبات التصنيع</h1><p>طلب جديد مع حساب وزن الحبة وعدد الحبات</p></div><button class="primary" onclick="openOrderForm()">طلب جديد</button></div>
+        <div id="ordersList" class="cards"></div>
+      </section>
 
 
-    <section id="orders" class="page">
-      <div class="page-head">
-        <h2>طلب تصنيع جديد</h2>
-        <p>نموذج احترافي للمقاسات، السماكة، الخامة، وزن الحبة، وعدد الحبات</p>
-      </div>
-
-      <form id="orderForm" class="order-form">
-        <div class="panel">
-          <div class="panel-head"><b>1. بيانات العميل</b><span>من سيستلم الطلب؟</span></div>
-          <div class="form-grid two">
-            <label>العميل<select id="orderCustomer" required></select></label>
-            <label>المندوب<select id="orderRep"></select></label>
-            <label>تاريخ الطلب<input id="orderDate" type="date"></label>
-            <label>عنوان التسليم<input id="deliveryAddress" placeholder="المدينة / الحي / الموقع"></label>
+      <section id="quotes" class="page">
+        <div class="page-head with-action">
+          <div>
+            <h1>عروض الأسعار</h1>
+            <p>إنشاء عرض سعر، اعتماد المدير، إرسال للعميل، ثم قبول أو إلغاء إذا العميل لم يوافق</p>
           </div>
+          <button class="primary" onclick="openQuoteForm()">عرض سعر جديد</button>
         </div>
-
-        <div class="panel">
-          <div class="panel-head"><b>2. مواصفات المنتج</b><span>مقاسات وخامة وطباعة</span></div>
-          <div class="form-grid four">
-            <label>نوع المنتج<select id="productType"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-            <label>الخامة<select id="material"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-            <label>اللون<input id="color" placeholder="شفاف / أبيض / أسود / حسب الطلب"></label>
-            <label>نوع اللحام<select id="sealType"><option>لحام سفلي</option><option>لحام جانبي</option><option>تي شيرت</option><option>رول</option></select></label>
-          </div>
-          <div class="form-grid four">
-            <label>العرض<input id="width" type="number" step="0.01" placeholder="65"></label>
-            <label>الطول<input id="length" type="number" step="0.01" placeholder="95"></label>
-            <label>وحدة المقاس<select id="sizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-            <label>السماكة<input id="thickness" type="number" step="0.01" placeholder="75"></label>
-          </div>
-          <div class="form-grid four">
-            <label>وحدة السماكة<select id="thicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-            <label>الطباعة<select id="printType"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
-            <label>عدد ألوان الطباعة<input id="printColors" type="number" min="0"></label>
-            <label>ملاحظات فنية<input id="technicalNotes" placeholder="تخريم / رول / كرتون / لحام خاص"></label>
-          </div>
+        <div class="panel filters">
+          <select id="quoteStatusFilter" onchange="renderQuotes()">
+            <option value="all">كل الحالات</option>
+            <option value="pending">بانتظار اعتماد المدير</option>
+            <option value="approved">معتمد</option>
+            <option value="sent">مرسل للعميل</option>
+            <option value="accepted">مقبول</option>
+            <option value="cancelled">ملغي - العميل لم يوافق</option>
+            <option value="rejected">مرفوض من المدير</option>
+          </select>
         </div>
+        <div id="quotesList" class="cards"></div>
+      </section>
 
-        <div class="panel calc-panel">
-          <div class="panel-head"><b>3. الحاسبة التلقائية</b><span>وزن الحبة وعدد الحبات</span></div>
-          <div class="form-grid four">
-            <label>كمية الطلب بالكيلو<input id="totalKg" type="number" step="0.01" placeholder="1000"></label>
-            <label>كثافة الخامة<input id="density" readonly></label>
-            <label>وزن الحبة<input id="pieceWeight" readonly></label>
-            <label>عدد الحبات المتوقع<input id="piecesCount" readonly></label>
-          </div>
-          <div class="formula">وزن الحبة = العرض بالمتر × الطول بالمتر × السماكة بالميكرون × كثافة الخامة</div>
-        </div>
+      <section id="collections" class="page">
+        <div class="page-head with-action"><div><h1>التحصيل</h1><p>تسجيل المبالغ المحصلة من العملاء</p></div><button class="primary" onclick="openCollectionForm()">تسجيل تحصيل</button></div>
+        <div id="collectionsList" class="cards"></div>
+      </section>
 
-        <div class="panel">
-          <div class="panel-head"><b>4. السعر والحالة</b><span>حساب قيمة الطلب</span></div>
-          <div class="form-grid four">
-            <label>سعر الكيلو<input id="priceKg" type="number" step="0.01"></label>
-            <label>قيمة الطلب<input id="orderAmount" readonly></label>
-            <label>حالة الطلب<select id="orderStatus"><option>جديد</option><option>بانتظار اعتماد المدير</option><option>قيد الإنتاج</option><option>جاهز للتسليم</option><option>تم التسليم</option></select></label>
-            <label>ملاحظات عامة<input id="orderNotes"></label>
-          </div>
-        </div>
-
-        <div class="actions-row">
-          <button class="primary" type="submit">حفظ الطلب</button>
-          <button class="secondary" type="button" onclick="resetOrder()">تفريغ النموذج</button>
-        </div>
-      </form>
-
-      <div class="panel">
-        <div class="panel-head"><b>قائمة الطلبات</b><span>أحدث الطلبات</span></div>
-        <div id="ordersList"></div>
-      </div>
-    </section>
-
-
-    <section id="quotes" class="page">
-      <div class="page-head with-action">
-        <div>
-          <h2>عروض الأسعار</h2>
-          <p>المندوب ينشئ العرض، والمدير يعتمد أو يرفض، وبعد الاعتماد فقط يمكن إرساله للعميل</p>
-        </div>
-        <button class="primary small" type="button" onclick="openQuoteForm()">إنشاء عرض سعر</button>
-      </div>
-
-      <div class="stats quote-stats">
-        <div class="stat"><span>كل العروض</span><b id="quotesTotal">0</b><small>عرض</small></div>
-        <div class="stat danger-card"><span>بانتظار الاعتماد</span><b id="quotesPending">0</b><small>عرض</small></div>
-        <div class="stat"><span>معتمدة</span><b id="quotesApproved">0</b><small>عرض</small></div>
-        <div class="stat"><span>مرفوضة</span><b id="quotesRejected">0</b><small>عرض</small></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <b>فلترة عروض الأسعار</b>
-          <span>حسب الحالة والمندوب</span>
-        </div>
-        <div class="form-grid four">
-          <label>الحالة
-            <select id="quoteStatusFilter">
-              <option value="all">كل الحالات</option>
-              <option value="pending">بانتظار اعتماد المدير</option>
-              <option value="approved">معتمد</option>
-              <option value="rejected">مرفوض</option>
-              <option value="sent">مرسل للعميل</option>
-            </select>
-          </label>
-          <label>المندوب
-            <select id="quoteRepFilter"></select>
-          </label>
-          <label>بحث
-            <input id="quoteSearch" placeholder="اسم العميل أو رقم العرض">
-          </label>
-          <label>إجراء
-            <button class="primary small" type="button" onclick="renderQuotes()">عرض</button>
-          </label>
-        </div>
-      </div>
-
-      <div id="quotesList" class="quotes-grid"></div>
-    </section>
-
-
-    <section id="routes" class="page">
-      <div class="page-head with-action">
-        <div><h2>المسارات اليومية</h2><p>تحديد مسار مندوب وترتيب العملاء</p></div>
-        <button class="primary small" onclick="createRoute()">إنشاء مسار</button>
-      </div>
-      <div id="routesList"></div>
-    </section>
-
-    <section id="alerts" class="page">
-      <div class="page-head">
-        <h2>تنبيهات العملاء</h2>
-        <p>تظهر للمدير إذا مر أكثر من 30 يوم بدون زيارة</p>
-      </div>
-      <div id="alertsList"></div>
-    </section>
-
-
-    <section id="visitNotes" class="page">
-      <div class="page-head">
-        <h2>ملاحظات وتقارير الزيارات</h2>
-        <p>كل ما يكتبه المندوب أثناء الزيارة يظهر هنا لمدير المبيعات ومدير النظام</p>
-      </div>
-
-      <div class="stats visit-note-stats">
-        <div class="stat"><span>تقارير الزيارات</span><b id="visitReportsCount">0</b><small>تقرير</small></div>
-        <div class="stat danger-card"><span>تحتاج إجراء</span><b id="visitActionCount">0</b><small>ملاحظة</small></div>
-        <div class="stat"><span>طلبات عروض سعر</span><b id="visitQuoteReqCount">0</b><small>طلب</small></div>
-        <div class="stat"><span>شكاوى العملاء</span><b id="visitComplaintCount">0</b><small>شكوى</small></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <b>فلترة ملاحظات الزيارات</b>
-          <span>حسب النوع والمندوب</span>
-        </div>
-        <div class="form-grid four">
-          <label>نوع الملاحظة
-            <select id="visitNoteTypeFilter">
-              <option value="all">كل الأنواع</option>
-              <option value="general">ملاحظة عامة</option>
-              <option value="quote">طلب عرض سعر</option>
-              <option value="complaint">شكوى عميل</option>
-              <option value="price">طلب سعر خاص</option>
-              <option value="manager">طلب مقابلة المدير</option>
-              <option value="followup">موعد متابعة</option>
-            </select>
-          </label>
-          <label>المندوب
-            <select id="visitNoteRepFilter"></select>
-          </label>
-          <label>بحث
-            <input id="visitNoteSearch" placeholder="اسم العميل أو نص الملاحظة">
-          </label>
-          <label>إجراء
-            <button class="primary small" type="button" onclick="renderVisitNotes()">عرض</button>
-          </label>
-        </div>
-      </div>
-
-      <div id="visitNotesList" class="visit-notes-list"></div>
-    </section>
-
-
-    <section id="users" class="page">
-      <div class="page-head with-action">
-        <div><h2>المستخدمين والمناديب</h2><p>فتح حساب، إيقاف مندوب، إعادة تعيين كلمة المرور</p></div>
-        <button class="primary small" onclick="openUserForm()">إضافة مستخدم</button>
-      </div>
-      <div id="usersList"></div>
-    </section>
-
-    <section id="profile" class="page">
-      <div class="page-head">
-        <h2>حسابي</h2>
-        <p>تغيير كلمة المرور</p>
-      </div>
-      <div class="panel">
-        <div class="form-grid two">
-          <label>كلمة المرور الحالية<input id="oldPassword" type="password"></label>
-          <label>كلمة المرور الجديدة<input id="newPassword" type="password"></label>
-        </div>
-        <button class="primary small" onclick="changeMyPassword()">تغيير كلمة المرور</button>
-      </div>
-    </section>
-  </main>
-</section>
-
-<div id="modal" class="modal hidden">
-  <div class="modal-card">
-    <button class="modal-close" onclick="closeModal()">×</button>
-    <div id="modalBody"></div>
+      <section id="users" class="page">
+        <div class="page-head with-action"><div><h1>المستخدمون</h1><p>إدارة حسابات المناديب ومدير المبيعات</p></div><button class="primary" onclick="openUserForm()">إضافة مستخدم</button></div>
+        <div id="usersList" class="cards"></div>
+      </section>
+    </main>
   </div>
-</div>
 
-<script src="seed.js"></script>
-<script src="app.js"></script>
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-close" onclick="closeModal()">×</button><div id="modalBody"></div></div></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
