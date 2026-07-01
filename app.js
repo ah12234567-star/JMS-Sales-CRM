@@ -1629,3 +1629,166 @@ function convertQuoteToOrder(qid){
     setInterval(() => { if(cloudReady) pullCloudData(); }, 30000);
   });
 })();
+
+
+
+/* JMS PATCH: searchable customer selector + automatic quote calculator */
+(function(){
+  const q = (id) => document.getElementById(id);
+
+  function normalizeText(v){
+    return String(v || '').toLowerCase().replace(/\s+/g,' ').trim();
+  }
+
+  function getAllowedCustomersSafe(){
+    try { return (typeof allowedCustomers === 'function') ? allowedCustomers() : (db.customers || []); }
+    catch(e){ return db.customers || []; }
+  }
+
+  function getAllowedRepsSafe(){
+    try {
+      if (currentUser && currentUser.role === 'rep') return (db.reps || []).filter(r => r.id === currentUser.id);
+      return db.reps || [];
+    } catch(e){ return db.reps || []; }
+  }
+
+  window.jmsQuoteCalcNow = function(){
+    const widthEl = q('mqWidth');
+    const lengthEl = q('mqLength');
+    const thickEl = q('mqThickness');
+    const sizeUnitEl = q('mqSizeUnit');
+    const thickUnitEl = q('mqThicknessUnit');
+    const materialEl = q('mqMaterial');
+    const kgEl = q('mqKg');
+    const pieceEl = q('mqPiece');
+    const piecesEl = q('mqPieces');
+    const densityEl = q('mqDensity') || q('density');
+    const totalEl = q('mqTotal');
+    const priceEl = q('mqPriceKg');
+
+    if(!widthEl || !lengthEl || !thickEl || !kgEl) return;
+
+    let w = Number(widthEl.value || 0);
+    let l = Number(lengthEl.value || 0);
+    let t = Number(thickEl.value || 0);
+
+    const sizeUnit = sizeUnitEl ? sizeUnitEl.value : 'cm';
+    if(sizeUnit === 'cm'){ w = w / 100; l = l / 100; }
+    else if(sizeUnit === 'mm'){ w = w / 1000; l = l / 1000; }
+
+    const thickUnit = thickUnitEl ? thickUnitEl.value : 'micron';
+    if(thickUnit === 'mm') t = t * 1000;
+
+    let den = 0.93;
+    if(densityEl && Number(densityEl.value)) den = Number(densityEl.value);
+    else if(materialEl && window.DENSITY && DENSITY[materialEl.value]) den = DENSITY[materialEl.value];
+    else if(materialEl && typeof DENSITY !== 'undefined' && DENSITY[materialEl.value]) den = DENSITY[materialEl.value];
+
+    if(densityEl) densityEl.value = den;
+
+    const gram = w * l * t * den;
+    if(pieceEl) pieceEl.value = gram ? gram.toFixed(2) + ' جرام' : '';
+
+    const kg = Number(kgEl.value || 0);
+    const pcs = gram ? Math.floor(kg / (gram / 1000)) : 0;
+    if(piecesEl) piecesEl.value = pcs ? pcs.toLocaleString('ar-SA') + ' حبة' : '';
+
+    if(totalEl && priceEl){
+      const total = kg * Number(priceEl.value || 0);
+      totalEl.value = total ? total.toFixed(2) : '';
+    }
+  };
+
+  window.jmsFilterQuoteCustomers = function(){
+    const input = q('mqCustomerSearch');
+    const list = q('mqCustomerList');
+    const hidden = q('mqCustomer');
+    if(!input || !list || !hidden) return;
+
+    const term = normalizeText(input.value);
+    const customers = getAllowedCustomersSafe().filter(c => {
+      const hay = normalizeText([c.name, c.phone, c.city, c.district, c.location].join(' '));
+      return !term || hay.includes(term);
+    }).slice(0, 60);
+
+    list.innerHTML = customers.map(c => `
+      <button type="button" class="customer-search-item" onclick="jmsSelectQuoteCustomer('${c.id}')">
+        <b>${c.name || '-'}</b>
+        <span>${c.phone || '-'} · ${c.city || '-'}</span>
+      </button>
+    `).join('') || '<div class="customer-search-empty">لا يوجد عميل بهذا الاسم</div>';
+  };
+
+  window.jmsSelectQuoteCustomer = function(customerId){
+    const hidden = q('mqCustomer');
+    const input = q('mqCustomerSearch');
+    const list = q('mqCustomerList');
+    const c = (db.customers || []).find(x => x.id === customerId);
+    if(!hidden || !c) return;
+    hidden.value = c.id;
+    if(input) input.value = c.name || '';
+    if(list) list.innerHTML = '';
+  };
+
+  function bindAutoCalc(){
+    ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg','mqDensity','density'].forEach(id=>{
+      const el = q(id);
+      if(el && !el.dataset.jmsCalcBound){
+        el.dataset.jmsCalcBound = '1';
+        el.addEventListener('input', window.jmsQuoteCalcNow);
+        el.addEventListener('change', window.jmsQuoteCalcNow);
+      }
+    });
+    setTimeout(window.jmsQuoteCalcNow, 50);
+  }
+
+  // Override only quote form to include search input
+  const oldOpenQuoteForm = window.openQuoteForm;
+  window.openQuoteForm = function(){
+    if(typeof oldOpenQuoteForm === 'function') oldOpenQuoteForm();
+
+    setTimeout(() => {
+      const oldSelect = q('mqCustomer');
+      if(!oldSelect || q('mqCustomerSearch')) {
+        bindAutoCalc();
+        return;
+      }
+
+      oldSelect.style.display = 'none';
+
+      const selectedText = oldSelect.options[oldSelect.selectedIndex]?.textContent || '';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'customer-search-wrap';
+      wrapper.innerHTML = `
+        <input id="mqCustomerSearch" class="customer-search-input" placeholder="اكتب اسم العميل أو الجوال للبحث" value="${selectedText === 'اختر العميل' ? '' : selectedText}">
+        <div id="mqCustomerList" class="customer-search-list"></div>
+      `;
+
+      oldSelect.parentNode.insertBefore(wrapper, oldSelect);
+      const input = q('mqCustomerSearch');
+      if(input){
+        input.addEventListener('input', window.jmsFilterQuoteCustomers);
+        input.addEventListener('focus', window.jmsFilterQuoteCustomers);
+      }
+      bindAutoCalc();
+    }, 100);
+  };
+
+  // Override calcQuoteForm to use robust calculator
+  window.calcQuoteForm = function(){
+    window.jmsQuoteCalcNow();
+  };
+
+  // Also bind if modal already open
+  document.addEventListener('input', function(e){
+    if(e.target && ['mqWidth','mqLength','mqThickness','mqKg','mqPriceKg','mqDensity'].includes(e.target.id)){
+      window.jmsQuoteCalcNow();
+    }
+  });
+  document.addEventListener('change', function(e){
+    if(e.target && ['mqSizeUnit','mqThicknessUnit','mqMaterial','density'].includes(e.target.id)){
+      window.jmsQuoteCalcNow();
+    }
+  });
+})();
+

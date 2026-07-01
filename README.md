@@ -123,3 +123,9 @@ window.JMS_CLOUD = {
 
 ## Preview Scroll Fix
 تم تعديل معاينة عرض السعر بحيث يمكن النزول لأسفل الصفحة ورؤية التواقيع والاعتمادات والختم قبل الطباعة.
+
+
+## JMS Fix - Customer Search + Auto Calculator
+- Added searchable customer input inside quotation form.
+- Added automatic calculation for piece weight and expected pieces count.
+- Calculation updates when changing width, length, thickness, material, density, quantity, and price.
