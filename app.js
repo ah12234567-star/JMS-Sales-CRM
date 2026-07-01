@@ -2023,3 +2023,324 @@ function convertQuoteToOrder(qid){
     });
   });
 })();
+
+
+
+/* JMS quote edit + required validation patch */
+(function(){
+  function localId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function ensure(){
+    db.customers ||= [];
+    db.reps ||= [];
+    db.quotes ||= [];
+    db.orders ||= [];
+  }
+  function requiredValue(id){
+    const el = document.getElementById(id);
+    const val = (el?.value || '').trim();
+    if(!val){
+      if(el) el.classList.add('jms-field-error');
+      return false;
+    }
+    if(el) el.classList.remove('jms-field-error');
+    return true;
+  }
+  function numValue(id){
+    const el = document.getElementById(id);
+    const val = Number(String(el?.value || '').replace(/[^\d.]/g,''));
+    if(!val || val <= 0){
+      if(el) el.classList.add('jms-field-error');
+      return false;
+    }
+    if(el) el.classList.remove('jms-field-error');
+    return true;
+  }
+  function getRepOptions(selected=''){
+    const reps = currentUser?.role === 'rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    return reps.map(r=>`<option value="${r.id}" ${selected===r.id?'selected':''}>${r.name}</option>`).join('');
+  }
+  function customerNameById(cid){
+    const c = db.customers.find(x=>x.id===cid);
+    return c?.name || '';
+  }
+  function setSelectedCustomer(prefix, cid, repSelectId){
+    const c = db.customers.find(x=>x.id===cid);
+    if(!c) return;
+    const hidden = document.getElementById(prefix+'Customer');
+    const search = document.getElementById(prefix+'CustomerSearch');
+    const pill = document.getElementById(prefix+'CustomerPill');
+    if(hidden) hidden.value = c.id;
+    if(search) search.value = c.name;
+    if(pill){ pill.textContent='تم اختيار العميل: '+c.name; pill.classList.add('jms-selected-pill'); }
+    if(repSelectId && c.rep_id){
+      const rep = document.getElementById(repSelectId);
+      if(rep) rep.value = c.rep_id;
+    }
+  }
+  function fieldVal(id){ return document.getElementById(id)?.value || ''; }
+
+  function quoteFormHtml(q=null){
+    ensure();
+    const isEdit = !!q;
+    const defaultRep = q?.rep_id || (currentUser?.role === 'rep' ? currentUser.id : (db.reps[0]?.id || ''));
+    return `<h2>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
+      <div class="quote-customer-mode">
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+      </div>
+
+      <div id="existingCustomerBox" class="form-grid two">
+        <label>بحث عن العميل
+          <div class="jms-search-box">
+            <input id="mqCustomerSearch" autocomplete="off" placeholder="اكتب اسم العميل أو الجوال أو المدينة..."
+              oninput="jmsSearchCustomers('mqCustomerSearch','mqCustomerResults','mqCustomer','mqCustomerPill','mqRep')"
+              onfocus="jmsSearchCustomers('mqCustomerSearch','mqCustomerResults','mqCustomer','mqCustomerPill','mqRep')">
+            <div id="mqCustomerResults" class="jms-search-results"></div>
+            <input type="hidden" id="mqCustomer">
+            <div id="mqCustomerPill"></div>
+          </div>
+        </label>
+        <label>المندوب<select id="mqRep">${getRepOptions(defaultRep)}</select></label>
+      </div>
+
+      <div id="newCustomerBox" class="form-grid two hidden">
+        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
+        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
+        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+      </div>
+
+      <div class="form-grid two">
+        <label>تاريخ العرض<input id="mqDate" type="date" value="${q?.date || q?.quote_date || tdy()}"></label>
+        <label>صلاحية العرض<input id="mqValid" type="date" value="${q?.valid_until || ''}"></label>
+      </div>
+
+      <div class="form-grid four">
+        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
+        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
+        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" value="${q?.color || ''}"></label>
+        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+      </div>
+
+      <div class="form-grid four">
+        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65" value="${q?.width || ''}"></label>
+        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="90" value="${q?.length || ''}"></label>
+        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
+        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75" value="${q?.thickness || ''}"></label>
+      </div>
+
+      <div class="form-grid four">
+        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
+        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="2000" value="${q?.total_kg || ''}"></label>
+        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg || ''}"></label>
+        <label>كثافة الخامة<input id="mqDensity" class="jms-calc-output" readonly></label>
+      </div>
+
+      <div class="form-grid three">
+        <label>وزن الحبة<input id="mqPiece" class="jms-calc-output" readonly value="${q?.piece_weight || ''}"></label>
+        <label>عدد الحبات<input id="mqPieces" class="jms-calc-output" readonly value="${q?.pieces || ''}"></label>
+        <label>الإجمالي<input id="mqTotal" class="jms-calc-output" readonly value="${q?.total_amount || ''}"></label>
+      </div>
+
+      <div class="form-grid two">
+        <label>شروط الدفع<input id="mqPayment" value="${q?.payment_terms || 'حسب الاتفاق'}"></label>
+        <label>مدة التسليم<input id="mqDelivery" value="${q?.delivery_terms || 'حسب جدول الإنتاج'}"></label>
+      </div>
+      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" value="${q?.notes || ''}"></label>
+      <div class="jms-required-hint">لا يمكن حفظ أو إرسال عرض السعر إذا كانت الخانات الأساسية فارغة.</div>
+      <br><button class="primary" type="button" onclick="${isEdit?`updateQuote('${q.id}')`:'saveQuote()'}">${isEdit?'حفظ التعديل وإرجاعه للاعتماد':'حفظ وإرساله للمدير للاعتماد'}</button>`;
+  }
+
+  function attachCalc(){
+    const ids=['mqWidth','mqLength','mqSizeUnit','mqThickness','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'];
+    ids.forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){
+        el.addEventListener('input',()=>window.jmsCalcQuote && window.jmsCalcQuote());
+        el.addEventListener('change',()=>window.jmsCalcQuote && window.jmsCalcQuote());
+      }
+    });
+    setTimeout(()=>window.jmsCalcQuote && window.jmsCalcQuote(),60);
+  }
+
+  function fillQuoteDefaults(q){
+    if(!q) return;
+    setTimeout(()=>{
+      setSelectedCustomer('mq', q.customer_id, 'mqRep');
+      if(document.getElementById('mqProduct')) mqProduct.value = q.product || mqProduct.value;
+      if(document.getElementById('mqMaterial')) mqMaterial.value = q.material || mqMaterial.value;
+      if(document.getElementById('mqPrint')) mqPrint.value = q.print || mqPrint.value;
+      if(document.getElementById('mqSizeUnit')) mqSizeUnit.value = q.size_unit || 'cm';
+      if(document.getElementById('mqThicknessUnit')) mqThicknessUnit.value = q.thickness_unit || 'micron';
+      window.jmsCalcQuote && window.jmsCalcQuote();
+    },80);
+  }
+
+  window.validateQuoteForm = function(){
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    let ok=true;
+    if(mode==='new'){
+      ok = requiredValue('mqNewCustomerName') && ok;
+    }else{
+      ok = requiredValue('mqCustomer') && ok;
+    }
+    ok = requiredValue('mqProduct') && ok;
+    ok = requiredValue('mqMaterial') && ok;
+    ok = numValue('mqWidth') && ok;
+    ok = numValue('mqLength') && ok;
+    ok = numValue('mqThickness') && ok;
+    ok = numValue('mqKg') && ok;
+    ok = numValue('mqPriceKg') && ok;
+    window.jmsCalcQuote && window.jmsCalcQuote();
+    ok = requiredValue('mqPiece') && ok;
+    ok = requiredValue('mqPieces') && ok;
+    ok = numValue('mqTotal') && ok;
+    if(!ok){
+      alert('لا يمكن حفظ عرض السعر. عبئ الخانات الأساسية أولًا: العميل، المنتج، المقاس، السماكة، الكمية، سعر الكيلو.');
+    }
+    return ok;
+  };
+
+  window.openQuoteForm = function(defaultCustomerId=''){
+    modalBody.innerHTML = quoteFormHtml(null);
+    modal.classList.remove('hidden');
+    if(defaultCustomerId) setTimeout(()=>setSelectedCustomer('mq', defaultCustomerId, 'mqRep'),80);
+    attachCalc();
+  };
+
+  window.editQuote = function(qid){
+    const q=db.quotes.find(x=>x.id===qid);
+    if(!q) return alert('لم يتم العثور على عرض السعر');
+    if(['approved','sent','accepted','cancelled'].includes(q.status)){
+      if(!(currentUser?.role==='admin'||currentUser?.role==='sales')){
+        return alert('لا يمكن تعديل عرض معتمد أو مرسل. اطلب من المدير إرجاعه للمراجعة.');
+      }
+    }
+    modalBody.innerHTML = quoteFormHtml(q);
+    modal.classList.remove('hidden');
+    fillQuoteDefaults(q);
+    attachCalc();
+  };
+
+  window.updateQuote = function(qid){
+    const q=db.quotes.find(x=>x.id===qid);
+    if(!q) return;
+    if(!validateQuoteForm()) return;
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    let customerId = document.getElementById('mqCustomer')?.value;
+    let repId = document.getElementById('mqRep')?.value || q.rep_id;
+    if(mode==='new'){
+      const name=(mqNewCustomerName.value||'').trim();
+      const newCustomer={id:localId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من تعديل عرض سعر'};
+      db.customers.unshift(newCustomer);
+      customerId=newCustomer.id;
+    }
+    Object.assign(q,{
+      customer_id:customerId,rep_id:repId,
+      date:fieldVal('mqDate')||tdy(),valid_until:fieldVal('mqValid'),
+      product:fieldVal('mqProduct'),material:fieldVal('mqMaterial'),color:fieldVal('mqColor'),print:fieldVal('mqPrint'),
+      width:fieldVal('mqWidth'),length:fieldVal('mqLength'),size_unit:fieldVal('mqSizeUnit'),
+      thickness:fieldVal('mqThickness'),thickness_unit:fieldVal('mqThicknessUnit'),
+      total_kg:fieldVal('mqKg'),price_kg:fieldVal('mqPriceKg'),total_amount:fieldVal('mqTotal'),
+      piece_weight:fieldVal('mqPiece'),pieces:fieldVal('mqPieces'),
+      payment_terms:fieldVal('mqPayment'),delivery_terms:fieldVal('mqDelivery'),notes:fieldVal('mqNotes'),
+      status:'pending',
+      edited_by:currentUser?.name||'',edited_at:new Date().toISOString()
+    });
+    if(typeof save==='function') save();
+    closeModal(); renderAll(); alert('تم تعديل العرض وإرجاعه لاعتماد المدير');
+  };
+
+  window.saveQuote = function(){
+    ensure();
+    if(!validateQuoteForm()) return;
+    const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
+    let customerId='';
+    let repId=document.getElementById('mqRep')?.value || currentUser?.id || '';
+    if(mode==='new'){
+      const name=(mqNewCustomerName.value||'').trim();
+      const newCustomer={id:localId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من عرض سعر'};
+      db.customers.unshift(newCustomer);
+      customerId=newCustomer.id;
+    }else{
+      customerId=document.getElementById('mqCustomer')?.value;
+    }
+    const no='Q-'+String((db.quotes||[]).length+1).padStart(5,'0');
+    db.quotes.unshift({
+      id:localId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:fieldVal('mqDate')||tdy(),valid_until:fieldVal('mqValid'),
+      product:fieldVal('mqProduct'),material:fieldVal('mqMaterial'),color:fieldVal('mqColor'),print:fieldVal('mqPrint'),
+      width:fieldVal('mqWidth'),length:fieldVal('mqLength'),size_unit:fieldVal('mqSizeUnit'),
+      thickness:fieldVal('mqThickness'),thickness_unit:fieldVal('mqThicknessUnit'),
+      total_kg:fieldVal('mqKg'),price_kg:fieldVal('mqPriceKg'),total_amount:fieldVal('mqTotal'),
+      piece_weight:fieldVal('mqPiece'),pieces:fieldVal('mqPieces'),
+      payment_terms:fieldVal('mqPayment'),delivery_terms:fieldVal('mqDelivery'),notes:fieldVal('mqNotes'),
+      created_by:currentUser?.name||'',created_at:new Date().toISOString()
+    });
+    if(typeof save==='function') save();
+    closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+  };
+
+  window.returnQuoteForEdit = function(qid){
+    const q=db.quotes.find(x=>x.id===qid);
+    if(!q) return;
+    if(!(currentUser?.role==='admin'||currentUser?.role==='sales')) return alert('هذه الصلاحية للمدير فقط');
+    q.status='pending';
+    q.returned_by=currentUser?.name||'';
+    q.returned_at=new Date().toISOString();
+    if(typeof save==='function') save();
+    renderAll();
+    alert('تم إرجاع العرض للمراجعة ويمكن تعديله الآن');
+  };
+
+  const oldSendQuote = window.sendQuote;
+  window.sendQuote = function(qid){
+    const q=db.quotes.find(x=>x.id===qid);
+    if(!q) return;
+    const required = ['customer_id','product','width','length','thickness','material','total_kg','price_kg','piece_weight','pieces','total_amount'];
+    const missing = required.some(k=>!q[k] || Number(q[k])===0);
+    if(missing){
+      return alert('لا يمكن إرسال عرض السعر لأنه ناقص. عدّل العرض وعبئ الخانات الأساسية أولًا.');
+    }
+    if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن الإرسال قبل اعتماد المدير');
+    q.status='sent';
+    q.sent_at=tdy();
+    if(typeof save==='function') save();
+    if(typeof renderQuotes==='function') renderQuotes();
+    const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit||''}%0Aالسماكة: ${q.thickness} ${q.thickness_unit||''}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي: ${q.total_amount} ريال`;
+    window.open(`https://wa.me/?text=${msg}`,'_blank');
+  };
+
+  const oldQuoteCard = window.quoteCard;
+  window.quoteCard = function(q){
+    const canApprove=currentUser?.role==='admin'||currentUser?.role==='sales';
+    const canEdit = q.status==='pending' || q.status==='rejected' || canApprove;
+    const canSend=q.status==='approved'||q.status==='sent';
+    const canConvert=q.status==='accepted'||q.status==='approved'||q.status==='sent';
+    return `<div class="quote-card">
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
+      <div class="quote-lines">
+        <div><span>المنتج</span><b>${q.product||'-'}</b></div>
+        <div><span>المقاس</span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div>
+        <div><span>السماكة</span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div>
+        <div><span>الخامة</span><b>${q.material||'-'}</b></div>
+        <div><span>الكمية</span><b>${q.total_kg||'-'} كجم</b></div>
+        <div><span>سعر الكيلو</span><b>${q.price_kg||'-'} ريال</b></div>
+        <div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div>
+        <div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div>
+      </div>
+      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
+      ${q.cancel_reason?`<div class="alert-card">سبب الإلغاء: ${q.cancel_reason}</div>`:''}
+      ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
+      <div class="quote-actions">
+        <button onclick="viewQuote('${q.id}')">عرض</button>
+        ${canEdit?`<button class="edit" onclick="editQuote('${q.id}')">تعديل</button>`:''}
+        ${canApprove && ['approved','sent','accepted'].includes(q.status)?`<button class="revision" onclick="returnQuoteForEdit('${q.id}')">إرجاع للمراجعة</button>`:''}
+        ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}
+        ${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}
+        ${q.status==='sent'?`<button class="accept" onclick="acceptQuote('${q.id}')">العميل وافق</button><button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}
+        ${canConvert && q.status!=='cancelled' && q.status!=='rejected'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}
+      </div>
+    </div>`;
+  };
+})();

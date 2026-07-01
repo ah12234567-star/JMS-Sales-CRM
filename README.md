@@ -124,8 +124,17 @@ window.JMS_CLOUD = {
 ## Preview Scroll Fix
 تم تعديل معاينة عرض السعر بحيث يمكن النزول لأسفل الصفحة ورؤية التواقيع والاعتمادات والختم قبل الطباعة.
 
+## JMS CRM V2 Final Fixes
+- إصلاح البحث عن العميل داخل عرض السعر.
+- إصلاح البحث عن العميل داخل طلب التصنيع.
+- إصلاح الحاسبة التلقائية: وزن الحبة وعدد الحبات والإجمالي.
+- تطبيق نفس التعديلات في عرض السعر وطلب التصنيع.
+- إضافة حالة إلغاء عرض السعر إذا العميل لم يوافق مع سبب الإلغاء.
+- تحسين عرض المعاينة والتمرير والطباعة.
 
-## JMS Fix - Customer Search + Auto Calculator
-- Added searchable customer input inside quotation form.
-- Added automatic calculation for piece weight and expected pieces count.
-- Calculation updates when changing width, length, thickness, material, density, quantity, and price.
+## Quote Edit + Required Fields Validation
+- إضافة زر تعديل عرض السعر.
+- يمنع حفظ عرض السعر إذا الخانات الأساسية فاضية.
+- يمنع إرسال عرض السعر إذا كان ناقصًا.
+- بعد تعديل عرض معتمد يرجع إلى حالة بانتظار اعتماد المدير.
+- المدير يستطيع إرجاع العرض للمراجعة.

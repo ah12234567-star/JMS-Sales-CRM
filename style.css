@@ -453,62 +453,29 @@
 }
 
 
-
-/* JMS PATCH: customer search inside quotation form */
-.customer-search-wrap{
-  position: relative;
-  width: 100%;
-}
-.customer-search-input{
-  width: 100%;
-  border: 1px solid #d8dee9;
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-size: 15px;
-  background: #fff;
-  color: #111827;
-  box-sizing: border-box;
-}
-.customer-search-list{
-  position: absolute;
-  z-index: 99999;
-  top: calc(100% + 6px);
-  right: 0;
-  left: 0;
-  max-height: 280px;
-  overflow-y: auto;
-  background: #fff;
-  border: 1px solid #d8dee9;
-  border-radius: 14px;
-  box-shadow: 0 16px 40px rgba(15,23,42,.18);
-}
-.customer-search-item{
-  display: block;
-  width: 100%;
-  text-align: right;
-  border: 0;
-  background: #fff;
-  padding: 11px 14px;
-  cursor: pointer;
-  color: #111827;
-  border-bottom: 1px solid #edf0f5;
-}
-.customer-search-item:hover{
-  background: #f3f6fb;
-}
-.customer-search-item b{
-  display: block;
-  font-size: 14px;
-}
-.customer-search-item span{
-  display: block;
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 3px;
-}
-.customer-search-empty{
-  padding: 14px;
-  color: #64748b;
-  text-align: center;
+/* JMS V2 final fixes: searchable customers + calculators + pro forms */
+.jms-search-box{position:relative;width:100%}
+.jms-search-box input{width:100%;border:1px solid #d8dee9;border-radius:14px;padding:12px;background:#fff;font-size:15px}
+.jms-search-results{position:absolute;top:100%;right:0;left:0;margin-top:6px;max-height:280px;overflow:auto;background:#fff;border:1px solid #d8dee9;border-radius:14px;box-shadow:0 18px 45px rgba(15,23,42,.20);z-index:9999;display:none}
+.jms-search-results.active{display:block}
+.jms-search-results button{width:100%;border:0;border-bottom:1px solid #edf2f7;background:#fff;text-align:right;padding:11px 12px;cursor:pointer;font-weight:900;color:#111827}
+.jms-search-results button:hover{background:#f8fafc}
+.jms-search-results small{display:block;color:#64748b;font-weight:400;margin-top:3px}
+.jms-selected-pill{display:inline-block;margin-top:8px;border-radius:999px;background:#dcfce7;color:#166534;padding:7px 11px;font-weight:900;font-size:13px}
+.jms-calc-output{background:#eef2ff!important;color:#111827!important;font-weight:900!important}
+.jms-pro-note{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;padding:10px 12px;color:#475569;margin-top:10px;font-size:13px}
+.quote-actions .cancel,.quote-actions-print .cancel{background:#991b1b!important}
+.quote-actions .accept{background:#166534!important}
+.quote-actions .pdf{background:#b91c1c!important}
+.modal-card{max-height:94vh;overflow-y:auto}
+.quote-print,.quote-print-pro,.quote-print-pro.a4{max-height:92vh;overflow-y:auto}
+@media print{
+  .modal-card,.quote-print,.quote-print-pro,.quote-print-pro.a4{max-height:none!important;overflow:visible!important}
 }
 
+
+/* Quote edit and validation */
+.quote-actions .edit{background:#475569!important}
+.quote-actions .revision{background:#7c3aed!important}
+.jms-required-hint{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;font-weight:800}
+.jms-field-error{border-color:#b91c1c!important;background:#fff1f2!important}
