@@ -97,3 +97,20 @@ create policy "public read rep locations" on jms_rep_locations for select using 
 create policy "public write rep locations" on jms_rep_locations for all using (true) with check (true);
 create policy "public read rep targets" on jms_rep_targets for select using (true);
 create policy "public write rep targets" on jms_rep_targets for all using (true) with check (true);
+
+
+
+-- CRM 3.0 Smart Visits Phase 2 optional cloud table
+create table if not exists jms_smart_visits (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table jms_smart_visits enable row level security;
+
+drop policy if exists "public read smart visits" on jms_smart_visits;
+drop policy if exists "public write smart visits" on jms_smart_visits;
+
+create policy "public read smart visits" on jms_smart_visits for select using (true);
+create policy "public write smart visits" on jms_smart_visits for all using (true) with check (true);

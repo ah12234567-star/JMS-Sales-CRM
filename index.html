@@ -55,6 +55,7 @@
     <nav>
       <button class="nav active" data-page="dashboard">لوحة التحكم</button>
       <button class="nav manager-only" data-page="repsControl">المناديب</button>
+        <button class="nav" data-page="smartVisits">الزيارات الذكية</button>
         <button class="nav" data-page="customers">العملاء</button>
       <button class="nav" data-page="visits">الزيارات</button>
       <button class="nav" data-page="orders">طلبات التصنيع</button>
@@ -97,6 +98,55 @@
     </section>
 
     
+      
+      <section id="smartVisits" class="page">
+        <div class="page-head with-action">
+          <div>
+            <h1>الزيارات الذكية</h1>
+            <p>تسجيل الوصول والمغادرة، نتيجة الزيارة، GPS، وزيارات اليوم</p>
+          </div>
+          <div class="head-actions">
+            <button class="primary" onclick="openSmartVisitForm()">بدء زيارة</button>
+            <button class="primary secondary" onclick="renderSmartVisits()">تحديث</button>
+          </div>
+        </div>
+
+        <div class="stats visits-stats">
+          <div class="stat"><span>زيارات اليوم</span><b id="smartVisitsToday">0</b><small>زيارة</small></div>
+          <div class="stat"><span>زيارات مفتوحة</span><b id="smartVisitsOpen">0</b><small>زيارة</small></div>
+          <div class="stat"><span>متوسط المدة</span><b id="smartVisitsAvg">0</b><small>دقيقة</small></div>
+          <div class="stat danger-card"><span>بدون نتيجة</span><b id="smartVisitsNoResult">0</b><small>زيارة</small></div>
+        </div>
+
+        <div class="panel">
+          <div class="form-grid four">
+            <label>بحث
+              <input id="smartVisitSearch" placeholder="اسم العميل أو المندوب" oninput="renderSmartVisits()">
+            </label>
+            <label>النتيجة
+              <select id="smartVisitResultFilter" onchange="renderSmartVisits()">
+                <option value="all">كل النتائج</option>
+                <option value="quote">عرض سعر</option>
+                <option value="sale">تم البيع</option>
+                <option value="collection">تحصيل</option>
+                <option value="no_manager">لا يوجد مسؤول</option>
+                <option value="closed">العميل مغلق</option>
+                <option value="postponed">مؤجل</option>
+                <option value="none">بدون نتيجة</option>
+              </select>
+            </label>
+            <label>المندوب
+              <select id="smartVisitRepFilter" onchange="renderSmartVisits()"></select>
+            </label>
+            <label>إجراء
+              <button class="primary small" type="button" onclick="renderSmartVisits()">عرض</button>
+            </label>
+          </div>
+        </div>
+
+        <div id="smartVisitsGrid" class="smart-visits-grid"></div>
+      </section>
+
       <section id="repsControl" class="page">
         <div class="page-head with-action">
           <div>

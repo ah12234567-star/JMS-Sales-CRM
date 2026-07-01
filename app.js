@@ -2725,3 +2725,276 @@ function convertQuoteToOrder(qid){
     renderRepsControl();
   };
 })();
+
+
+
+/* CRM 3.0 Smart Visits Phase 2 */
+(function(){
+  function ensureVisitData(){
+    db.visits ||= [];
+    db.customers ||= [];
+    db.reps ||= [];
+    db.repLocations ||= [];
+    db.repAttendance ||= [];
+    db.repStatus ||= {};
+  }
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function nowIso(){ return new Date().toISOString(); }
+  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function customerObj(id){ return db.customers.find(c=>c.id===id) || {}; }
+  function customerNm(id){ return (typeof customerName==='function') ? customerName(id) : (customerObj(id).name || '-'); }
+  function repNm(id){ return (typeof repName==='function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+  function timeStr(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
+  function minDiff(a,b){ if(!a||!b) return 0; return Math.max(0, Math.round((new Date(b)-new Date(a))/60000)); }
+  function resultText(r){
+    return ({quote:'عرض سعر',sale:'تم البيع',collection:'تحصيل',no_manager:'لا يوجد مسؤول',closed:'العميل مغلق',postponed:'مؤجل',none:'بدون نتيجة'})[r||'none'] || 'بدون نتيجة';
+  }
+  function allowedReps(){
+    return currentUser?.role==='rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+  }
+  function allowedVisitList(){
+    ensureVisitData();
+    return currentUser?.role==='rep' ? db.visits.filter(v=>v.rep_id===currentUser.id) : db.visits;
+  }
+  function setRepStatus(repId,status){
+    db.repStatus ||= {};
+    db.repStatus[repId] = {status,updated_at:nowIso()};
+  }
+  function getGeo(cb){
+    if(!navigator.geolocation) return cb(null,'المتصفح لا يدعم GPS');
+    navigator.geolocation.getCurrentPosition(
+      pos=>cb({lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy},null),
+      err=>cb(null,'لم يتم السماح بتحديد الموقع أو حدث خطأ'),
+      {enableHighAccuracy:true,timeout:12000,maximumAge:30000}
+    );
+  }
+  function saveRender(){
+    if(typeof save==='function') save();
+    if(typeof renderAll==='function') renderAll();
+  }
+
+  window.openSmartVisitForm = function(customerId=''){
+    ensureVisitData();
+    const reps=allowedReps();
+    const customers=(typeof allowedCustomers==='function'?allowedCustomers():db.customers);
+    modalBody.innerHTML = `<h2>بدء زيارة ذكية</h2>
+      <div class="form-grid two">
+        <label>العميل
+          <select id="svCustomer">
+            <option value="">اختر العميل</option>
+            ${customers.map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${c.name}</option>`).join('')}
+          </select>
+        </label>
+        <label>المندوب
+          <select id="svRep">
+            ${reps.map(r=>`<option value="${r.id}" ${r.id===currentUser?.id?'selected':''}>${r.name}</option>`).join('')}
+          </select>
+        </label>
+        <label>نوع الزيارة
+          <select id="svType">
+            <option value="scheduled">زيارة مجدولة</option>
+            <option value="new_order">طلب جديد</option>
+            <option value="collection">تحصيل</option>
+            <option value="follow_up">متابعة</option>
+          </select>
+        </label>
+        <label>موعد الزيارة القادمة
+          <input id="svNextDate" type="date">
+        </label>
+      </div>
+      <label>ملاحظات الوصول
+        <input id="svStartNotes" placeholder="ملاحظة مختصرة عند بداية الزيارة">
+      </label>
+      <div class="smart-note">سيتم تسجيل وقت الوصول وموقع GPS إن سمح المتصفح بذلك.</div>
+      <br><button class="primary" onclick="startSmartVisit()">تسجيل الوصول وبدء الزيارة</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.startSmartVisit = function(){
+    ensureVisitData();
+    const customerId=svCustomer.value;
+    const repId=svRep.value;
+    if(!customerId) return alert('اختر العميل');
+    if(!repId) return alert('اختر المندوب');
+    const open=db.visits.find(v=>v.rep_id===repId && !v.checkout_at && (v.smart||v.checkin_at));
+    if(open) return alert('يوجد زيارة مفتوحة لهذا المندوب. أنهها أولًا.');
+    getGeo((geo,err)=>{
+      const v={
+        id:uid(), smart:true, date:tdy(), customer_id:customerId, rep_id:repId,
+        type:svType.value, checkin_at:nowIso(), checkout_at:null,
+        checkin_lat:geo?.lat||null, checkin_lng:geo?.lng||null, checkin_accuracy:geo?.accuracy||null,
+        result:'none', notes:svStartNotes.value||'', next_visit_date:svNextDate.value||''
+      };
+      db.visits.unshift(v);
+      if(geo){
+        db.repLocations ||= [];
+        db.repLocations.unshift({id:uid(),rep_id:repId,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'visit_checkin',visit_id:v.id,created_at:nowIso()});
+      }
+      setRepStatus(repId,'in_visit');
+      saveRender();
+      closeModal();
+      alert(err ? 'تم بدء الزيارة بدون GPS: '+err : 'تم تسجيل الوصول وبدء الزيارة');
+    });
+  };
+
+  window.endSmartVisit = function(visitId){
+    const v=db.visits.find(x=>x.id===visitId);
+    if(!v) return;
+    modalBody.innerHTML = `<h2>إنهاء الزيارة</h2>
+      <p><b>العميل:</b> ${customerNm(v.customer_id)}</p>
+      <div class="form-grid two">
+        <label>نتيجة الزيارة
+          <select id="evResult">
+            <option value="quote">عرض سعر</option>
+            <option value="sale">تم البيع</option>
+            <option value="collection">تحصيل</option>
+            <option value="no_manager">لا يوجد مسؤول</option>
+            <option value="closed">العميل مغلق</option>
+            <option value="postponed">مؤجل</option>
+            <option value="none">بدون نتيجة</option>
+          </select>
+        </label>
+        <label>الزيارة القادمة
+          <input id="evNextDate" type="date" value="${v.next_visit_date||''}">
+        </label>
+      </div>
+      <label>ملاحظات الزيارة
+        <input id="evNotes" value="${v.notes||''}" placeholder="ماذا حدث في الزيارة؟">
+      </label>
+      <div class="smart-note">سيتم تسجيل وقت المغادرة وموقع GPS إن سمح المتصفح بذلك.</div>
+      <br><button class="primary" onclick="saveEndSmartVisit('${visitId}')">حفظ وإنهاء الزيارة</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.saveEndSmartVisit = function(visitId){
+    const v=db.visits.find(x=>x.id===visitId);
+    if(!v) return;
+    getGeo((geo,err)=>{
+      v.checkout_at=nowIso();
+      v.checkout_lat=geo?.lat||null;
+      v.checkout_lng=geo?.lng||null;
+      v.checkout_accuracy=geo?.accuracy||null;
+      v.result=evResult.value;
+      v.notes=evNotes.value||'';
+      v.next_visit_date=evNextDate.value||'';
+      v.duration_minutes=minDiff(v.checkin_at,v.checkout_at);
+      if(geo){
+        db.repLocations ||= [];
+        db.repLocations.unshift({id:uid(),rep_id:v.rep_id,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'visit_checkout',visit_id:v.id,created_at:nowIso()});
+      }
+      const c=customerObj(v.customer_id);
+      if(c){
+        c.last_visit=v.date;
+        c.next_visit_date=v.next_visit_date || c.next_visit_date || '';
+        c.last_visit_result=v.result;
+      }
+      setRepStatus(v.rep_id,'on_duty');
+      saveRender();
+      closeModal();
+      if(v.result==='quote' && confirm('نتيجة الزيارة عرض سعر. هل تريد إنشاء عرض سعر الآن؟')){
+        if(typeof openQuoteForm==='function') openQuoteForm(v.customer_id);
+      }else{
+        alert('تم إنهاء الزيارة');
+      }
+    });
+  };
+
+  window.openVisitOnMap = function(visitId,point='checkin'){
+    const v=db.visits.find(x=>x.id===visitId);
+    if(!v) return;
+    const lat = point==='checkout' ? v.checkout_lat : v.checkin_lat;
+    const lng = point==='checkout' ? v.checkout_lng : v.checkin_lng;
+    if(!lat || !lng) return alert('لا يوجد موقع محفوظ لهذه النقطة');
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank');
+  };
+
+  window.openCustomerRoute = function(customerId){
+    const c=customerObj(customerId);
+    const q = c.lat && c.lng ? `${c.lat},${c.lng}` : encodeURIComponent(`${c.name||''} ${c.city||'جدة'} ${c.location||''}`);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${q}`,'_blank');
+  };
+
+  window.renderSmartVisits = function(){
+    if(!window.smartVisitsGrid) return;
+    ensureVisitData();
+    if(window.smartVisitRepFilter){
+      const old=smartVisitRepFilter.value||'all';
+      smartVisitRepFilter.innerHTML = `<option value="all">كل المناديب</option>` + allowedReps().map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+      smartVisitRepFilter.value = old;
+    }
+    const todayList=allowedVisitList().filter(v=>String(v.date||'').startsWith(tdy()));
+    const open=todayList.filter(v=>!v.checkout_at);
+    const done=todayList.filter(v=>v.checkout_at);
+    const avg=done.length ? Math.round(done.reduce((s,v)=>s+Number(v.duration_minutes||0),0)/done.length) : 0;
+    const none=todayList.filter(v=>(v.result||'none')==='none').length;
+    if(window.smartVisitsToday) smartVisitsToday.textContent=todayList.length;
+    if(window.smartVisitsOpen) smartVisitsOpen.textContent=open.length;
+    if(window.smartVisitsAvg) smartVisitsAvg.textContent=avg;
+    if(window.smartVisitsNoResult) smartVisitsNoResult.textContent=none;
+
+    const q=(smartVisitSearch?.value||'').trim();
+    const rf=smartVisitResultFilter?.value||'all';
+    const repf=smartVisitRepFilter?.value||'all';
+    const list=allowedVisitList().filter(v=>{
+      if(rf!=='all'){
+        if(rf==='none' && (v.result||'none')!=='none') return false;
+        if(rf!=='none' && v.result!==rf) return false;
+      }
+      if(repf!=='all' && v.rep_id!==repf) return false;
+      if(q && !(`${customerNm(v.customer_id)} ${repNm(v.rep_id)} ${v.notes||''}`).includes(q)) return false;
+      return true;
+    }).slice(0,80);
+
+    smartVisitsGrid.innerHTML=list.map(v=>{
+      const isOpen=!v.checkout_at;
+      return `<div class="visit-card ${isOpen?'open':'closed'}">
+        <div class="visit-card-head">
+          <div>
+            <h3>${customerNm(v.customer_id)}</h3>
+            <p>${repNm(v.rep_id)} · ${v.date||'-'}</p>
+            <span class="visit-result">${resultText(v.result)}</span>
+          </div>
+          <span class="visit-status ${isOpen?'open':'closed'}">${isOpen?'مفتوحة':'منتهية'}</span>
+        </div>
+        <div class="visit-lines">
+          <div><span>وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
+          <div><span>وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
+          <div><span>مدة الزيارة</span><b>${v.duration_minutes||0} دقيقة</b></div>
+          <div><span>الزيارة القادمة</span><b>${v.next_visit_date||'-'}</b></div>
+        </div>
+        <div class="smart-note">${v.notes||'لا توجد ملاحظات'}</div>
+        <div class="visit-actions">
+          ${isOpen?`<button class="end" onclick="endSmartVisit('${v.id}')">إنهاء الزيارة</button>`:''}
+          <button class="route" onclick="openCustomerRoute('${v.customer_id}')">فتح موقع العميل</button>
+          <button onclick="openVisitOnMap('${v.id}','checkin')">موقع الوصول</button>
+          ${v.checkout_at?`<button onclick="openVisitOnMap('${v.id}','checkout')">موقع المغادرة</button>`:''}
+          ${v.result==='quote'?`<button class="quote" onclick="openQuoteForm('${v.customer_id}')">إنشاء عرض سعر</button>`:''}
+        </div>
+      </div>`;
+    }).join('') || '<div class="panel">لا توجد زيارات</div>';
+  };
+
+  // Override customer "تمت الزيارة" to smart visit when possible
+  window.quickVisit = function(customerId){
+    openSmartVisitForm(customerId);
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll==='function') oldRenderAll();
+    renderSmartVisits();
+  };
+
+  const oldShowApp = window.showApp;
+  if(typeof oldShowApp === 'function'){
+    window.showApp = function(){
+      oldShowApp();
+      document.querySelectorAll('.nav').forEach(btn=>{
+        if(btn.dataset.page==='smartVisits'){
+          btn.style.display = currentUser ? 'block' : 'none';
+        }
+      });
+    };
+  }
+})();

@@ -513,3 +513,29 @@
 .rep-map-link{display:inline-block;margin-top:6px;color:#1d4ed8;font-weight:900;text-decoration:none}
 .rep-self-panel{background:#ecfdf5;border:1px solid #bbf7d0;border-radius:18px;padding:14px;margin-bottom:14px}
 @media(max-width:900px){.reps-stats{grid-template-columns:1fr 1fr}.rep-metrics{grid-template-columns:1fr}}
+
+
+/* CRM 3.0 Smart Visits Phase 2 */
+.visits-stats{grid-template-columns:repeat(4,1fr)}
+.smart-visits-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:16px}
+.visit-card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:18px;box-shadow:0 12px 32px rgba(15,23,42,.06)}
+.visit-card.open{border-color:#f59e0b;background:#fffbeb}
+.visit-card.closed{border-color:#bbf7d0}
+.visit-card-head{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #edf2f7;padding-bottom:12px;margin-bottom:12px}
+.visit-card h3{margin:0;color:#0f172a}
+.visit-card p{margin:6px 0 0;color:#64748b;line-height:1.7;font-size:13px}
+.visit-status{border-radius:999px;padding:7px 11px;font-size:12px;font-weight:900;white-space:nowrap}
+.visit-status.open{background:#fef3c7;color:#92400e}
+.visit-status.closed{background:#dcfce7;color:#166534}
+.visit-result{display:inline-block;border-radius:999px;background:#eff6ff;color:#1d4ed8;padding:6px 10px;font-size:12px;font-weight:900;margin-top:8px}
+.visit-lines{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.visit-lines div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px}
+.visit-lines span{display:block;color:#64748b;font-size:12px}
+.visit-lines b{display:block;color:#111827;margin-top:5px}
+.visit-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.visit-actions button{border:0;border-radius:12px;padding:9px 11px;background:#111827;color:#fff;font-weight:900;cursor:pointer}
+.visit-actions .end{background:#991b1b}
+.visit-actions .quote{background:#1d4ed8}
+.visit-actions .route{background:#166534}
+.smart-note{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;padding:10px;margin-top:10px;color:#475569}
+@media(max-width:900px){.visits-stats{grid-template-columns:1fr 1fr}.visit-lines{grid-template-columns:1fr}}
