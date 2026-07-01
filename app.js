@@ -22,7 +22,13 @@ function load(){
     visits:[],orders:[],collections:[],routes:[]
   };
 }
-function save(){localStorage.setItem(STORE,JSON.stringify(db))}
+function save(){
+  localStorage.setItem(STORE, JSON.stringify(db));
+  // Supabase sync: after any local change, push the latest DB to cloud.
+  if(typeof window.pushCloudData === 'function'){
+    setTimeout(() => window.pushCloudData(), 80);
+  }
+}
 function id(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
 function $(id){return document.getElementById(id)}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -1530,15 +1536,15 @@ function convertQuoteToOrder(qid){
   };
 
   function getDb(){
-    if(window.db) return window.db;
-    try { return JSON.parse(localStorage.getItem("jms_db") || localStorage.getItem("JMS_DB") || "{}"); }
-    catch(e){ return {}; }
+    // app.js uses a top-level `let db`, not `window.db`.
+    // Because this patch is in the same file, we can read it directly.
+    return db || {};
   }
 
   function setDb(next){
-    if(window.db) Object.assign(window.db, next);
+    db = Object.assign(db || {}, next || {});
     try{
-      localStorage.setItem("jms_db", JSON.stringify(window.db || next));
+      localStorage.setItem(STORE, JSON.stringify(db));
     }catch(e){}
   }
 
@@ -1610,11 +1616,8 @@ function convertQuoteToOrder(qid){
     }
   };
 
-  const oldSave = window.save;
-  window.save = function(){
-    if(typeof oldSave === "function") oldSave.apply(this, arguments);
-    if(cloudReady) setTimeout(() => pushCloudData(), 80);
-  };
+  // Expose the real save function for debugging. The actual save() above now pushes to Supabase.
+  window.save = save;
 
   const oldRenderAll = window.renderAll;
   window.renderAll = function(){
