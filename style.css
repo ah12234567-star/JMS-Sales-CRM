@@ -408,3 +408,46 @@
 .cloud-sync-status.local{background:#fef3c7;color:#92400e}
 .cloud-sync-status.cloud{background:#dcfce7;color:#166534}
 .cloud-sync-status.error{background:#fee2e2;color:#991b1b}
+
+
+/* === JMS PREVIEW SCROLL + PRINT FIX === */
+/* يجعل نافذة عرض السعر قابلة للتمرير حتى يظهر أسفل الصفحة والتواقيع */
+.modal{
+  align-items:flex-start !important;
+  place-items:start center !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  padding:18px !important;
+}
+.modal-card{
+  max-height:none !important;
+  overflow:visible !important;
+  margin:0 auto 36px !important;
+}
+#modalBody{
+  max-height:none !important;
+  overflow:visible !important;
+}
+.quote-print-shell{
+  max-height:none !important;
+  overflow:visible !important;
+}
+.quote-a4{
+  overflow:visible !important;
+}
+.quote-a4-approval{
+  page-break-inside:avoid;
+  break-inside:avoid;
+}
+.quote-a4-footer{
+  page-break-inside:avoid;
+  break-inside:avoid;
+}
+@media screen and (max-height:850px){
+  .modal{padding-top:10px !important;}
+  .quote-a4{margin-top:10px !important;margin-bottom:28px !important;}
+}
+@media print{
+  .modal{overflow:visible!important;padding:0!important;align-items:stretch!important;place-items:stretch!important;}
+  .modal-card,#modalBody,.quote-print-shell{overflow:visible!important;max-height:none!important;margin:0!important;}
+}
