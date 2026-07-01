@@ -479,3 +479,8 @@
 .quote-actions .revision{background:#7c3aed!important}
 .jms-required-hint{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;font-weight:800}
 .jms-field-error{border-color:#b91c1c!important;background:#fff1f2!important}
+
+
+/* Force quote edit button visibility */
+.quote-actions .edit{background:#475569!important;color:#fff!important}
+.quote-actions .revision{background:#7c3aed!important;color:#fff!important}
