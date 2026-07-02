@@ -698,3 +698,20 @@ html[dir="ltr"] textarea{
   direction:rtl!important;
   text-align:right!important;
 }
+
+
+/* AI Login Security Fix */
+body:not(.jms-logged-in) #jmsAiLaunch,
+body:not(.jms-logged-in) #jmsAiPanel{
+  display:none!important;
+}
+
+
+/* AI Visibility Fix */
+body.jms-login-screen #jmsAiLaunch,
+body.jms-login-screen #jmsAiPanel{
+  display:none!important;
+}
+body.jms-app-screen #jmsAiLaunch{
+  display:block!important;
+}

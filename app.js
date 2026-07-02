@@ -4451,3 +4451,157 @@ ${todaySummary()}
   setTimeout(secureAIVisibility, 700);
   setInterval(secureAIVisibility, 1000);
 })();
+
+
+
+/* AI VISIBILITY FIX: show AI inside app, hide only on login */
+(function(){
+  function hasLoggedUser(){
+    return !!(window.currentUser && (currentUser.id || currentUser.email || currentUser.name || currentUser.role));
+  }
+  function isLoginVisible(){
+    const login = document.getElementById('login') || document.querySelector('.login') || document.querySelector('#loginScreen');
+    if(!login) return !hasLoggedUser();
+    const style = getComputedStyle(login);
+    return style.display !== 'none' && style.visibility !== 'hidden' && !login.classList.contains('hidden');
+  }
+  function appIsOpen(){
+    return hasLoggedUser() && !isLoginVisible();
+  }
+  function ensureAIExists(){
+    if(document.getElementById('jmsAiLaunch') && document.getElementById('jmsAiPanel')) return;
+    if(!appIsOpen()) return;
+
+    const btn=document.createElement('button');
+    btn.id='jmsAiLaunch';
+    btn.className='jms-ai-launch';
+    btn.textContent='JMS AI';
+    btn.onclick=function(){
+      const p=document.getElementById('jmsAiPanel');
+      if(p) p.classList.toggle('open');
+    };
+
+    const panel=document.createElement('div');
+    panel.id='jmsAiPanel';
+    panel.className='jms-ai-panel';
+    panel.innerHTML=`
+      <div class="jms-ai-head">
+        <div><b>JMS AI</b><small>مساعد ذكي يحلل بيانات النظام</small></div>
+        <button class="jms-ai-close" onclick="jmsAiPanel.classList.remove('open')">×</button>
+      </div>
+      <div id="jmsAiBody" class="jms-ai-body">
+        <div class="jms-ai-msg bot">أهلاً، اسألني عن العملاء، المناديب، الزيارات، التحصيلات، أو الأداء.</div>
+      </div>
+      <div class="jms-ai-quick">
+        <button onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+        <button onclick="askJmsAI('تحليل المبيعات')">تحليل المبيعات</button>
+        <button onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+        <button onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+        <button onclick="askJmsAI('ما هي المديونيات؟')">المديونيات</button>
+      </div>
+      <div class="jms-ai-input">
+        <input id="jmsAiInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter') askJmsAI(this.value)">
+        <button onclick="askJmsAI(jmsAiInput.value)">إرسال</button>
+      </div>`;
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+  }
+
+  function fallbackAnswer(q){
+    const d=window.db||{};
+    d.customers ||= []; d.reps ||= []; d.visits ||= []; d.quotes ||= []; d.orders ||= []; d.collections ||= [];
+    const today = new Date().toISOString().slice(0,10);
+    const money = n => Number(n||0).toLocaleString('ar-SA');
+    const repName = id => (d.reps.find(r=>r.id===id)||{}).name || '-';
+    const dateOf = x => String(x.date||x.created_at||x.checkin_at||'').slice(0,10);
+    q=String(q||'');
+    if(q.includes('أفضل') || q.includes('افضل') || q.includes('مندوب')){
+      const map={};
+      d.reps.forEach(r=>map[r.id]={name:r.name,visits:0,quotes:0,orders:0});
+      d.visits.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].visits++; });
+      d.quotes.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].quotes++; });
+      d.orders.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].orders++; });
+      return 'أفضل المناديب:\n' + Object.values(map).sort((a,b)=>(b.visits+b.quotes+b.orders)-(a.visits+a.quotes+a.orders)).map((r,i)=>`${i+1}. ${r.name}: زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders}`).join('\n');
+    }
+    if(q.includes('30') || q.includes('لم تتم') || q.includes('مازار')){
+      const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+      const rows=d.customers.filter(c=>{
+        const last=d.visits.filter(v=>v.customer_id===c.id).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+        if(!last) return true;
+        return new Date(last.date||last.checkin_at) < cutoff;
+      }).slice(0,20);
+      return rows.length ? 'عملاء لم تتم زيارتهم منذ 30 يوم:\n'+rows.map((c,i)=>`${i+1}. ${c.name} - ${repName(c.rep_id)}`).join('\n') : 'لا يوجد عملاء متأخرين عن الزيارة.';
+    }
+    if(q.includes('تحصيل') || q.includes('مديونية')){
+      const total=d.collections.reduce((s,c)=>s+Number(c.amount||0),0);
+      const todayAmount=d.collections.filter(c=>dateOf(c)===today).reduce((s,c)=>s+Number(c.amount||0),0);
+      return `التحصيلات:\n- إجمالي التحصيل: ${money(total)} ريال\n- تحصيل اليوم: ${money(todayAmount)} ريال`;
+    }
+    return `ملخص اليوم:\n- العملاء: ${d.customers.length}\n- المناديب: ${d.reps.length}\n- الزيارات: ${d.visits.length}\n- العروض: ${d.quotes.length}\n- الطلبات: ${d.orders.length}`;
+  }
+
+  if(typeof window.askJmsAI !== 'function'){
+    window.askJmsAI=function(q){
+      const input=document.getElementById('jmsAiInput');
+      q=String(q||input?.value||'').trim();
+      if(!q) return;
+      const body=document.getElementById('jmsAiBody');
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${fallbackAnswer(q)}</div>`);
+      body.scrollTop=body.scrollHeight;
+      if(input) input.value='';
+    };
+  }
+
+  function updateAIVisibility(){
+    const login = isLoginVisible();
+    const app = appIsOpen();
+    document.body?.classList.toggle('jms-login-screen', login);
+    document.body?.classList.toggle('jms-app-screen', app);
+
+    ensureAIExists();
+
+    const btn=document.getElementById('jmsAiLaunch');
+    const panel=document.getElementById('jmsAiPanel');
+
+    if(login || !app){
+      if(btn) btn.style.display='none';
+      if(panel){ panel.classList.remove('open'); panel.style.display='none'; }
+    }else{
+      if(btn) btn.style.display='block';
+      if(panel) panel.style.display='';
+    }
+  }
+
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){
+    window.showApp=function(){
+      oldShowApp.apply(this,arguments);
+      setTimeout(updateAIVisibility,100);
+      setTimeout(updateAIVisibility,700);
+    };
+  }
+
+  const oldRenderAll=window.renderAll;
+  if(typeof oldRenderAll==='function'){
+    window.renderAll=function(){
+      oldRenderAll.apply(this,arguments);
+      setTimeout(updateAIVisibility,150);
+    };
+  }
+
+  ['logout','signOut','doLogout'].forEach(fn=>{
+    if(typeof window[fn]==='function'){
+      const old=window[fn];
+      window[fn]=function(){
+        const r=old.apply(this,arguments);
+        setTimeout(updateAIVisibility,100);
+        return r;
+      };
+    }
+  });
+
+  setTimeout(updateAIVisibility,200);
+  setTimeout(updateAIVisibility,1000);
+  setInterval(updateAIVisibility,1500);
+})();
