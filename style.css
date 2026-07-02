@@ -683,3 +683,18 @@ body,input,select,textarea,button{font-family:system-ui,-apple-system,"Segoe UI"
   background:#fff;border:1px solid #e5e7eb;border-radius:16px;
   padding:12px;margin-top:10px;line-height:1.8
 }
+
+
+/* Arabic Stable Lock */
+html,body,*{direction:rtl!important}
+body,input,select,textarea,button{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial!important}
+#jmsSafeLang,#fieldLangBox,#jmsMainLangSwitch,.jms-lang-switch,.safe-lang-mini{display:none!important}
+html[dir="ltr"] body,
+html[dir="ltr"] .page,
+html[dir="ltr"] .modal-card,
+html[dir="ltr"] input,
+html[dir="ltr"] select,
+html[dir="ltr"] textarea{
+  direction:rtl!important;
+  text-align:right!important;
+}

@@ -4260,3 +4260,111 @@ ${todaySummary()}
   };
   setTimeout(upgradeQuickButtons,1000);
 })();
+
+
+
+/* ARABIC STABLE LOCK: force full Arabic UI */
+(function(){
+  const AR = {
+    'Dashboard':'لوحة التحكم',
+    'Customers':'العملاء',
+    'Representatives':'المناديب',
+    'Smart Visits':'الزيارات الذكية',
+    'Production Orders':'طلبات التصنيع',
+    'Quotations':'عروض الأسعار',
+    'Logout':'تسجيل الخروج',
+    'Create Quotation':'إنشاء عرض سعر',
+    'Start Work':'بدء الدوام',
+    'End Work':'إنهاء الدوام',
+    'Update Location':'تحديث موقعي',
+    'I am in Visit':'أنا في زيارة',
+    'Current User':'المستخدم الحالي',
+    'System Admin':'مدير النظام',
+    'Sales Manager':'مدير المبيعات',
+    'Representative':'مندوب',
+    'Search by customer name, mobile or city':'ابحث باسم العميل أو الجوال أو المدينة',
+    'Customer':'العميل',
+    'Product':'المنتج',
+    'Thickness':'السماكة',
+    'Material':'الخامة',
+    'Quantity':'الكمية',
+    'Price':'السعر',
+    'Total':'الإجمالي',
+    'Approved':'معتمد',
+    'Pending Approval':'بانتظار الاعتماد',
+    'All Quotes':'كل العروض',
+    'Status':'الحالة',
+    'Rep':'المندوب',
+    'Search':'بحث',
+    'Add Customer':'إضافة عميل',
+    'Import Customers':'استيراد العملاء'
+  };
+
+  function forceArabic(){
+    document.documentElement.lang = 'ar';
+    document.documentElement.dir = 'rtl';
+    if(document.body) document.body.dir = 'rtl';
+
+    // remove or hide all language switchers
+    document.querySelectorAll('#jmsSafeLang,#fieldLangBox,#jmsMainLangSwitch,.jms-lang-switch,.safe-lang-mini').forEach(x=>x.remove());
+
+    // translate simple text nodes
+    const els = document.querySelectorAll('button,a,span,b,small,label,h1,h2,h3,p,th,td,option');
+    els.forEach(el=>{
+      if(el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE){
+        const txt = el.textContent.trim();
+        if(AR[txt]) el.textContent = el.textContent.replace(txt, AR[txt]);
+      }
+    });
+
+    // translate placeholders
+    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{
+      const p = el.getAttribute('placeholder') || '';
+      if(AR[p]) el.setAttribute('placeholder', AR[p]);
+      if(p.includes('customer') || p.includes('mobile') || p.includes('city')){
+        el.setAttribute('placeholder','ابحث باسم العميل أو الجوال أو المدينة');
+      }
+    });
+
+    // hard fixes for common page titles/buttons
+    document.querySelectorAll('h1,h2').forEach(el=>{
+      const t=el.textContent.trim();
+      if(t === 'Customers') el.textContent='العملاء';
+      if(t === 'Dashboard') el.textContent='لوحة التحكم';
+      if(t === 'Quotations') el.textContent='عروض الأسعار';
+    });
+
+    document.querySelectorAll('button').forEach(btn=>{
+      const t=btn.textContent.trim();
+      if(t === 'Start Work') btn.textContent='بدء الدوام';
+      if(t === 'End Work') btn.textContent='إنهاء الدوام';
+      if(t === 'Create Quotation') btn.textContent='إنشاء عرض سعر';
+      if(t === 'Logout') btn.textContent='تسجيل الخروج';
+    });
+  }
+
+  // Disable previous language functions so they never switch to English again
+  window.setFieldLang = function(){ forceArabic(); };
+  window.setJmsLanguage = function(){ forceArabic(); };
+  window.applyFieldLang = forceArabic;
+  window.applyJmsLanguage = forceArabic;
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    setTimeout(forceArabic,150);
+  };
+
+  const oldShowApp = window.showApp;
+  if(typeof oldShowApp === 'function'){
+    window.showApp = function(){
+      oldShowApp();
+      setTimeout(forceArabic,150);
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', forceArabic);
+  document.addEventListener('click', ()=>setTimeout(forceArabic,50), true);
+  setTimeout(forceArabic,300);
+  setInterval(forceArabic,1500);
+})();
