@@ -3637,3 +3637,122 @@ function convertQuoteToOrder(qid){
 
   setTimeout(rebuildCustomerCardActions, 800);
 })();
+
+
+
+/* UI CLEANUP FIX: language duplicates, customer buttons, logo fallback */
+(function(){
+  function ensure(){ db.customers ||= []; }
+  function phoneOk(c){ return String(c?.phone || c?.mobile || '').replace(/\D/g,'').length >= 8; }
+  function findCustomerFromCard(card){
+    const title = card.querySelector('h3')?.textContent?.trim();
+    return db.customers.find(c => String(c.name||'').trim() === title);
+  }
+
+  function cleanupLanguageButtons(){
+    const boxes = Array.from(document.querySelectorAll('#jmsSafeLang,#fieldLangBox,.jms-lang-switch,.safe-lang-mini'));
+    if(!boxes.length) return;
+    boxes.forEach((box,i)=>{
+      box.style.display = i === 0 ? '' : 'none';
+      if(i === 0) box.id = 'jmsMainLangSwitch';
+    });
+  }
+
+  function fixLogoFallback(){
+    const side = document.querySelector('aside') || document.querySelector('.sidebar') || document.querySelector('.side');
+    if(!side || document.getElementById('jmsLogoFallback')) return;
+    const imgs = Array.from(side.querySelectorAll('img'));
+    const needsFallback = imgs.length === 0 || imgs.some(img => !img.getAttribute('src') || (img.complete && img.naturalWidth === 0));
+    if(needsFallback){
+      imgs.forEach(img => img.style.display='none');
+      const wrap = document.createElement('div');
+      wrap.id = 'jmsLogoFallback';
+      wrap.className = 'jms-logo-wrap';
+      wrap.innerHTML = '<div class="jms-logo-fallback">JMS</div>';
+      const brand = side.querySelector('.brand') || side.firstElementChild;
+      if(brand) brand.insertAdjacentElement('afterend', wrap);
+      else side.insertBefore(wrap, side.firstChild);
+    }
+    imgs.forEach(img=>{
+      img.onerror = function(){
+        this.style.display='none';
+        if(!document.getElementById('jmsLogoFallback')){
+          const wrap = document.createElement('div');
+          wrap.id = 'jmsLogoFallback';
+          wrap.className = 'jms-logo-wrap';
+          wrap.innerHTML = '<div class="jms-logo-fallback">JMS</div>';
+          side.insertBefore(wrap, side.firstChild);
+        }
+      };
+    });
+  }
+
+  function rebuildCleanCustomerActions(){
+    ensure();
+    document.querySelectorAll('.customer-card').forEach(card=>{
+      const c = findCustomerFromCard(card);
+      if(!c) return;
+
+      card.querySelectorAll('.field-upgrade-actions,.customer-actions-clean,.customer-more-menu').forEach(x=>x.remove());
+
+      Array.from(card.querySelectorAll('button')).forEach(b=>{
+        const t=b.textContent.trim();
+        if(['تمت الزيارة','طلب جديد','موعد','تحصيل','ملاحظه','ملاحظة','موقع العميل','رسالة تقييم','المزيد'].includes(t)){
+          b.style.display='none';
+        }
+      });
+
+      const id = c.id;
+      const hasPhone = phoneOk(c);
+      const actions = document.createElement('div');
+      actions.className = 'customer-actions-clean';
+      actions.innerHTML = `
+        <button type="button" class="done" onclick="quickVisit('${id}')">تمت الزيارة</button>
+        <button type="button" class="order" onclick="openQuoteForm('${id}')">طلب جديد</button>
+        <button type="button" class="meeting" onclick="openCustomerMeeting ? openCustomerMeeting('${id}') : alert('سيتم إضافة المواعيد قريباً')">موعد</button>
+        <button type="button" class="more" onclick="toggleCustomerMore('${id}')">المزيد</button>
+      `;
+      const more = document.createElement('div');
+      more.id = 'more_' + id;
+      more.className = 'customer-more-menu';
+      more.innerHTML = `
+        <button type="button" onclick="openCollection ? openCollection('${id}') : alert('سيتم إضافة التحصيل قريباً')">💰 التحصيل</button>
+        <button type="button" onclick="openCustomerMap('${id}')">📍 موقع العميل</button>
+        <button type="button" onclick="openCustomerNote ? openCustomerNote('${id}') : alert('سيتم إضافة الملاحظات قريباً')">📝 ملاحظة</button>
+        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">💬 رسالة تقييم واتساب</button>` : `<button type="button" disabled>💬 لا يوجد رقم جوال</button>`}
+        <button type="button" onclick="editCustomerPro ? editCustomerPro('${id}') : alert('تعديل العميل غير متاح في هذه النسخة')">✏️ تعديل العميل</button>
+        <button type="button" onclick="openQuoteForm('${id}')">📄 إنشاء عرض سعر</button>
+      `;
+      card.appendChild(actions);
+      card.appendChild(more);
+    });
+  }
+
+  window.toggleCustomerMore = window.toggleCustomerMore || function(customerId){
+    const el=document.getElementById('more_'+customerId);
+    if(el) el.classList.toggle('open');
+  };
+
+  function runCleanup(){
+    cleanupLanguageButtons();
+    fixLogoFallback();
+    rebuildCleanCustomerActions();
+  }
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    setTimeout(runCleanup, 200);
+  };
+
+  const oldRenderCustomers = window.renderCustomers;
+  if(typeof oldRenderCustomers === 'function'){
+    window.renderCustomers = function(){
+      oldRenderCustomers.apply(this, arguments);
+      setTimeout(runCleanup, 200);
+    };
+  }
+
+  document.addEventListener('click', function(){ setTimeout(cleanupLanguageButtons, 50); }, true);
+  setTimeout(runCleanup, 700);
+})();
