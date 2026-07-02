@@ -3637,3 +3637,183 @@ function convertQuoteToOrder(qid){
 
   setTimeout(rebuildCustomerCardActions, 800);
 })();
+
+
+
+/* JMS PRO CUSTOMERS UI: professional filtering by representative */
+(function(){
+  function ensure(){ db.customers ||= []; db.reps ||= []; db.visits ||= []; db.quotes ||= []; db.orders ||= []; }
+  function todayStr(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function isRep(){ return currentUser?.role === 'rep'; }
+  function repNameSafe(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+  function moneySafe(n){ return (typeof money === 'function') ? money(n||0) : Number(n||0).toLocaleString('ar-SA'); }
+  function phoneOk(c){ return String(c?.phone || c?.mobile || '').replace(/\D/g,'').length >= 8; }
+  function customerScope(){
+    ensure();
+    if(isRep()) return db.customers.filter(c=>c.rep_id===currentUser.id);
+    return db.customers;
+  }
+  function uniqueValues(arr, key){
+    return [...new Set(arr.map(x=>String(x[key]||'').trim()).filter(Boolean))];
+  }
+  function lastVisit(customerId){
+    const v=(db.visits||[]).filter(x=>x.customer_id===customerId).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+    return v?.date || v?.checkin_at?.slice?.(0,10) || '-';
+  }
+  function quoteCount(customerId){ return (db.quotes||[]).filter(q=>q.customer_id===customerId).length; }
+  function orderCount(customerId){ return (db.orders||[]).filter(o=>o.customer_id===customerId).length; }
+  window.toggleProCustomerMore = function(id){
+    const el=document.getElementById('pro_more_'+id);
+    if(el) el.classList.toggle('open');
+  };
+  function buildToolbar(listAll){
+    const reps = isRep() ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    const currentRep = document.getElementById('proRepFilter')?.value || (isRep()?currentUser.id:'all');
+    const cities = uniqueValues(listAll,'city');
+    const cats = uniqueValues(listAll,'category');
+    return `<div class="pro-customers-toolbar" id="proCustomersToolbar">
+      <div class="pro-customers-stats">
+        <div class="pro-stat"><span>إجمالي العملاء</span><b id="proTotalCustomers">0</b></div>
+        <div class="pro-stat"><span>عملاء المندوب</span><b id="proRepCustomers">0</b></div>
+        <div class="pro-stat"><span>زيارات اليوم</span><b id="proTodayVisits">0</b></div>
+        <div class="pro-stat"><span>عروض الأسعار</span><b id="proQuotesCount">0</b></div>
+        <div class="pro-stat"><span>طلبات</span><b id="proOrdersCount">0</b></div>
+      </div>
+      <div class="pro-filters">
+        <input id="proCustomerSearch" placeholder="ابحث باسم العميل أو الجوال أو المدينة..." value="${document.getElementById('proCustomerSearch')?.value || ''}" oninput="renderCustomers()">
+        <select id="proRepFilter" onchange="renderCustomers()" ${isRep()?'disabled':''}>
+          <option value="all">كل المناديب</option>
+          ${reps.map(r=>`<option value="${r.id}" ${currentRep===r.id?'selected':''}>${r.name}</option>`).join('')}
+        </select>
+        <select id="proCityFilter" onchange="renderCustomers()">
+          <option value="all">كل المدن</option>
+          ${cities.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+        <select id="proCategoryFilter" onchange="renderCustomers()">
+          <option value="all">كل التصنيفات</option>
+          ${cats.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }
+  function filteredCustomers(){
+    const all=customerScope();
+    const q=(document.getElementById('proCustomerSearch')?.value||'').trim();
+    const rep=document.getElementById('proRepFilter')?.value || (isRep()?currentUser.id:'all');
+    const city=document.getElementById('proCityFilter')?.value || 'all';
+    const cat=document.getElementById('proCategoryFilter')?.value || 'all';
+    return all.filter(c=>{
+      if(rep !== 'all' && c.rep_id !== rep) return false;
+      if(city !== 'all' && c.city !== city) return false;
+      if(cat !== 'all' && c.category !== cat) return false;
+      if(q && !(`${c.name||''} ${c.phone||''} ${c.city||''} ${c.district||''} ${repNameSafe(c.rep_id)}`).includes(q)) return false;
+      return true;
+    });
+  }
+  function updateStats(list){
+    const rep=document.getElementById('proRepFilter')?.value || (isRep()?currentUser.id:'all');
+    const today=todayStr();
+    if(window.proTotalCustomers) proTotalCustomers.textContent = customerScope().length;
+    if(window.proRepCustomers) proRepCustomers.textContent = rep==='all' ? list.length : customerScope().filter(c=>c.rep_id===rep).length;
+    if(window.proTodayVisits) proTodayVisits.textContent = (db.visits||[]).filter(v=>String(v.date||v.checkin_at||'').startsWith(today) && (rep==='all'||v.rep_id===rep)).length;
+    if(window.proQuotesCount) proQuotesCount.textContent = (db.quotes||[]).filter(q=>rep==='all'||q.rep_id===rep).length;
+    if(window.proOrdersCount) proOrdersCount.textContent = (db.orders||[]).filter(o=>rep==='all'||o.rep_id===rep).length;
+  }
+  function card(c){
+    const hasPhone=phoneOk(c);
+    return `<div class="pro-customer-card">
+      <div class="pro-customer-head">
+        <div class="pro-customer-title">
+          <h3>${c.name||'-'}</h3>
+          <p>📍 ${c.city||'-'} ${c.district?(' - '+c.district):''}<br>👤 ${repNameSafe(c.rep_id)}</p>
+        </div>
+        <span class="pro-badge">${c.category||'عميل'}</span>
+      </div>
+      <div class="pro-customer-info">
+        <div><span>الجوال</span><b>${c.phone||'-'}</b></div>
+        <div><span>آخر زيارة</span><b>${lastVisit(c.id)}</b></div>
+        <div><span>العروض</span><b>${quoteCount(c.id)}</b></div>
+        <div><span>الطلبات</span><b>${orderCount(c.id)}</b></div>
+        <div><span>الرصيد</span><b>${moneySafe(c.debt_balance||0)} ريال</b></div>
+        <div><span>الموقع</span><b>${c.location||c.district||'-'}</b></div>
+      </div>
+      <div class="pro-customer-actions">
+        <button class="visit" onclick="quickVisit('${c.id}')">زيارة</button>
+        <button class="quote" onclick="openQuoteForm('${c.id}')">عرض سعر</button>
+        <button class="map" onclick="openCustomerMap('${c.id}')">موقع</button>
+        <button class="more" onclick="toggleProCustomerMore('${c.id}')">⋮</button>
+      </div>
+      <div class="pro-more-panel" id="pro_more_${c.id}">
+        ${hasPhone ? `<button onclick="sendSatisfactionWhatsApp('${c.id}')">رسالة تقييم واتساب</button>` : `<button disabled>لا يوجد رقم جوال</button>`}
+        <button onclick="editCustomerPro('${c.id}')">تعديل العميل</button>
+        <button onclick="quickVisit('${c.id}')">تسجيل زيارة</button>
+        <button onclick="openQuoteForm('${c.id}')">إنشاء عرض سعر</button>
+      </div>
+    </div>`;
+  }
+  window.editCustomerPro = function(id){
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML = `<h2>تعديل العميل</h2>
+      <div class="form-grid two">
+        <label>اسم العميل<input id="ecName" value="${c.name||''}"></label>
+        <label>الجوال<input id="ecPhone" value="${c.phone||''}"></label>
+        <label>المدينة<input id="ecCity" value="${c.city||''}"></label>
+        <label>الحي<input id="ecDistrict" value="${c.district||''}"></label>
+        <label>الموقع / العنوان<input id="ecLocation" value="${c.location||''}"></label>
+        <label>التصنيف<input id="ecCategory" value="${c.category||'عميل'}"></label>
+        <label>المندوب<select id="ecRep">${db.reps.map(r=>`<option value="${r.id}" ${c.rep_id===r.id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label>الرصيد<input id="ecDebt" type="number" value="${c.debt_balance||0}"></label>
+        <label>خط العرض lat<input id="ecLat" value="${c.lat||''}"></label>
+        <label>خط الطول lng<input id="ecLng" value="${c.lng||''}"></label>
+      </div>
+      <label>ملاحظات<input id="ecNotes" value="${c.notes||''}"></label>
+      <br><button class="primary" onclick="saveCustomerPro('${id}')">حفظ التعديل</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCustomerPro = function(id){
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return;
+    Object.assign(c,{
+      name:ecName.value, phone:ecPhone.value, city:ecCity.value, district:ecDistrict.value,
+      location:ecLocation.value, category:ecCategory.value, rep_id:ecRep.value,
+      debt_balance:Number(ecDebt.value||0), lat:ecLat.value, lng:ecLng.value, notes:ecNotes.value
+    });
+    if(typeof save==='function') save();
+    closeModal();
+    renderAll();
+    alert('تم تعديل العميل');
+  };
+
+  const oldRenderCustomers = window.renderCustomers;
+  window.renderCustomers = function(){
+    ensure();
+    const grid = window.customersGrid || document.getElementById('customersGrid') || document.querySelector('#customers .grid') || document.querySelector('#customersGrid');
+    if(!grid){
+      if(typeof oldRenderCustomers === 'function') oldRenderCustomers();
+      return;
+    }
+    const all=customerScope();
+    const section=document.getElementById('customers') || grid.parentElement;
+    let toolbar=document.getElementById('proCustomersToolbar');
+    if(!toolbar && section){
+      const temp=document.createElement('div');
+      temp.innerHTML=buildToolbar(all);
+      const head=section.querySelector('.page-head') || grid;
+      head.insertAdjacentElement('afterend', temp.firstElementChild);
+    }
+    const list=filteredCustomers();
+    updateStats(list);
+    grid.className='pro-customers-grid';
+    grid.innerHTML = list.map(card).join('') || '<div class="pro-empty">لا يوجد عملاء حسب الفلتر المحدد</div>';
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    setTimeout(()=>{ try{ renderCustomers(); }catch(e){} },150);
+  };
+
+  setTimeout(()=>{ try{ renderCustomers(); }catch(e){} },800);
+})();
