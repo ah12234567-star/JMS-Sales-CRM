@@ -577,3 +577,13 @@ html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:
 .import-actions .template{background:#1d4ed8}
 .import-actions .import{background:#166534}
 .customer-import-btn{background:#1d4ed8!important}
+
+
+/* Field Sales Upgrade */
+.field-upgrade-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.field-upgrade-actions button{border:0;border-radius:12px;padding:10px 12px;background:#111827;color:#fff;font-weight:900;cursor:pointer}
+.field-upgrade-actions .map{background:#1d4ed8}.field-upgrade-actions .wa{background:#16a34a}.field-upgrade-actions .route{background:#7c3aed}
+.customer-route-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px;margin:8px 0}
+.customer-route-card small{display:block;color:#64748b;margin-top:4px}
+.safe-lang-mini{display:flex;gap:6px;margin:8px 0}.safe-lang-mini button{border:0;border-radius:10px;padding:8px 10px;font-weight:900;background:#334155;color:#fff}.safe-lang-mini button.active{background:#16a34a}
+html[dir="ltr"] body{direction:ltr;text-align:left}html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:ltr;text-align:left}
