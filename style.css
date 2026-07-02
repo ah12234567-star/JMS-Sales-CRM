@@ -668,3 +668,18 @@ body,input,select,textarea,button{font-family:system-ui,-apple-system,"Segoe UI"
 .jms-ai-input button{border:0;border-radius:14px;background:#16a34a;color:#052e16;padding:0 14px;font-weight:1000;cursor:pointer}
 .jms-mini-modal-field{display:grid;gap:10px;margin-top:12px}
 .jms-mini-modal-field input,.jms-mini-modal-field textarea,.jms-mini-modal-field select{border:1px solid #dbe3ef;border-radius:14px;padding:12px;background:#f8fafc}
+
+
+/* JMS AI Phase 2 Smart Engine */
+.jms-ai-action-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.jms-ai-action-row button{
+  border:0;border-radius:999px;background:#0f172a;color:#fff;
+  padding:7px 10px;font-weight:900;cursor:pointer;font-size:12px
+}
+.jms-ai-action-row button.green{background:#16a34a;color:#052e16}
+.jms-ai-action-row button.blue{background:#2563eb}
+.jms-ai-action-row button.orange{background:#c2410c}
+.jms-ai-report{
+  background:#fff;border:1px solid #e5e7eb;border-radius:16px;
+  padding:12px;margin-top:10px;line-height:1.8
+}

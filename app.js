@@ -3986,3 +3986,277 @@ function convertQuoteToOrder(qid){
   setInterval(lockArabic, 1200);
   setTimeout(()=>{lockArabic();addAI();},700);
 })();
+
+
+
+/* JMS AI PHASE 2 SMART ENGINE: deeper local AI + action suggestions */
+(function(){
+  function ensure(){
+    db.customers ||= [];
+    db.reps ||= [];
+    db.visits ||= [];
+    db.quotes ||= [];
+    db.orders ||= [];
+    db.collections ||= [];
+    db.notes ||= [];
+    db.aiReports ||= [];
+  }
+  function rid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function moneyFmt(n){ return Number(n||0).toLocaleString('ar-SA'); }
+  function repNameSafe(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+  function customerNameSafe(id){ return (typeof customerName === 'function') ? customerName(id) : ((db.customers.find(c=>c.id===id)||{}).name || '-'); }
+  function dateOf(x){ return String(x.date || x.created_at || x.checkin_at || x.quote_date || x.order_date || '').slice(0,10); }
+  function currentMonth(){ return new Date().toISOString().slice(0,7); }
+  function includesAny(q, words){ return words.some(w => q.includes(w)); }
+
+  function getRepStats(period='all'){
+    const month=currentMonth();
+    const stats={};
+    db.reps.forEach(r=>stats[r.id]={id:r.id,name:r.name,customers:0,visits:0,quotes:0,orders:0,collections:0,collectionAmount:0});
+    db.customers.forEach(c=>{ if(stats[c.rep_id]) stats[c.rep_id].customers++; });
+    db.visits.forEach(v=>{
+      if(period==='month' && !dateOf(v).startsWith(month)) return;
+      if(stats[v.rep_id]) stats[v.rep_id].visits++;
+    });
+    db.quotes.forEach(q=>{
+      if(period==='month' && !dateOf(q).startsWith(month)) return;
+      if(stats[q.rep_id]) stats[q.rep_id].quotes++;
+    });
+    db.orders.forEach(o=>{
+      if(period==='month' && !dateOf(o).startsWith(month)) return;
+      if(stats[o.rep_id]) stats[o.rep_id].orders++;
+    });
+    db.collections.forEach(col=>{
+      if(period==='month' && !dateOf(col).startsWith(month)) return;
+      const c=db.customers.find(x=>x.id===col.customer_id);
+      const repId=c?.rep_id || col.rep_id;
+      if(stats[repId]){
+        stats[repId].collections++;
+        stats[repId].collectionAmount += Number(col.amount||0);
+      }
+    });
+    return Object.values(stats);
+  }
+
+  function staleCustomers(days=30, repId='all'){
+    const cutoff=new Date();
+    cutoff.setDate(cutoff.getDate()-days);
+    return db.customers.filter(c=>{
+      if(repId !== 'all' && c.rep_id !== repId) return false;
+      const last=db.visits.filter(v=>v.customer_id===c.id).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+      if(!last) return true;
+      const d=new Date(last.date||last.checkin_at);
+      return d < cutoff;
+    });
+  }
+
+  function pendingQuotes(){
+    return db.quotes.filter(q=>{
+      const s=String(q.status||q.state||'').toLowerCase();
+      return !s || s.includes('pending') || s.includes('انتظار') || s.includes('draft') || s.includes('اعتماد');
+    });
+  }
+
+  function debts(){
+    return db.customers.filter(c=>Number(c.debt_balance||0)>0).sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0));
+  }
+
+  function todaySummary(){
+    const today=tdy();
+    const visits=db.visits.filter(v=>dateOf(v)===today);
+    const cols=db.collections.filter(c=>dateOf(c)===today);
+    const quotes=db.quotes.filter(q=>dateOf(q)===today);
+    const orders=db.orders.filter(o=>dateOf(o)===today);
+    const amount=cols.reduce((s,c)=>s+Number(c.amount||0),0);
+    return `ملخص اليوم ${today}:
+- العملاء المسجلين: ${db.customers.length}
+- المناديب: ${db.reps.length}
+- زيارات اليوم: ${visits.length}
+- عروض اليوم: ${quotes.length}
+- طلبات اليوم: ${orders.length}
+- تحصيل اليوم: ${moneyFmt(amount)} ريال`;
+  }
+
+  function salesAnalysis(){
+    const reps=getRepStats('month').sort((a,b)=>(b.orders+b.quotes+b.visits)-(a.orders+a.quotes+a.visits));
+    const totalCollections=reps.reduce((s,r)=>s+r.collectionAmount,0);
+    const top=reps[0];
+    let text=`تحليل المبيعات لهذا الشهر:
+- إجمالي المناديب: ${reps.length}
+- إجمالي التحصيل: ${moneyFmt(totalCollections)} ريال
+- أفضل مندوب حاليًا: ${top?top.name:'لا يوجد'}${top?` (${top.visits} زيارات، ${top.quotes} عروض، ${top.orders} طلبات)`:''}
+
+ترتيب المناديب:
+`;
+    text += reps.map((r,i)=>`${i+1}. ${r.name}: عملاء ${r.customers} | زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders} | تحصيل ${moneyFmt(r.collectionAmount)} ريال`).join('\n');
+    return text;
+  }
+
+  function riskAnalysis(){
+    const stale=staleCustomers(30);
+    const debt=debts();
+    const pq=pendingQuotes();
+    return `تنبيهات ذكية:
+- عملاء لم تتم زيارتهم منذ 30 يوم: ${stale.length}
+- عملاء عليهم مديونية: ${debt.length}
+- عروض تحتاج متابعة/اعتماد: ${pq.length}
+
+أعلى 10 عملاء مديونية:
+${debt.slice(0,10).map((c,i)=>`${i+1}. ${c.name} - ${moneyFmt(c.debt_balance)} ريال - ${repNameSafe(c.rep_id)}`).join('\n') || 'لا توجد مديونيات مسجلة.'}`;
+  }
+
+  function customerLookup(q){
+    const keyword=q.replace(/ابحث|بحث|عن|عميل|العميل|بيانات|معلومات/g,'').trim();
+    if(!keyword) return null;
+    const c=db.customers.find(c=>`${c.name||''} ${c.phone||''} ${c.city||''}`.includes(keyword));
+    if(!c) return `لم أجد عميل مطابق لكلمة: ${keyword}`;
+    const visits=db.visits.filter(v=>v.customer_id===c.id);
+    const quotes=db.quotes.filter(x=>x.customer_id===c.id);
+    const orders=db.orders.filter(x=>x.customer_id===c.id);
+    const cols=db.collections.filter(x=>x.customer_id===c.id);
+    const colAmount=cols.reduce((s,x)=>s+Number(x.amount||0),0);
+    return `بطاقة العميل:
+- الاسم: ${c.name}
+- الجوال: ${c.phone||'لا يوجد'}
+- المدينة: ${c.city||'-'}
+- المندوب: ${repNameSafe(c.rep_id)}
+- الزيارات: ${visits.length}
+- العروض: ${quotes.length}
+- الطلبات: ${orders.length}
+- التحصيل: ${moneyFmt(colAmount)} ريال
+- الرصيد: ${moneyFmt(c.debt_balance||0)} ريال
+- ملاحظات: ${c.notes||'لا توجد'}`;
+  }
+
+  function suggestActions(q, answer){
+    let buttons='';
+    if(includesAny(q,['30','لم تتم','مازار','زيارة'])) {
+      buttons += `<button class="blue" onclick="jmsAIShowStaleCustomers()">عرض العملاء</button>`;
+    }
+    if(includesAny(q,['مديونية','تحصيل','متأخر'])) {
+      buttons += `<button class="orange" onclick="jmsAIShowDebts()">عرض المديونيات</button>`;
+    }
+    if(includesAny(q,['تقرير','pdf','ملخص'])) {
+      buttons += `<button class="green" onclick="jmsAISaveReport()">حفظ التقرير</button>`;
+    }
+    buttons += `<button onclick="jmsAICopyLast()">نسخ الجواب</button>`;
+    return buttons ? `<div class="jms-ai-action-row">${buttons}</div>` : '';
+  }
+
+  window.jmsAIShowStaleCustomers=function(){
+    const rows=staleCustomers(30).slice(0,30);
+    const text=rows.map((c,i)=>`${i+1}. ${c.name} - ${c.phone||'لا يوجد جوال'} - ${repNameSafe(c.rep_id)}`).join('\n') || 'لا يوجد عملاء متأخرين.';
+    window.askJmsAI('قائمة العملاء غير المزورين 30 يوم');
+    setTimeout(()=>window.__jmsLastAIAnswer = text,50);
+  };
+
+  window.jmsAIShowDebts=function(){
+    const rows=debts().slice(0,30);
+    const text=rows.map((c,i)=>`${i+1}. ${c.name} - ${moneyFmt(c.debt_balance)} ريال - ${repNameSafe(c.rep_id)}`).join('\n') || 'لا توجد مديونيات.';
+    const body=document.getElementById('jmsAiBody');
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${text}</div>`);
+    body.scrollTop=body.scrollHeight;
+    window.__jmsLastAIAnswer=text;
+  };
+
+  window.jmsAISaveReport=function(){
+    ensure();
+    const text=window.__jmsLastAIAnswer || 'لا يوجد تقرير للحفظ';
+    db.aiReports.unshift({id:rid(),date:tdy(),text,created_at:new Date().toISOString()});
+    if(typeof save==='function') save();
+    alert('تم حفظ تقرير AI داخل بيانات النظام');
+  };
+
+  window.jmsAICopyLast=function(){
+    const text=window.__jmsLastAIAnswer || '';
+    if(!text) return alert('لا يوجد جواب لنسخه');
+    navigator.clipboard?.writeText(text);
+    alert('تم نسخ الجواب');
+  };
+
+  function answerAI2(q){
+    ensure();
+    q=String(q||'').trim();
+    let ans='';
+    if(!q) ans='اكتب سؤالك عن العملاء أو المناديب أو الزيارات أو التحصيل.';
+    else if(includesAny(q,['ملخص اليوم','اليوم','داشبورد'])) ans=todaySummary();
+    else if(includesAny(q,['تحليل','مبيعات','الأداء','اداء'])) ans=salesAnalysis();
+    else if(includesAny(q,['أفضل مندوب','افضل مندوب','ترتيب المناديب','مندوب'])) ans=salesAnalysis();
+    else if(includesAny(q,['خطر','تنبيه','متأخر','مديونية','مديونيات'])) ans=riskAnalysis();
+    else if(includesAny(q,['لم تتم','مازار','لم يزر','30 يوم','ثلاثين'])) {
+      const rows=staleCustomers(30).slice(0,20);
+      ans=rows.length ? `العملاء الذين لم تتم زيارتهم منذ 30 يوم أو لا توجد لهم زيارة:\n${rows.map((c,i)=>`${i+1}. ${c.name} - ${c.city||'-'} - ${repNameSafe(c.rep_id)} - ${c.phone||'لا يوجد جوال'}`).join('\n')}` : 'لا يوجد عملاء متأخرين عن الزيارة حسب البيانات الحالية.';
+    }
+    else if(includesAny(q,['عرض','عروض','اعتماد'])) {
+      const rows=pendingQuotes().slice(0,20);
+      ans=`عروض الأسعار:
+- إجمالي العروض: ${db.quotes.length}
+- عروض تحتاج متابعة/اعتماد: ${rows.length}
+
+${rows.map((x,i)=>`${i+1}. ${x.quote_no||x.number||x.id} - ${customerNameSafe(x.customer_id)} - ${repNameSafe(x.rep_id)} - ${x.status||'بدون حالة'}`).join('\n') || 'لا توجد عروض معلقة.'}`;
+    }
+    else if(includesAny(q,['بحث','ابحث','عميل','بيانات العميل','معلومات العميل'])) ans=customerLookup(q) || `عدد العملاء: ${db.customers.length}`;
+    else if(includesAny(q,['تحصيل','التحصيل'])) {
+      const total=db.collections.reduce((s,c)=>s+Number(c.amount||0),0);
+      const todayAmt=db.collections.filter(c=>dateOf(c)===tdy()).reduce((s,c)=>s+Number(c.amount||0),0);
+      ans=`التحصيلات:
+- إجمالي التحصيلات: ${moneyFmt(total)} ريال
+- تحصيل اليوم: ${moneyFmt(todayAmt)} ريال
+- عدد عمليات التحصيل: ${db.collections.length}`;
+    }
+    else if(includesAny(q,['رسالة','واتساب'])) {
+      ans=`أقدر أساعدك في تجهيز رسائل واتساب، مثل:
+- رسالة متابعة للعميل.
+- رسالة تقييم بعد الزيارة.
+- رسالة تذكير بالمديونية.
+اكتب: "جهز رسالة للعميل [اسم العميل]"`;
+    }
+    else ans=`فهمت سؤالك. هذه قراءة سريعة:
+${todaySummary()}
+
+أسئلة مفيدة:
+- من أفضل مندوب؟
+- من العملاء الذين لم تتم زيارتهم منذ 30 يوم؟
+- أعطني تحليل المبيعات
+- ما هي المديونيات؟`;
+
+    window.__jmsLastAIAnswer=ans;
+    return ans;
+  }
+
+  window.answerJmsAISmart = answerAI2;
+
+  // Override askJmsAI but keep same UI
+  window.askJmsAI=function(q){
+    const input=document.getElementById('jmsAiInput');
+    q=String(q||input?.value||'').trim();
+    if(!q) return;
+    const body=document.getElementById('jmsAiBody');
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+    const a=answerAI2(q);
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${a}${suggestActions(q,a)}</div>`);
+    body.scrollTop=body.scrollHeight;
+    if(input) input.value='';
+  };
+
+  function upgradeQuickButtons(){
+    const quick=document.querySelector('.jms-ai-quick');
+    if(!quick || quick.dataset.phase2==='1') return;
+    quick.dataset.phase2='1';
+    quick.innerHTML=`
+      <button onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+      <button onclick="askJmsAI('تحليل المبيعات')">تحليل المبيعات</button>
+      <button onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+      <button onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+      <button onclick="askJmsAI('ما هي المديونيات؟')">المديونيات</button>
+      <button onclick="askJmsAI('عروض الأسعار المعلقة')">العروض المعلقة</button>`;
+  }
+
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){
+    if(typeof oldRenderAll==='function') oldRenderAll();
+    setTimeout(upgradeQuickButtons,250);
+  };
+  setTimeout(upgradeQuickButtons,1000);
+})();
