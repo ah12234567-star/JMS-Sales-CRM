@@ -3318,3 +3318,195 @@ function convertQuoteToOrder(qid){
     };
   }
 })();
+
+
+
+/* Customer Import from Excel / CSV */
+(function(){
+  function ensureImportData(){
+    db.customers ||= [];
+    db.reps ||= [];
+    db.users ||= [];
+  }
+  function newId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function clean(v){ return String(v ?? '').trim(); }
+  function num(v){ const n=Number(String(v ?? '').replace(/[^\d.-]/g,'')); return isNaN(n)?0:n; }
+  function defaultRepId(){
+    if(currentUser?.role==='rep') return currentUser.id;
+    return db.reps?.[0]?.id || 'rep-yaser';
+  }
+  function findRep(row){
+    const repId = clean(row.rep_id || row["rep_id"] || row["كود المندوب"]);
+    if(repId && db.reps.some(r=>r.id===repId)) return repId;
+    const repEmail = clean(row.rep_email || row["rep_email"] || row["ايميل المندوب"] || row["إيميل المندوب"]);
+    if(repEmail){
+      const r = db.reps.find(x=>String(x.email||'').toLowerCase()===repEmail.toLowerCase());
+      if(r) return r.id;
+    }
+    const repName = clean(row.rep_name || row["rep_name"] || row["اسم المندوب"]);
+    if(repName){
+      const r = db.reps.find(x=>String(x.name||'').includes(repName) || repName.includes(String(x.name||'')));
+      if(r) return r.id;
+    }
+    return defaultRepId();
+  }
+  function normalizeRow(row){
+    const name = clean(row.name || row["name"] || row["اسم العميل"] || row["العميل"] || row["Customer Name"] || row["customer"]);
+    const phone = clean(row.phone || row["phone"] || row["الجوال"] || row["رقم الجوال"] || row["Mobile"] || row["Phone"]);
+    const city = clean(row.city || row["city"] || row["المدينة"] || row["City"]) || 'جدة';
+    const district = clean(row.district || row["district"] || row["الحي"] || row["District"]);
+    const location = clean(row.location || row["location"] || row["العنوان"] || row["الموقع"] || row["Address"]);
+    const category = clean(row.category || row["category"] || row["التصنيف"]) || 'عميل';
+    const notes = clean(row.notes || row["notes"] || row["ملاحظات"]);
+    const debt = num(row.debt_balance || row["debt_balance"] || row["المديونية"] || row["رصيد المديونية"]);
+    const lat = num(row.lat || row["lat"] || row["latitude"] || row["خط العرض"]);
+    const lng = num(row.lng || row["lng"] || row["longitude"] || row["خط الطول"]);
+    if(!name) return null;
+    return {name,phone,city,district,location,category,notes,debt_balance:debt,lat:lat||'',lng:lng||'',rep_id:findRep(row),status:'active'};
+  }
+  function sameCustomer(a,b){
+    if(a.phone && b.phone && String(a.phone).replace(/\D/g,'') === String(b.phone).replace(/\D/g,'')) return true;
+    return clean(a.name) && clean(a.name) === clean(b.name) && clean(a.city) === clean(b.city);
+  }
+  function parseCsv(text){
+    const rows=[];
+    const lines=text.replace(/\r/g,'').split('\n').filter(x=>x.trim());
+    if(!lines.length) return rows;
+    const splitLine = (line)=>{
+      const out=[]; let cur='', inQ=false;
+    };
+  }
+  function simpleCsv(text){
+    const lines=text.replace(/\r/g,'').split('\n').filter(x=>x.trim());
+    if(!lines.length) return [];
+    const parseLine=(line)=>{
+      const cells=[]; let cur=''; let q=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch === '"' && line[i+1] === '"'){ cur+='"'; i++; continue; }
+        if(ch === '"'){ q=!q; continue; }
+        if(ch === ',' && !q){ cells.push(cur); cur=''; continue; }
+        cells.push ? null : null;
+        cur += ch;
+      }
+      cells.push(cur);
+      return cells.map(x=>x.trim());
+    };
+    const headers=parseLine(lines[0]);
+    return lines.slice(1).map(line=>{
+      const vals=parseLine(line);
+      const obj={};
+      headers.forEach((h,i)=>obj[h]=vals[i]||'');
+      return obj;
+    });
+  }
+  function readFile(file, cb){
+    const reader=new FileReader();
+    const ext=file.name.toLowerCase().split('.').pop();
+    reader.onload=function(e){
+      try{
+        if(ext==='xlsx' || ext==='xls'){
+          if(!window.XLSX) throw new Error('مكتبة قراءة Excel لم يتم تحميلها. جرب CSV أو حدّث الصفحة.');
+          const data=new Uint8Array(e.target.result);
+          const wb=XLSX.read(data,{type:'array'});
+          const sh=wb.Sheets[wb.SheetNames[0]];
+          cb(XLSX.utils.sheet_to_json(sh,{defval:''}), null);
+        }else{
+          cb(simpleCsv(String(e.target.result||'')), null);
+        }
+      }catch(err){ cb(null, err.message || String(err)); }
+    };
+    if(ext==='xlsx' || ext==='xls') reader.readAsArrayBuffer(file);
+    else reader.readAsText(file,'UTF-8');
+  }
+
+  window.downloadCustomerTemplate = function(){
+    const csv = [
+      ['name','phone','city','district','location','category','rep_email','rep_id','debt_balance','notes','lat','lng'].join(','),
+      ['شركة تجريبية','0500000000','جدة','الصناعية','جدة المدينة الصناعية','عميل','yaser@jms.local','rep-yaser','0','ملاحظة','21.4858','39.1925'].join(',')
+    ].join('\n');
+    const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='customers_import_template.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+
+  window.openCustomerImport = function(){
+    ensureImportData();
+    modalBody.innerHTML = `<h2>استيراد العملاء من Excel / CSV</h2>
+      <div class="import-help">
+        ارفع ملف Excel أو CSV يحتوي على أعمدة مثل:<br>
+        <b>name, phone, city, district, location, category, rep_email, rep_id, debt_balance, notes, lat, lng</b><br>
+        النظام يمنع التكرار إذا كان رقم الجوال مكررًا أو الاسم والمدينة مكررين.
+      </div>
+      <div class="import-drop">
+        <b>اختر ملف العملاء</b>
+        <input id="customerImportFile" type="file" accept=".xlsx,.xls,.csv">
+        <small>يفضل استخدام القالب الجاهز ثم تعبئته.</small>
+      </div>
+      <div class="import-actions">
+        <button class="template" onclick="downloadCustomerTemplate()">تحميل قالب العملاء</button>
+        <button class="import" onclick="runCustomerImport()">استيراد الآن</button>
+      </div>
+      <div id="customerImportResult" class="import-result">لم يتم الاستيراد بعد.</div>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.runCustomerImport = function(){
+    ensureImportData();
+    const file=document.getElementById('customerImportFile')?.files?.[0];
+    if(!file) return alert('اختر ملف Excel أو CSV أولاً');
+    customerImportResult.textContent='جاري قراءة الملف...';
+    readFile(file,(rows,err)=>{
+      if(err){ customerImportResult.textContent='خطأ: '+err; return; }
+      let added=0, updated=0, skipped=0;
+      (rows||[]).forEach(row=>{
+        const c=normalizeRow(row);
+        if(!c){ skipped++; return; }
+        const existing=db.customers.find(x=>sameCustomer(x,c));
+        if(existing){
+          Object.assign(existing,{
+            phone:c.phone || existing.phone,
+            city:c.city || existing.city,
+            district:c.district || existing.district,
+            location:c.location || existing.location,
+            category:c.category || existing.category,
+            rep_id:c.rep_id || existing.rep_id,
+            debt_balance:c.debt_balance || existing.debt_balance || 0,
+            notes:[existing.notes,c.notes].filter(Boolean).join(' | '),
+            lat:c.lat || existing.lat || '',
+            lng:c.lng || existing.lng || ''
+          });
+          updated++;
+        }else{
+          db.customers.push({id:newId(),...c,credit_limit:0,created_at:new Date().toISOString()});
+          added++;
+        }
+      });
+      if(typeof save==='function') save();
+      if(typeof renderAll==='function') renderAll();
+      customerImportResult.textContent=`تم الاستيراد بنجاح\nالمضاف: ${added}\nالمحدّث: ${updated}\nالمتجاهل: ${skipped}`;
+    });
+  };
+
+  function addImportButton(){
+    const head=document.querySelector('#customers .page-head.with-action') || document.querySelector('#customers .page-head');
+    if(!head || document.getElementById('customerImportButton')) return;
+    const btn=document.createElement('button');
+    btn.id='customerImportButton';
+    btn.className='primary customer-import-btn';
+    btn.type='button';
+    btn.textContent='استيراد العملاء';
+    btn.onclick=openCustomerImport;
+    const actionBox=head.querySelector('.head-actions') || head;
+    actionBox.appendChild(btn);
+  }
+
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){
+    if(typeof oldRenderAll==='function') oldRenderAll();
+    setTimeout(addImportButton,100);
+  };
+  setTimeout(addImportButton,700);
+})();
