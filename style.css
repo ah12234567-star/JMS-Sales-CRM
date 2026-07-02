@@ -631,3 +631,40 @@ img[src=""], img:not([src]){display:none!important}
 .customer-more-menu button{text-align:right!important}
 .customer-more-menu button[disabled]{opacity:.6;cursor:not-allowed}
 @media(max-width:800px){.customer-actions-clean{grid-template-columns:repeat(2,1fr)!important}}
+
+
+/* JMS AI Phase 1 + Arabic Lock */
+#jmsSafeLang,#fieldLangBox,.jms-lang-switch,.safe-lang-mini,#jmsMainLangSwitch{display:none!important}
+html,body{direction:rtl!important}
+body,input,select,textarea,button{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial!important}
+
+.jms-ai-launch{
+  position:fixed;left:22px;bottom:22px;z-index:9999;
+  border:0;border-radius:999px;padding:14px 18px;
+  background:linear-gradient(135deg,#111827,#2563eb,#16a34a);
+  color:#fff;font-weight:1000;box-shadow:0 18px 45px rgba(15,23,42,.28);
+  cursor:pointer
+}
+.jms-ai-panel{
+  position:fixed;left:22px;bottom:82px;width:min(430px,92vw);max-height:72vh;
+  background:#fff;border:1px solid #e5e7eb;border-radius:26px;
+  box-shadow:0 24px 70px rgba(15,23,42,.28);z-index:9999;display:none;overflow:hidden
+}
+.jms-ai-panel.open{display:block}
+.jms-ai-head{
+  background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:16px 18px;
+  display:flex;justify-content:space-between;align-items:center
+}
+.jms-ai-head b{font-size:18px}.jms-ai-head small{display:block;color:#cbd5e1;margin-top:4px}
+.jms-ai-close{border:0;background:#334155;color:#fff;border-radius:10px;width:34px;height:34px;cursor:pointer;font-weight:900}
+.jms-ai-body{padding:14px;max-height:48vh;overflow:auto;background:#f8fafc}
+.jms-ai-msg{border-radius:16px;padding:11px 12px;margin:8px 0;line-height:1.8;font-size:14px;white-space:pre-line}
+.jms-ai-msg.user{background:#dbeafe;color:#1e3a8a;margin-right:40px}
+.jms-ai-msg.bot{background:#fff;border:1px solid #e5e7eb;color:#0f172a;margin-left:20px}
+.jms-ai-quick{display:flex;gap:7px;flex-wrap:wrap;padding:10px 14px;background:#fff;border-top:1px solid #e5e7eb}
+.jms-ai-quick button{border:0;border-radius:999px;background:#eef2ff;color:#3730a3;padding:8px 10px;font-weight:900;cursor:pointer;font-size:12px}
+.jms-ai-input{display:flex;gap:8px;padding:12px;background:#fff;border-top:1px solid #e5e7eb}
+.jms-ai-input input{flex:1;border:1px solid #dbe3ef;border-radius:14px;padding:12px;font-weight:800}
+.jms-ai-input button{border:0;border-radius:14px;background:#16a34a;color:#052e16;padding:0 14px;font-weight:1000;cursor:pointer}
+.jms-mini-modal-field{display:grid;gap:10px;margin-top:12px}
+.jms-mini-modal-field input,.jms-mini-modal-field textarea,.jms-mini-modal-field select{border:1px solid #dbe3ef;border-radius:14px;padding:12px;background:#f8fafc}

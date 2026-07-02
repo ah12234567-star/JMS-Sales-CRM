@@ -3756,3 +3756,233 @@ function convertQuoteToOrder(qid){
   document.addEventListener('click', function(){ setTimeout(cleanupLanguageButtons, 50); }, true);
   setTimeout(runCleanup, 700);
 })();
+
+
+
+/* JMS AI PHASE 1: Arabic lock + working collection/note/edit + local AI assistant */
+(function(){
+  function ensure(){
+    db.customers ||= [];
+    db.reps ||= [];
+    db.visits ||= [];
+    db.quotes ||= [];
+    db.orders ||= [];
+    db.collections ||= [];
+    db.notes ||= [];
+  }
+  function rid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function moneyFmt(n){ return Number(n||0).toLocaleString('ar-SA'); }
+  function customerNameSafe(id){ return (typeof customerName === 'function') ? customerName(id) : ((db.customers.find(c=>c.id===id)||{}).name || '-'); }
+  function repNameSafe(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+
+  function lockArabic(){
+    document.documentElement.lang='ar';
+    document.documentElement.dir='rtl';
+    document.body && (document.body.dir='rtl');
+    document.querySelectorAll('#jmsSafeLang,#fieldLangBox,.jms-lang-switch,.safe-lang-mini,#jmsMainLangSwitch').forEach(x=>x.style.display='none');
+  }
+  window.setFieldLang = function(){ lockArabic(); };
+  window.setJmsLanguage = function(){ lockArabic(); };
+  window.applyFieldLang = lockArabic;
+  window.applyJmsLanguage = lockArabic;
+
+  window.openCollection = function(customerId){
+    ensure();
+    const c=db.customers.find(x=>x.id===customerId);
+    if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML = `<h2>تسجيل تحصيل</h2>
+      <p><b>العميل:</b> ${c.name||'-'}</p>
+      <div class="jms-mini-modal-field">
+        <input id="colAmount" type="number" placeholder="المبلغ">
+        <select id="colMethod">
+          <option value="cash">نقدي</option>
+          <option value="bank">تحويل بنكي</option>
+          <option value="mada">مدى</option>
+          <option value="other">أخرى</option>
+        </select>
+        <textarea id="colNotes" placeholder="ملاحظات التحصيل"></textarea>
+      </div>
+      <br><button class="primary" onclick="saveCollection('${customerId}')">حفظ التحصيل</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCollection = function(customerId){
+    const amount=Number(document.getElementById('colAmount')?.value||0);
+    if(amount<=0) return alert('اكتب مبلغ التحصيل');
+    db.collections.unshift({id:rid(),customer_id:customerId,amount,method:colMethod.value,notes:colNotes.value||'',date:tdy(),created_at:new Date().toISOString()});
+    const c=db.customers.find(x=>x.id===customerId);
+    if(c) c.debt_balance=Math.max(0, Number(c.debt_balance||0)-amount);
+    if(typeof save==='function') save();
+    closeModal();
+    if(typeof renderAll==='function') renderAll();
+    alert('تم حفظ التحصيل');
+  };
+
+  window.openCustomerNote = function(customerId){
+    ensure();
+    const c=db.customers.find(x=>x.id===customerId);
+    if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML = `<h2>ملاحظة للعميل</h2>
+      <p><b>العميل:</b> ${c.name||'-'}</p>
+      <div class="jms-mini-modal-field">
+        <textarea id="noteText" placeholder="اكتب الملاحظة هنا"></textarea>
+      </div>
+      <br><button class="primary" onclick="saveCustomerNote('${customerId}')">حفظ الملاحظة</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCustomerNote = function(customerId){
+    const text=(document.getElementById('noteText')?.value||'').trim();
+    if(!text) return alert('اكتب الملاحظة');
+    db.notes.unshift({id:rid(),customer_id:customerId,text,date:tdy(),created_at:new Date().toISOString()});
+    const c=db.customers.find(x=>x.id===customerId);
+    if(c) c.notes=[c.notes,text].filter(Boolean).join(' | ');
+    if(typeof save==='function') save();
+    closeModal();
+    if(typeof renderAll==='function') renderAll();
+    alert('تم حفظ الملاحظة');
+  };
+
+  window.editCustomerPro = window.editCustomerPro || function(id){
+    ensure();
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML = `<h2>تعديل العميل</h2>
+      <div class="form-grid two">
+        <label>اسم العميل<input id="ecName" value="${c.name||''}"></label>
+        <label>الجوال<input id="ecPhone" value="${c.phone||''}"></label>
+        <label>المدينة<input id="ecCity" value="${c.city||''}"></label>
+        <label>الحي<input id="ecDistrict" value="${c.district||''}"></label>
+        <label>الموقع / العنوان<input id="ecLocation" value="${c.location||''}"></label>
+        <label>التصنيف<input id="ecCategory" value="${c.category||'عميل'}"></label>
+        <label>المندوب<select id="ecRep">${db.reps.map(r=>`<option value="${r.id}" ${c.rep_id===r.id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label>الرصيد<input id="ecDebt" type="number" value="${c.debt_balance||0}"></label>
+      </div>
+      <label>ملاحظات<input id="ecNotes" value="${c.notes||''}"></label>
+      <br><button class="primary" onclick="saveCustomerPro('${id}')">حفظ التعديل</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCustomerPro = window.saveCustomerPro || function(id){
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return;
+    Object.assign(c,{
+      name:ecName.value, phone:ecPhone.value, city:ecCity.value, district:ecDistrict.value,
+      location:ecLocation.value, category:ecCategory.value, rep_id:ecRep.value,
+      debt_balance:Number(ecDebt.value||0), notes:ecNotes.value
+    });
+    if(typeof save==='function') save();
+    closeModal();
+    if(typeof renderAll==='function') renderAll();
+    alert('تم تعديل العميل');
+  };
+
+  function aiStats(){
+    ensure();
+    const today=tdy();
+    const visitsToday=db.visits.filter(v=>String(v.date||v.checkin_at||'').startsWith(today));
+    const collectionsToday=db.collections.filter(c=>String(c.date||c.created_at||'').startsWith(today));
+    const totalCollection=collectionsToday.reduce((s,c)=>s+Number(c.amount||0),0);
+    return {today,customers:db.customers.length,reps:db.reps.length,visitsToday:visitsToday.length,collectionsToday:collectionsToday.length,totalCollection};
+  }
+  function bestRep(){
+    const map={};
+    db.reps.forEach(r=>map[r.id]={name:r.name,visits:0,quotes:0,orders:0,collection:0});
+    db.visits.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].visits++; });
+    db.quotes.forEach(q=>{ if(map[q.rep_id]) map[q.rep_id].quotes++; });
+    db.orders.forEach(o=>{ if(map[o.rep_id]) map[o.rep_id].orders++; });
+    db.collections.forEach(c=>{
+      const cust=db.customers.find(x=>x.id===c.customer_id);
+      if(cust && map[cust.rep_id]) map[cust.rep_id].collection += Number(c.amount||0);
+    });
+    return Object.values(map).sort((a,b)=>(b.visits+b.quotes+b.orders)-(a.visits+a.quotes+a.orders));
+  }
+  function staleCustomers(days=30){
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-days);
+    return db.customers.filter(c=>{
+      const last=db.visits.filter(v=>v.customer_id===c.id).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+      if(!last) return true;
+      const d=new Date(last.date||last.checkin_at);
+      return d < cutoff;
+    });
+  }
+  function answerAI(q){
+    ensure();
+    q=String(q||'').trim();
+    const s=aiStats();
+    if(!q) return 'اكتب سؤالك عن العملاء أو المناديب أو الزيارات.';
+    if(q.includes('ملخص') || q.includes('اليوم') || q.includes('داشبورد')){
+      return `ملخص اليوم ${s.today}:\n- العملاء: ${s.customers}\n- المناديب: ${s.reps}\n- زيارات اليوم: ${s.visitsToday}\n- تحصيلات اليوم: ${s.collectionsToday}\n- إجمالي التحصيل: ${moneyFmt(s.totalCollection)} ريال`;
+    }
+    if(q.includes('أفضل') || q.includes('افضل') || q.includes('مندوب')){
+      const rows=bestRep().slice(0,5);
+      return 'ترتيب المناديب:\n' + rows.map((r,i)=>`${i+1}. ${r.name}: زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders} | تحصيل ${moneyFmt(r.collection)} ريال`).join('\n');
+    }
+    if(q.includes('لم تتم') || q.includes('مازار') || q.includes('30') || q.includes('ثلاثين')){
+      const rows=staleCustomers(30).slice(0,20);
+      return rows.length ? `عملاء لم تتم زيارتهم منذ 30 يوم أو لا توجد لهم زيارة:\n` + rows.map((c,i)=>`${i+1}. ${c.name} - ${c.city||'-'} - ${repNameSafe(c.rep_id)}`).join('\n') : 'كل العملاء لديهم زيارات حديثة حسب البيانات الحالية.';
+    }
+    if(q.includes('عميل') || q.includes('العملاء')){
+      return `عدد العملاء الحالي: ${db.customers.length}\nأول 10 عملاء:\n` + db.customers.slice(0,10).map((c,i)=>`${i+1}. ${c.name} - ${c.phone||'لا يوجد جوال'} - ${repNameSafe(c.rep_id)}`).join('\n');
+    }
+    if(q.includes('تحصيل')){
+      const total=(db.collections||[]).reduce((s,c)=>s+Number(c.amount||0),0);
+      return `إجمالي التحصيلات المسجلة: ${moneyFmt(total)} ريال\nتحصيل اليوم: ${moneyFmt(s.totalCollection)} ريال`;
+    }
+    return `فهمت سؤالك، وهذه قراءة سريعة:\n- العملاء: ${s.customers}\n- زيارات اليوم: ${s.visitsToday}\n- تحصيل اليوم: ${moneyFmt(s.totalCollection)} ريال\n\nجرب تسأل: "من أفضل مندوب؟" أو "من العملاء الذين لم تتم زيارتهم منذ 30 يوم؟"`;
+  }
+
+  function addAI(){
+    if(document.getElementById('jmsAiLaunch')) return;
+    const btn=document.createElement('button');
+    btn.id='jmsAiLaunch';
+    btn.className='jms-ai-launch';
+    btn.textContent='JMS AI';
+    btn.onclick=()=>document.getElementById('jmsAiPanel').classList.toggle('open');
+
+    const panel=document.createElement('div');
+    panel.id='jmsAiPanel';
+    panel.className='jms-ai-panel';
+    panel.innerHTML=`
+      <div class="jms-ai-head">
+        <div><b>JMS AI</b><small>مساعد ذكي يحلل بيانات النظام</small></div>
+        <button class="jms-ai-close" onclick="jmsAiPanel.classList.remove('open')">×</button>
+      </div>
+      <div id="jmsAiBody" class="jms-ai-body">
+        <div class="jms-ai-msg bot">أهلاً، اسألني عن العملاء، المناديب، الزيارات، التحصيلات، أو الأداء.</div>
+      </div>
+      <div class="jms-ai-quick">
+        <button onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+        <button onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+        <button onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+        <button onclick="askJmsAI('كم التحصيل؟')">التحصيل</button>
+      </div>
+      <div class="jms-ai-input">
+        <input id="jmsAiInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter') askJmsAI(this.value)">
+        <button onclick="askJmsAI(jmsAiInput.value)">إرسال</button>
+      </div>`;
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+  }
+  window.askJmsAI=function(q){
+    const input=document.getElementById('jmsAiInput');
+    q=String(q||input?.value||'').trim();
+    if(!q) return;
+    const body=document.getElementById('jmsAiBody');
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+    const a=answerAI(q);
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${a}</div>`);
+    body.scrollTop=body.scrollHeight;
+    if(input) input.value='';
+  };
+
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){
+    if(typeof oldRenderAll==='function') oldRenderAll();
+    setTimeout(()=>{lockArabic();addAI();},150);
+  };
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){
+    window.showApp=function(){ oldShowApp(); setTimeout(()=>{lockArabic();addAI();},200); };
+  }
+  setInterval(lockArabic, 1200);
+  setTimeout(()=>{lockArabic();addAI();},700);
+})();
