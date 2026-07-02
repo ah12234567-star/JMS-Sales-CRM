@@ -3817,3 +3817,226 @@ function convertQuoteToOrder(qid){
 
   setTimeout(()=>{ try{ renderCustomers(); }catch(e){} },800);
 })();
+
+
+
+/* JMS SAAS CUSTOMERS REBUILD - full page replacement */
+(function(){
+  function ensure(){ db.customers ||= []; db.reps ||= []; db.visits ||= []; db.quotes ||= []; db.orders ||= []; }
+  function todayStr(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function isRep(){ return currentUser?.role === 'rep'; }
+  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function repName(id){ return (typeof window.repName === 'function') ? window.repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+  function money(n){ return (typeof window.money === 'function') ? window.money(n||0) : Number(n||0).toLocaleString('ar-SA'); }
+  function uniq(arr,key){ return [...new Set(arr.map(x=>String(x[key]||'').trim()).filter(Boolean))]; }
+  function scopeCustomers(){ ensure(); return isRep() ? db.customers.filter(c=>c.rep_id===currentUser.id) : db.customers; }
+  function phoneOk(c){ return String(c?.phone||c?.mobile||'').replace(/\D/g,'').length >= 8; }
+  function lastVisit(id){
+    const v=(db.visits||[]).filter(x=>x.customer_id===id).sort((a,b)=>String(b.checkin_at||b.date||'').localeCompare(String(a.checkin_at||a.date||'')))[0];
+    return (v?.checkin_at||v?.date||'-').slice ? (v?.checkin_at||v?.date||'-').slice(0,10) : '-';
+  }
+  function qCount(id){ return (db.quotes||[]).filter(q=>q.customer_id===id).length; }
+  function oCount(id){ return (db.orders||[]).filter(o=>o.customer_id===id).length; }
+  function selected(id, val){ return id===val ? 'selected' : ''; }
+  function getFilter(id, fallback='all'){ return document.getElementById(id)?.value || fallback; }
+  function setIfOld(id, html){
+    const el=document.getElementById(id);
+    if(el) el.innerHTML=html;
+  }
+  function makePhone(c){ return c.phone || c.mobile || '-'; }
+
+  window.toggleSaasCustomerMore = function(id){
+    const el=document.getElementById('saas_more_'+id);
+    if(el) el.classList.toggle('open');
+  };
+
+  function filtered(){
+    const all=scopeCustomers();
+    const q=(document.getElementById('saasCustomerSearch')?.value||'').trim();
+    const rep=getFilter('saasRepFilter', isRep()?currentUser.id:'all');
+    const city=getFilter('saasCityFilter','all');
+    const cat=getFilter('saasCategoryFilter','all');
+    return all.filter(c=>{
+      if(rep !== 'all' && c.rep_id !== rep) return false;
+      if(city !== 'all' && String(c.city||'') !== city) return false;
+      if(cat !== 'all' && String(c.category||'') !== cat) return false;
+      if(q && !(`${c.name||''} ${c.phone||''} ${c.mobile||''} ${c.city||''} ${c.district||''} ${repName(c.rep_id)}`).includes(q)) return false;
+      return true;
+    });
+  }
+
+  function kpiHtml(){
+    return `<div class="jms-saas-kpis">
+      <div class="jms-saas-kpi"><span>إجمالي العملاء</span><b id="saasKpiCustomers">0</b></div>
+      <div class="jms-saas-kpi"><span>عملاء الفلتر</span><b id="saasKpiFiltered">0</b></div>
+      <div class="jms-saas-kpi"><span>زيارات اليوم</span><b id="saasKpiVisits">0</b></div>
+      <div class="jms-saas-kpi"><span>عروض الأسعار</span><b id="saasKpiQuotes">0</b></div>
+      <div class="jms-saas-kpi"><span>طلبات</span><b id="saasKpiOrders">0</b></div>
+    </div>`;
+  }
+
+  function filterHtml(){
+    const all=scopeCustomers();
+    const reps=isRep()?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+    const oldRep=getFilter('saasRepFilter', isRep()?currentUser.id:'all');
+    const oldCity=getFilter('saasCityFilter','all');
+    const oldCat=getFilter('saasCategoryFilter','all');
+    const oldQ=document.getElementById('saasCustomerSearch')?.value || '';
+    const cities=uniq(all,'city');
+    const cats=uniq(all,'category');
+    return `<div class="jms-saas-filterbar">
+      <div class="jms-saas-filters">
+        <input id="saasCustomerSearch" placeholder="ابحث باسم العميل أو الجوال أو المدينة..." value="${oldQ}" oninput="renderSaasCustomersOnly()">
+        <select id="saasRepFilter" onchange="renderSaasCustomersOnly()" ${isRep()?'disabled':''}>
+          <option value="all">كل المناديب</option>
+          ${reps.map(r=>`<option value="${r.id}" ${selected(r.id,oldRep)}>${r.name}</option>`).join('')}
+        </select>
+        <select id="saasCityFilter" onchange="renderSaasCustomersOnly()">
+          <option value="all">كل المدن</option>
+          ${cities.map(c=>`<option value="${c}" ${selected(c,oldCity)}>${c}</option>`).join('')}
+        </select>
+        <select id="saasCategoryFilter" onchange="renderSaasCustomersOnly()">
+          <option value="all">كل التصنيفات</option>
+          ${cats.map(c=>`<option value="${c}" ${selected(c,oldCat)}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }
+
+  function card(c){
+    const hasPhone=phoneOk(c);
+    return `<div class="jms-saas-card">
+      <div class="jms-saas-card-head">
+        <div class="jms-saas-title">
+          <h3>${c.name || '-'}</h3>
+          <p>📍 ${c.city || '-'} ${c.district ? ' - '+c.district : ''}<br>👤 ${repName(c.rep_id)}</p>
+        </div>
+        <span class="jms-saas-badge">${c.category || 'عميل'}</span>
+      </div>
+      <div class="jms-saas-info">
+        <div><span>الجوال</span><b>${makePhone(c)}</b></div>
+        <div><span>آخر زيارة</span><b>${lastVisit(c.id)}</b></div>
+        <div><span>العروض</span><b>${qCount(c.id)}</b></div>
+        <div><span>الطلبات</span><b>${oCount(c.id)}</b></div>
+        <div><span>الرصيد</span><b>${money(c.debt_balance||0)} ريال</b></div>
+        <div><span>العنوان</span><b>${c.location || c.district || '-'}</b></div>
+      </div>
+      <div class="jms-saas-actions">
+        <button class="visit" onclick="quickVisit('${c.id}')">زيارة</button>
+        <button class="quote" onclick="openQuoteForm('${c.id}')">عرض سعر</button>
+        <button class="collect" onclick="openCollection ? openCollection('${c.id}') : alert('سيتم إضافة التحصيل قريباً')">تحصيل</button>
+        <button class="more" onclick="toggleSaasCustomerMore('${c.id}')">⋮</button>
+      </div>
+      <div class="jms-saas-more" id="saas_more_${c.id}">
+        <button onclick="editCustomerPro('${c.id}')">تعديل العميل</button>
+        <button onclick="openCustomerMap('${c.id}')">موقع العميل</button>
+        ${hasPhone ? `<button onclick="sendSatisfactionWhatsApp('${c.id}')">رسالة تقييم واتساب</button>` : `<button disabled>لا يوجد رقم جوال</button>`}
+        <button onclick="quickVisit('${c.id}')">تسجيل زيارة</button>
+        <button onclick="openQuoteForm('${c.id}')">إنشاء عرض سعر</button>
+      </div>
+    </div>`;
+  }
+
+  function updateKpis(list){
+    const all=scopeCustomers();
+    const rep=getFilter('saasRepFilter', isRep()?currentUser.id:'all');
+    const today=todayStr();
+    setIfOld('saasKpiCustomers', all.length);
+    setIfOld('saasKpiFiltered', list.length);
+    setIfOld('saasKpiVisits', (db.visits||[]).filter(v=>String(v.date||v.checkin_at||'').startsWith(today) && (rep==='all'||v.rep_id===rep)).length);
+    setIfOld('saasKpiQuotes', (db.quotes||[]).filter(q=>rep==='all'||q.rep_id===rep).length);
+    setIfOld('saasKpiOrders', (db.orders||[]).filter(o=>rep==='all'||o.rep_id===rep).length);
+  }
+
+  window.renderSaasCustomersOnly = function(){
+    ensure();
+    const list=filtered();
+    const target=document.getElementById('jmsSaasCustomersList');
+    const count=document.getElementById('jmsSaasCustomersCount');
+    if(count) count.textContent = `${list.length} عميل`;
+    if(target) target.innerHTML = list.map(card).join('') || '<div class="jms-saas-empty">لا يوجد عملاء حسب الفلتر المحدد</div>';
+    updateKpis(list);
+  };
+
+  window.renderSaasCustomersPage = function(){
+    ensure();
+    const section=document.getElementById('customers');
+    if(!section) return false;
+
+    Array.from(section.children).forEach(ch=>{
+      if(!ch.classList.contains('page-head')) ch.classList.add('old-customers-hidden');
+    });
+
+    let shell=document.getElementById('jmsSaasCustomersShell');
+    if(!shell){
+      shell=document.createElement('div');
+      shell.id='jmsSaasCustomersShell';
+      shell.className='jms-saas-shell';
+      const head=section.querySelector('.page-head') || section.firstElementChild;
+      if(head) head.insertAdjacentElement('afterend', shell);
+      else section.appendChild(shell);
+    }
+
+    shell.innerHTML = `
+      <div class="jms-saas-hero">
+        <div>
+          <h2>إدارة العملاء</h2>
+          <p>واجهة SaaS احترافية لفلترة العملاء حسب المندوب والمدينة والتصنيف</p>
+        </div>
+        <div class="jms-saas-hero-actions">
+          <button class="jms-saas-primary" onclick="openCustomerForm ? openCustomerForm() : alert('زر إضافة العميل الأصلي غير موجود')">إضافة عميل</button>
+          <button class="jms-saas-secondary" onclick="openCustomerImport ? openCustomerImport() : alert('استيراد العملاء غير متاح')">استيراد Excel</button>
+        </div>
+      </div>
+      ${kpiHtml()}
+      ${filterHtml()}
+      <div class="jms-saas-list-head"><span>قائمة العملاء</span><span id="jmsSaasCustomersCount">0 عميل</span></div>
+      <div id="jmsSaasCustomersList" class="jms-saas-customers"></div>
+    `;
+    renderSaasCustomersOnly();
+    return true;
+  };
+
+  // Keep customer edit modal available even if older module failed
+  window.editCustomerPro = window.editCustomerPro || function(id){
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML = `<h2>تعديل العميل</h2>
+      <div class="form-grid two">
+        <label>اسم العميل<input id="ecName" value="${c.name||''}"></label>
+        <label>الجوال<input id="ecPhone" value="${c.phone||''}"></label>
+        <label>المدينة<input id="ecCity" value="${c.city||''}"></label>
+        <label>الحي<input id="ecDistrict" value="${c.district||''}"></label>
+        <label>الموقع / العنوان<input id="ecLocation" value="${c.location||''}"></label>
+        <label>التصنيف<input id="ecCategory" value="${c.category||'عميل'}"></label>
+        <label>المندوب<select id="ecRep">${db.reps.map(r=>`<option value="${r.id}" ${c.rep_id===r.id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label>الرصيد<input id="ecDebt" type="number" value="${c.debt_balance||0}"></label>
+      </div>
+      <label>ملاحظات<input id="ecNotes" value="${c.notes||''}"></label>
+      <br><button class="primary" onclick="saveCustomerPro('${id}')">حفظ التعديل</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.saveCustomerPro = window.saveCustomerPro || function(id){
+    const c=db.customers.find(x=>x.id===id);
+    if(!c) return;
+    Object.assign(c,{name:ecName.value,phone:ecPhone.value,city:ecCity.value,district:ecDistrict.value,location:ecLocation.value,category:ecCategory.value,rep_id:ecRep.value,debt_balance:Number(ecDebt.value||0),notes:ecNotes.value});
+    if(typeof save==='function') save();
+    closeModal();
+    renderSaasCustomersPage();
+    alert('تم تعديل العميل');
+  };
+
+  const oldRenderCustomers=window.renderCustomers;
+  window.renderCustomers=function(){
+    if(!renderSaasCustomersPage() && typeof oldRenderCustomers==='function') oldRenderCustomers();
+  };
+
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){
+    if(typeof oldRenderAll==='function') oldRenderAll();
+    setTimeout(renderSaasCustomersPage,100);
+  };
+
+  setTimeout(renderSaasCustomersPage,700);
+})();
