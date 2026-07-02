@@ -2998,3 +2998,274 @@ function convertQuoteToOrder(qid){
     };
   }
 })();
+
+
+
+/* VISITS REPORT FIX: rep filter + clear report rendering */
+(function(){
+  function ensureVisits(){
+    db.visits ||= [];
+    db.customers ||= [];
+    db.reps ||= [];
+    db.quotes ||= [];
+    db.orders ||= [];
+  }
+  function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
+  function isRep(){ return currentUser?.role === 'rep'; }
+  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function cn(id){ return (typeof customerName === 'function') ? customerName(id) : ((db.customers.find(c=>c.id===id)||{}).name || '-'); }
+  function rn(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
+  function timeStr(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
+  function dateStr(v){ return String(v.date || v.visit_date || v.created_at || v.checkin_at || '').slice(0,10); }
+  function resultText(r){ return ({quote:'عرض سعر',sale:'تم البيع',collection:'تحصيل',no_manager:'لا يوجد مسؤول',closed:'العميل مغلق',postponed:'مؤجل',none:'بدون نتيجة',general:'ملاحظة عامة'})[r||'none'] || (r||'بدون نتيجة'); }
+  function minDiff(a,b){ if(!a||!b) return 0; return Math.max(0, Math.round((new Date(b)-new Date(a))/60000)); }
+  function startDate(){
+    return document.getElementById('visitFrom')?.value || document.getElementById('smartVisitFrom')?.value || '';
+  }
+  function endDate(){
+    return document.getElementById('visitTo')?.value || document.getElementById('smartVisitTo')?.value || '';
+  }
+  function selectedRep(){
+    return document.getElementById('visitRep')?.value || document.getElementById('smartVisitRepFilter')?.value || 'all';
+  }
+  function selectedResult(){
+    return document.getElementById('smartVisitResultFilter')?.value || 'all';
+  }
+  function qText(){
+    return (document.getElementById('smartVisitSearch')?.value || document.getElementById('visitSearch')?.value || '').trim();
+  }
+  function allRepsForFilter(){
+    if(isRep()) return db.reps.filter(r=>r.id===currentUser.id);
+    return db.reps || [];
+  }
+  function normalizeVisit(v){
+    const checkin = v.checkin_at || v.arrival_time || v.created_at || '';
+    const checkout = v.checkout_at || v.departure_time || '';
+    return {
+      ...v,
+      date: dateStr(v) || tdy(),
+      checkin_at: checkin,
+      checkout_at: checkout,
+      duration_minutes: v.duration_minutes || minDiff(checkin, checkout),
+      result: v.result || v.visit_result || 'none',
+      notes: v.notes || v.note || '',
+      rep_id: v.rep_id || v.rep || '',
+      customer_id: v.customer_id || v.customer || ''
+    };
+  }
+  function filteredVisits(){
+    ensureVisits();
+    const from=startDate();
+    const to=endDate();
+    const rep=selectedRep();
+    const result=selectedResult();
+    const q=qText();
+    return db.visits.map(normalizeVisit).filter(v=>{
+      if(isRep() && v.rep_id !== currentUser.id) return false;
+      if(from && v.date < from) return false;
+      if(to && v.date > to) return false;
+      if(rep && rep !== 'all' && v.rep_id !== rep) return false;
+      if(result && result !== 'all'){
+        if(result === 'none' && (v.result || 'none') !== 'none') return false;
+        if(result !== 'none' && v.result !== result) return false;
+      }
+      if(q && !(`${cn(v.customer_id)} ${rn(v.rep_id)} ${v.notes||''}`).includes(q)) return false;
+      return true;
+    }).sort((a,b)=>String(b.checkin_at||b.date).localeCompare(String(a.checkin_at||a.date)));
+  }
+  function renderRepFilters(){
+    const reps=allRepsForFilter();
+    ['visitRep','smartVisitRepFilter'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      const old=el.value || 'all';
+      el.innerHTML = `<option value="all">كل المناديب</option>` + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+      if(isRep()) el.value=currentUser.id;
+      else el.value = [...el.options].some(o=>o.value===old) ? old : 'all';
+    });
+  }
+  function updateStats(list){
+    const todayList=list.filter(v=>v.date===tdy());
+    const open=list.filter(v=>!v.checkout_at);
+    const done=list.filter(v=>v.checkout_at);
+    const avg=done.length ? Math.round(done.reduce((s,v)=>s+Number(v.duration_minutes||0),0)/done.length) : 0;
+    const none=list.filter(v=>(v.result||'none')==='none').length;
+
+    if(window.smartVisitsToday) smartVisitsToday.textContent=list.length;
+    if(window.smartVisitsOpen) smartVisitsOpen.textContent=open.length;
+    if(window.smartVisitsAvg) smartVisitsAvg.textContent=avg;
+    if(window.smartVisitsNoResult) smartVisitsNoResult.textContent=none;
+
+    if(window.visitsPeriodCount) visitsPeriodCount.textContent=list.length;
+    if(window.visitedCustomersCount) visitedCustomersCount.textContent=new Set(list.map(v=>v.customer_id).filter(Boolean)).size;
+    if(window.unvisitedCustomersCount){
+      const rep=selectedRep();
+      const customerScope = rep && rep !== 'all' ? db.customers.filter(c=>c.rep_id===rep) : db.customers;
+      const visited=new Set(list.map(v=>v.customer_id).filter(Boolean));
+      unvisitedCustomersCount.textContent=customerScope.filter(c=>!visited.has(c.id)).length;
+    }
+  }
+  function visitCard(v){
+    const open=!v.checkout_at;
+    const locIn = v.checkin_lat && v.checkin_lng;
+    const locOut = v.checkout_lat && v.checkout_lng;
+    return `<div class="visit-report-card ${open?'open':''}">
+      <h3>${cn(v.customer_id)}</h3>
+      <p>${rn(v.rep_id)} · ${v.date} · <b>${open?'زيارة مفتوحة':'زيارة منتهية'}</b></p>
+      <span class="visit-result">${resultText(v.result)}</span>
+      <div class="visit-report-meta">
+        <div><span>وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
+        <div><span>وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
+        <div><span>مدة الزيارة</span><b>${v.duration_minutes || 0} دقيقة</b></div>
+        <div><span>الزيارة القادمة</span><b>${v.next_visit_date || '-'}</b></div>
+      </div>
+      <div class="smart-note">${v.notes || 'لا توجد ملاحظات'}</div>
+      <div class="visit-report-actions">
+        ${open?`<button onclick="endSmartVisit('${v.id}')">إنهاء الزيارة</button>`:''}
+        ${locIn?`<button class="map" onclick="window.open('https://www.google.com/maps?q=${v.checkin_lat},${v.checkin_lng}','_blank')">موقع الوصول</button>`:''}
+        ${locOut?`<button class="map" onclick="window.open('https://www.google.com/maps?q=${v.checkout_lat},${v.checkout_lng}','_blank')">موقع المغادرة</button>`:''}
+        <button class="map" onclick="openCustomerRoute('${v.customer_id}')">موقع العميل</button>
+        <button class="quote" onclick="openQuoteForm('${v.customer_id}')">عرض سعر</button>
+      </div>
+    </div>`;
+  }
+  function renderPerformance(list){
+    const box=document.getElementById('repPerformanceBox') || document.getElementById('smartRepPerformance');
+    if(!box) return;
+    const map={};
+    list.forEach(v=>{
+      map[v.rep_id] ||= {visits:0,customers:new Set(),minutes:0,quotes:0};
+      map[v.rep_id].visits++;
+      if(v.customer_id) map[v.rep_id].customers.add(v.customer_id);
+      map[v.rep_id].minutes += Number(v.duration_minutes||0);
+      if(v.result==='quote') map[v.rep_id].quotes++;
+    });
+    const rows=Object.entries(map).sort((a,b)=>b[1].visits-a[1].visits);
+    box.innerHTML = rows.map(([rep,m])=>`<div class="rep-performance-row"><b>${rn(rep)}</b><span>${m.visits} زيارة · ${m.customers.size} عميل · ${m.quotes} عروض · ${m.minutes} دقيقة</span></div>`).join('') || '<p>لا يوجد أداء في الفترة المحددة</p>';
+  }
+
+  window.renderSmartVisits = function(){
+    ensureVisits();
+    renderRepFilters();
+    const list=filteredVisits();
+    updateStats(list);
+    if(window.smartVisitsGrid){
+      smartVisitsGrid.innerHTML = list.map(visitCard).join('') || '<div class="panel">لا توجد زيارات حسب الفلتر المحدد</div>';
+    }
+    if(window.visitLog || window.visitsLog){
+      const el=window.visitLog || window.visitsLog;
+      el.innerHTML = list.map(visitCard).join('') || '<div class="panel">لا توجد زيارات حسب الفلتر المحدد</div>';
+    }
+    renderPerformance(list);
+  };
+
+  // Patch old visits report page too
+  window.renderVisits = function(){
+    renderSmartVisits();
+  };
+
+  window.setVisitRange = function(range){
+    const fromEl=document.getElementById('visitFrom') || document.getElementById('smartVisitFrom');
+    const toEl=document.getElementById('visitTo') || document.getElementById('smartVisitTo');
+    const d=new Date();
+    const end=d.toISOString().slice(0,10);
+    let start=end;
+    if(range==='week'){ const s=new Date(); s.setDate(d.getDate()-7); start=s.toISOString().slice(0,10); }
+    if(range==='month'){ const s=new Date(); s.setDate(d.getDate()-30); start=s.toISOString().slice(0,10); }
+    if(fromEl) fromEl.value=start;
+    if(toEl) toEl.value=end;
+    renderSmartVisits();
+  };
+
+  // If the existing visits page has old buttons, make them work.
+  window.showVisitReport = function(){ renderSmartVisits(); };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    renderSmartVisits();
+  };
+
+  setTimeout(renderSmartVisits, 500);
+})();
+
+
+
+/* CRM user language: Arabic / English per logged-in user */
+(function(){
+  const LANG_KEY='jms_user_lang_v1';
+  const dict={
+    'لوحة التحكم':'Dashboard','العملاء':'Customers','عروض الأسعار':'Quotations','الزيارات الذكية':'Smart Visits','الزيارات':'Visits','المناديب':'Representatives','طلبات التصنيع':'Production Orders','المستخدمين':'Users','حسابي':'My Account','تسجيل الخروج':'Logout',
+    'إدارة المناديب':'Representatives Management','إضافة مندوب':'Add Representative','تحديث':'Refresh','بدء الدوام':'Start Work','إنهاء الدوام':'End Work','تحديث الموقع':'Update Location','أنا في زيارة':'In Visit','في زيارة':'In Visit','رجوع للطريق':'Back on Route','عرض الموقع':'View Location','خارج الدوام':'Off Duty','على الدوام':'On Duty',
+    'زيارات اليوم':'Today Visits','عروض اليوم':'Today Quotes','طلبات اليوم':'Today Orders','عدد المناديب':'Representatives','بحث':'Search','الحالة':'Status','المنطقة':'Area','إجراء':'Action','كل الحالات':'All Statuses','كل المناديب':'All Representatives',
+    'إدارة العملاء والمناديب والإنتاج':'Customers, representatives and production management','المستخدم الحالي':'Current User','مدير النظام':'System Admin','مدير المبيعات':'Sales Manager','مندوب':'Representative',
+    'بدء زيارة':'Start Visit','تسجيل الوصول وبدء الزيارة':'Check in and Start Visit','إنهاء الزيارة':'End Visit','حفظ وإنهاء الزيارة':'Save and End Visit','وقت الوصول':'Check-in Time','وقت المغادرة':'Check-out Time','مدة الزيارة':'Visit Duration','الزيارة القادمة':'Next Visit','نتيجة الزيارة':'Visit Result','ملاحظات الزيارة':'Visit Notes','موقع الوصول':'Check-in Location','موقع المغادرة':'Check-out Location','فتح موقع العميل':'Open Customer Location','موقع العميل':'Customer Location',
+    'عرض سعر':'Quotation','إنشاء عرض سعر':'Create Quotation','تعديل':'Edit','عرض':'View','اعتماد':'Approve','رفض':'Reject','إرسال للعميل':'Send to Customer','العميل وافق':'Customer Approved','إلغاء - العميل لم يوافق':'Cancel - Customer Rejected','تحويل لطلب':'Convert to Order','بانتظار اعتماد المدير':'Pending Manager Approval','معتمد':'Approved','مرسل للعميل':'Sent to Customer','مقبول من العميل':'Accepted by Customer','مرفوض':'Rejected',
+    'إضافة عميل جديد':'Add New Customer','اسم العميل':'Customer Name','الجوال':'Mobile','المدينة':'City','العنوان':'Address','المندوب':'Representative','العميل':'Customer','اختر العميل':'Select Customer','المنتج':'Product','الخامة':'Material','اللون':'Color','الطباعة':'Printing','العرض':'Width','الطول':'Length','السماكة':'Thickness','وحدة المقاس':'Size Unit','وحدة السماكة':'Thickness Unit','كمية الطلب بالكيلو':'Order Quantity KG','سعر الكيلو':'Price / KG','كثافة الخامة':'Material Density','وزن الحبة':'Piece Weight','عدد الحبات':'Pieces Count','الإجمالي':'Total','شروط الدفع':'Payment Terms','مدة التسليم':'Delivery Time','ملاحظات':'Notes',
+    'حفظ وإرساله للمدير للاعتماد':'Save and Send for Approval','حفظ التعديل وإرجاعه للاعتماد':'Save Changes and Return for Approval','تم حفظ البيانات سحابياً':'Cloud data saved','لا توجد زيارات':'No visits','لا يوجد مناديب':'No representatives','لا توجد عروض أسعار':'No quotations','كل النتائج':'All Results','تم البيع':'Sale Completed','تحصيل':'Collection','لا يوجد مسؤول':'No Manager Available','العميل مغلق':'Customer Closed','مؤجل':'Postponed','بدون نتيجة':'No Result','زيارة مفتوحة':'Open Visit','زيارة منتهية':'Closed Visit','دقيقة':'min','زيارة':'visit','عميل':'customer','عرض':'quote','طلب':'order','ريال':'SAR','كجم':'KG','سم':'cm','ميكرون':'micron'
+  };
+  const reverseDict=Object.fromEntries(Object.entries(dict).map(([ar,en])=>[en,ar]));
+
+  function getLang(){
+    try{
+      if(window.currentUser && currentUser.lang) return currentUser.lang;
+      const userId=window.currentUser?.id||window.currentUser?.email||'guest';
+      return localStorage.getItem(LANG_KEY+'_'+userId)||localStorage.getItem(LANG_KEY)||'ar';
+    }catch(e){return 'ar'}
+  }
+  function saveLang(lang){
+    const userId=window.currentUser?.id||window.currentUser?.email||'guest';
+    localStorage.setItem(LANG_KEY+'_'+userId,lang);
+    localStorage.setItem(LANG_KEY,lang);
+    if(window.currentUser) currentUser.lang=lang;
+    if(window.db&&db.users){const u=db.users.find(x=>x.id===currentUser?.id||x.email===currentUser?.email);if(u)u.lang=lang}
+    if(window.db&&db.reps){const r=db.reps.find(x=>x.id===currentUser?.id||x.email===currentUser?.email);if(r)r.lang=lang}
+    if(typeof save==='function') save();
+  }
+  function tr(text,lang){
+    const clean=String(text||'').trim();
+    if(!clean) return text;
+    if(lang==='en'&&dict[clean]) return String(text).replace(clean,dict[clean]);
+    if(lang==='ar'&&reverseDict[clean]) return String(text).replace(clean,reverseDict[clean]);
+    return text;
+  }
+  function walk(root,lang){
+    if(!root) return;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){
+      if(!n.nodeValue||!n.nodeValue.trim())return NodeFilter.FILTER_REJECT;
+      if(['SCRIPT','STYLE','TEXTAREA'].includes(n.parentElement?.tagName))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }});
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    nodes.forEach(n=>{n.nodeValue=tr(n.nodeValue,lang)});
+    root.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{el.placeholder=tr(el.placeholder,lang)});
+    root.querySelectorAll('option,button,a,span,small,label,h1,h2,h3,p,b').forEach(el=>{
+      if(el.childNodes.length===1&&el.childNodes[0].nodeType===Node.TEXT_NODE) el.textContent=tr(el.textContent,lang);
+    });
+  }
+  window.setJmsLanguage=function(lang){saveLang(lang);applyJmsLanguage()};
+  window.applyJmsLanguage=function(){
+    const lang=getLang();
+    document.documentElement.lang=lang==='en'?'en':'ar';
+    document.documentElement.dir=lang==='en'?'ltr':'rtl';
+    document.body?.setAttribute('data-lang',lang);
+    walk(document.body,lang);
+    document.querySelectorAll('.jms-lang-switch button').forEach(btn=>btn.classList.toggle('active',btn.dataset.lang===lang));
+  };
+  function addSwitcher(){
+    if(document.getElementById('jmsLangSwitch'))return;
+    const holder=document.querySelector('.sidebar')||document.querySelector('aside')||document.querySelector('.side')||document.body;
+    const box=document.createElement('div');
+    box.id='jmsLangSwitch';box.className='jms-lang-switch';
+    box.innerHTML='<button type="button" data-lang="ar" onclick="setJmsLanguage(\\'ar\\')">عربي</button><button type="button" data-lang="en" onclick="setJmsLanguage(\\'en\\')">English</button>';
+    holder.insertBefore(box,holder.firstChild?holder.firstChild.nextSibling:null);
+  }
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){window.showApp=function(){oldShowApp();addSwitcher();setTimeout(applyJmsLanguage,80)}}
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){if(typeof oldRenderAll==='function')oldRenderAll();addSwitcher();setTimeout(applyJmsLanguage,80)};
+  const oldAlert=window.alert;
+  window.alert=function(msg){oldAlert(tr(msg,getLang()))};
+  const mo=new MutationObserver(()=>setTimeout(applyJmsLanguage,50));
+  setTimeout(()=>{addSwitcher();applyJmsLanguage();if(document.body)mo.observe(document.body,{childList:true,subtree:true})},500);
+})();

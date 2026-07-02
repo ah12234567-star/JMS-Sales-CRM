@@ -539,3 +539,30 @@
 .visit-actions .route{background:#166534}
 .smart-note{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;padding:10px;margin-top:10px;color:#475569}
 @media(max-width:900px){.visits-stats{grid-template-columns:1fr 1fr}.visit-lines{grid-template-columns:1fr}}
+
+
+/* Visits report and rep filter fix */
+.visit-report-card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:18px;box-shadow:0 12px 32px rgba(15,23,42,.06);margin-bottom:14px}
+.visit-report-card h3{margin:0 0 8px;color:#0f172a}
+.visit-report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.visit-report-meta div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px}
+.visit-report-meta span{display:block;color:#64748b;font-size:12px}
+.visit-report-meta b{display:block;color:#111827;margin-top:4px}
+.visit-report-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.visit-report-actions button{border:0;border-radius:12px;padding:9px 11px;background:#111827;color:#fff;font-weight:900;cursor:pointer}
+.visit-report-actions .map{background:#1d4ed8}
+.visit-report-actions .quote{background:#166534}
+.rep-performance-row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #eef2f7;padding:10px 0}
+.rep-performance-row:last-child{border-bottom:0}
+.rep-performance-row b{color:#111827}
+.rep-performance-row span{color:#64748b}
+@media(max-width:900px){.visit-report-meta{grid-template-columns:1fr 1fr}}
+
+
+/* User language switcher */
+.jms-lang-switch{display:flex;gap:6px;align-items:center;margin:10px 0;padding:8px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(255,255,255,.06)}
+.jms-lang-switch button{flex:1;border:0;border-radius:10px;padding:8px 10px;font-weight:900;cursor:pointer;background:#334155;color:#fff}
+.jms-lang-switch button.active{background:#16a34a}
+html[dir="ltr"] body{direction:ltr;text-align:left}
+html[dir="ltr"] .page,html[dir="ltr"] .modal-card,html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:ltr;text-align:left}
+html[dir="ltr"] .form-grid label{text-align:left}
