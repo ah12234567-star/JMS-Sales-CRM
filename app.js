@@ -3538,3 +3538,102 @@ function convertQuoteToOrder(qid){
   const oldShowApp=window.showApp;if(typeof oldShowApp==='function'){window.showApp=function(){oldShowApp();setTimeout(()=>{addLangBox();applyFieldLang();addButtons()},200)}}
   setTimeout(()=>{addLangBox();applyFieldLang();addButtons()},800)
 })();
+
+
+
+/* CUSTOMER CARD ACTIONS FIX: hide WhatsApp if no phone + clean buttons */
+(function(){
+  function ensure(){ db.customers ||= []; }
+  function phoneOk(c){
+    const p = String(c?.phone || c?.mobile || '').replace(/\D/g,'');
+    return p.length >= 8;
+  }
+  function esc(s){ return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+  function findCustomerFromCard(card){
+    const title = card.querySelector('h3')?.textContent?.trim();
+    return db.customers.find(c => String(c.name||'').trim() === title);
+  }
+  function safeBtn(label, cls, onclick){
+    return `<button type="button" class="${cls}" onclick="${onclick}">${label}</button>`;
+  }
+  window.toggleCustomerMore = function(customerId){
+    const el = document.getElementById('more_'+customerId);
+    if(el) el.classList.toggle('open');
+  };
+  function rebuildCustomerCardActions(){
+    ensure();
+    document.querySelectorAll('.customer-card').forEach(card=>{
+      const c = findCustomerFromCard(card);
+      if(!c) return;
+      if(card.dataset.actionsFixed === '1') return;
+      card.dataset.actionsFixed = '1';
+
+      // Hide old added field-upgrade actions to avoid duplicated buttons
+      card.querySelectorAll('.field-upgrade-actions').forEach(x=>x.remove());
+
+      // Try to hide old raw buttons area only if inside customer card and contains these labels
+      const oldButtons = Array.from(card.querySelectorAll('button')).filter(b=>{
+        const t = b.textContent.trim();
+        return ['تمت الزيارة','طلب جديد','موعد','تحصيل','ملاحظه','ملاحظة','موقع العميل','رسالة تقييم'].includes(t);
+      });
+      oldButtons.forEach(b=>b.style.display='none');
+
+      const id = c.id;
+      const hasPhone = phoneOk(c);
+      const actions = document.createElement('div');
+      actions.className = 'customer-actions-clean';
+      actions.innerHTML =
+        safeBtn('تمت الزيارة','done',`quickVisit('${id}')`) +
+        safeBtn('طلب جديد','order',`openQuoteForm('${id}')`) +
+        safeBtn('موعد','meeting',`openCustomerMeeting ? openCustomerMeeting('${id}') : alert('سيتم إضافة المواعيد قريباً')`) +
+        safeBtn('تحصيل','collection',`openCollection ? openCollection('${id}') : alert('سيتم إضافة التحصيل قريباً')`) +
+        safeBtn('ملاحظة','note',`openCustomerNote ? openCustomerNote('${id}') : alert('سيتم إضافة الملاحظات قريباً')`) +
+        safeBtn('موقع العميل','map',`openCustomerMap('${id}')`) +
+        (hasPhone ? safeBtn('رسالة تقييم','wa',`sendSatisfactionWhatsApp('${id}')`) : '') +
+        safeBtn('المزيد','more',`toggleCustomerMore('${id}')`);
+
+      const more = document.createElement('div');
+      more.id = 'more_' + id;
+      more.className = 'customer-more-menu';
+      more.innerHTML = `
+        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">إرسال تقييم واتساب</button>` : `<button type="button" disabled>لا يوجد رقم جوال</button>`}
+        <button type="button" onclick="openCustomerMap('${id}')">فتح موقع العميل</button>
+        <button type="button" onclick="quickVisit('${id}')">تسجيل زيارة</button>
+        <button type="button" onclick="openQuoteForm('${id}')">إنشاء عرض سعر</button>
+      `;
+      card.appendChild(actions);
+      card.appendChild(more);
+    });
+  }
+
+  // Safer WhatsApp function: no annoying alert for missing phone from card button; just return
+  const oldSendSat = window.sendSatisfactionWhatsApp;
+  window.sendSatisfactionWhatsApp = function(customerId, visitId=''){
+    const c = db.customers.find(x=>x.id===customerId);
+    if(!phoneOk(c)){
+      alert('لا يوجد رقم جوال للعميل. أضف رقم الجوال في بطاقة العميل أولاً.');
+      return;
+    }
+    if(typeof oldSendSat === 'function') return oldSendSat(customerId, visitId);
+    const phone=String(c.phone||'').replace(/\D/g,'');
+    const sa=phone.startsWith('966')?phone:('966'+phone.replace(/^0/,''));
+    const msg='السلام عليكم%0Aنشكر لكم التعامل مع شركة جدة النموذجية للصناعة.%0Aنأمل تقييم خدمتنا من 1 إلى 5 نجوم:%0A⭐⭐⭐⭐⭐';
+    window.open(`https://wa.me/${sa}?text=${msg}`,'_blank');
+  };
+
+  const oldRenderAll = window.renderAll;
+  window.renderAll = function(){
+    if(typeof oldRenderAll === 'function') oldRenderAll();
+    setTimeout(rebuildCustomerCardActions, 200);
+  };
+
+  const oldRenderCustomers = window.renderCustomers;
+  if(typeof oldRenderCustomers === 'function'){
+    window.renderCustomers = function(){
+      oldRenderCustomers.apply(this, arguments);
+      setTimeout(rebuildCustomerCardActions, 200);
+    };
+  }
+
+  setTimeout(rebuildCustomerCardActions, 800);
+})();

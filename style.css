@@ -587,3 +587,20 @@ html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:
 .customer-route-card small{display:block;color:#64748b;margin-top:4px}
 .safe-lang-mini{display:flex;gap:6px;margin:8px 0}.safe-lang-mini button{border:0;border-radius:10px;padding:8px 10px;font-weight:900;background:#334155;color:#fff}.safe-lang-mini button.active{background:#16a34a}
 html[dir="ltr"] body{direction:ltr;text-align:left}html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:ltr;text-align:left}
+
+
+/* Customer card actions fix */
+.customer-actions-clean{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.customer-actions-clean button{border:0;border-radius:12px;padding:9px 8px;font-weight:900;color:#fff;cursor:pointer;font-size:13px}
+.customer-actions-clean .done{background:#111827}
+.customer-actions-clean .order{background:#166534}
+.customer-actions-clean .meeting{background:#1d4ed8}
+.customer-actions-clean .collection{background:#c2410c}
+.customer-actions-clean .note{background:#334155}
+.customer-actions-clean .map{background:#4338ca}
+.customer-actions-clean .wa{background:#16a34a}
+.customer-actions-clean .more{background:#64748b}
+.customer-more-menu{display:none;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:8px;margin-top:8px;box-shadow:0 10px 24px rgba(15,23,42,.12)}
+.customer-more-menu.open{display:block}
+.customer-more-menu button{display:block;width:100%;border:0;background:#f8fafc;color:#111827;border-radius:10px;padding:9px;margin:5px 0;font-weight:900;text-align:right}
+@media(max-width:800px){.customer-actions-clean{grid-template-columns:repeat(2,1fr)}}
