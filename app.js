@@ -3188,3 +3188,133 @@ function convertQuoteToOrder(qid){
 
   setTimeout(renderSmartVisits, 500);
 })();
+
+
+
+/* SAFE USER LANGUAGE MODULE - no core override */
+(function(){
+  const KEY = 'jms_safe_lang';
+  const T = {
+    'لوحة التحكم':'Dashboard',
+    'العملاء':'Customers',
+    'عروض الأسعار':'Quotations',
+    'الزيارات الذكية':'Smart Visits',
+    'المناديب':'Representatives',
+    'طلبات التصنيع':'Production Orders',
+    'المستخدمون':'Users',
+    'تسجيل الخروج':'Logout',
+    'إدارة المناديب':'Representatives Management',
+    'إضافة مندوب':'Add Representative',
+    'تحديث':'Refresh',
+    'بدء الدوام':'Start Work',
+    'إنهاء الدوام':'End Work',
+    'تحديث الموقع':'Update Location',
+    'في زيارة':'In Visit',
+    'خارج الدوام':'Off Duty',
+    'على الدوام':'On Duty',
+    'زيارات اليوم':'Today Visits',
+    'عروض اليوم':'Today Quotes',
+    'طلبات اليوم':'Today Orders',
+    'كل المناديب':'All Representatives',
+    'بحث':'Search',
+    'الحالة':'Status',
+    'المنطقة':'Area',
+    'إجراء':'Action',
+    'بدء زيارة':'Start Visit',
+    'إنهاء الزيارة':'End Visit',
+    'وقت الوصول':'Check-in Time',
+    'وقت المغادرة':'Check-out Time',
+    'مدة الزيارة':'Visit Duration',
+    'نتيجة الزيارة':'Visit Result',
+    'عرض سعر':'Quotation',
+    'إنشاء عرض سعر':'Create Quotation',
+    'تعديل':'Edit',
+    'عرض':'View',
+    'اعتماد':'Approve',
+    'رفض':'Reject',
+    'إرسال للعميل':'Send to Customer',
+    'تحويل لطلب':'Convert to Order',
+    'العميل':'Customer',
+    'المندوب':'Representative',
+    'المنتج':'Product',
+    'الخامة':'Material',
+    'اللون':'Color',
+    'العرض':'Width',
+    'الطول':'Length',
+    'السماكة':'Thickness',
+    'الإجمالي':'Total',
+    'ملاحظات':'Notes'
+  };
+  const R = Object.fromEntries(Object.entries(T).map(([a,e])=>[e,a]));
+
+  function lang(){
+    const uid = window.currentUser?.id || window.currentUser?.email || 'guest';
+    return localStorage.getItem(KEY + '_' + uid) || localStorage.getItem(KEY) || 'ar';
+  }
+  function saveLang(v){
+    const uid = window.currentUser?.id || window.currentUser?.email || 'guest';
+    localStorage.setItem(KEY + '_' + uid, v);
+    localStorage.setItem(KEY, v);
+  }
+  function trText(txt, target){
+    const clean = String(txt || '').trim();
+    if(!clean) return txt;
+    if(target === 'en' && T[clean]) return String(txt).replace(clean, T[clean]);
+    if(target === 'ar' && R[clean]) return String(txt).replace(clean, R[clean]);
+    return txt;
+  }
+  function translateElement(el, target){
+    if(!el || el.dataset.noTranslate === '1') return;
+    if(!el.dataset.originalText && el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE){
+      el.dataset.originalText = el.textContent;
+    }
+    if(el.dataset.originalText){
+      const base = target === 'ar' ? (R[el.dataset.originalText] || el.dataset.originalText) : el.dataset.originalText;
+      el.textContent = trText(base, target);
+    }
+  }
+  function apply(){
+    const target = lang();
+    document.documentElement.lang = target === 'en' ? 'en' : 'ar';
+    document.documentElement.dir = target === 'en' ? 'ltr' : 'rtl';
+    document.querySelectorAll('.nav,button,th,label,h1,h2,h3,span').forEach(el=>translateElement(el,target));
+    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{
+      if(!el.dataset.originalPlaceholder) el.dataset.originalPlaceholder = el.placeholder;
+      const base = target === 'ar' ? (R[el.dataset.originalPlaceholder] || el.dataset.originalPlaceholder) : el.dataset.originalPlaceholder;
+      el.placeholder = trText(base,target);
+    });
+    document.querySelectorAll('.jms-safe-lang button').forEach(b=>b.classList.toggle('active', b.dataset.lang === target));
+  }
+  function addSwitcher(){
+    if(document.getElementById('jmsSafeLang')) return;
+    const side = document.querySelector('aside') || document.querySelector('.sidebar') || document.body;
+    const box = document.createElement('div');
+    box.id='jmsSafeLang';
+    box.className='jms-safe-lang';
+    box.innerHTML='<button type="button" data-lang="ar">عربي</button><button type="button" data-lang="en">English</button>';
+    box.querySelectorAll('button').forEach(btn=>{
+      btn.onclick = function(){
+        saveLang(this.dataset.lang);
+        apply();
+      };
+    });
+    side.insertBefore(box, side.children[1] || null);
+  }
+  window.applySafeLanguage = function(){ addSwitcher(); apply(); };
+
+  // Only hook after rendering without replacing core functions destructively.
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(window.applySafeLanguage, 700);
+    document.addEventListener('click', function(){ setTimeout(window.applySafeLanguage, 150); }, true);
+  });
+
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll === 'function' && !window.__safeLangRenderPatched){
+    window.__safeLangRenderPatched = true;
+    window.renderAll = function(){
+      const r = oldRenderAll.apply(this, arguments);
+      setTimeout(window.applySafeLanguage, 100);
+      return r;
+    };
+  }
+})();

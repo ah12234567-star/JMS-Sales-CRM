@@ -557,3 +557,11 @@
 .rep-performance-row b{color:#111827}
 .rep-performance-row span{color:#64748b}
 @media(max-width:900px){.visit-report-meta{grid-template-columns:1fr 1fr}}
+
+
+/* Safe language switcher - isolated */
+.jms-safe-lang{display:flex;gap:6px;margin:10px 0;padding:8px;border-radius:14px;background:rgba(255,255,255,.08)}
+.jms-safe-lang button{flex:1;border:0;border-radius:10px;padding:8px 10px;font-weight:900;cursor:pointer;background:#334155;color:#fff}
+.jms-safe-lang button.active{background:#16a34a}
+html[dir="ltr"] body{direction:ltr;text-align:left}
+html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:ltr;text-align:left}
