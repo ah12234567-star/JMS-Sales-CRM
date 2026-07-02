@@ -557,12 +557,3 @@
 .rep-performance-row b{color:#111827}
 .rep-performance-row span{color:#64748b}
 @media(max-width:900px){.visit-report-meta{grid-template-columns:1fr 1fr}}
-
-
-/* User language switcher */
-.jms-lang-switch{display:flex;gap:6px;align-items:center;margin:10px 0;padding:8px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(255,255,255,.06)}
-.jms-lang-switch button{flex:1;border:0;border-radius:10px;padding:8px 10px;font-weight:900;cursor:pointer;background:#334155;color:#fff}
-.jms-lang-switch button.active{background:#16a34a}
-html[dir="ltr"] body{direction:ltr;text-align:left}
-html[dir="ltr"] .page,html[dir="ltr"] .modal-card,html[dir="ltr"] input,html[dir="ltr"] select,html[dir="ltr"] textarea{direction:ltr;text-align:left}
-html[dir="ltr"] .form-grid label{text-align:left}
