@@ -4368,3 +4368,86 @@ ${todaySummary()}
   setTimeout(forceArabic,300);
   setInterval(forceArabic,1500);
 })();
+
+
+
+/* AI LOGIN SECURITY FIX: AI appears only after login */
+(function(){
+  function isLoggedIn(){
+    return !!(window.currentUser && (currentUser.id || currentUser.email || currentUser.name));
+  }
+
+  function secureAIVisibility(){
+    const ok = isLoggedIn();
+    document.body?.classList.toggle('jms-logged-in', ok);
+
+    const btn = document.getElementById('jmsAiLaunch');
+    const panel = document.getElementById('jmsAiPanel');
+
+    if(!ok){
+      if(btn) btn.style.display='none';
+      if(panel){
+        panel.classList.remove('open');
+        panel.style.display='none';
+      }
+      return;
+    }
+
+    if(btn) btn.style.display='';
+    if(panel) panel.style.display='';
+  }
+
+  // Prevent AI from being added before login
+  const oldAddAI = window.addAI;
+  if(typeof oldAddAI === 'function'){
+    window.addAI = function(){
+      if(!isLoggedIn()) return;
+      return oldAddAI.apply(this, arguments);
+    };
+  }
+
+  // If addAI was local in previous module, remove visible AI until login.
+  const oldShowApp = window.showApp;
+  if(typeof oldShowApp === 'function'){
+    window.showApp = function(){
+      oldShowApp.apply(this, arguments);
+      setTimeout(secureAIVisibility, 100);
+      setTimeout(secureAIVisibility, 500);
+    };
+  }
+
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll === 'function'){
+    window.renderAll = function(){
+      oldRenderAll.apply(this, arguments);
+      setTimeout(secureAIVisibility, 100);
+    };
+  }
+
+  // Patch logout functions if present
+  ['logout','signOut','doLogout'].forEach(fn=>{
+    if(typeof window[fn] === 'function'){
+      const old = window[fn];
+      window[fn] = function(){
+        const r = old.apply(this, arguments);
+        setTimeout(secureAIVisibility, 50);
+        return r;
+      };
+    }
+  });
+
+  // Hard guard for AI button click
+  document.addEventListener('click', function(e){
+    const aiTarget = e.target?.closest?.('#jmsAiLaunch,#jmsAiPanel');
+    if(aiTarget && !isLoggedIn()){
+      e.preventDefault();
+      e.stopPropagation();
+      secureAIVisibility();
+      return false;
+    }
+  }, true);
+
+  setTimeout(secureAIVisibility, 100);
+  setTimeout(secureAIVisibility, 700);
+  setInterval(secureAIVisibility, 1000);
+})();
