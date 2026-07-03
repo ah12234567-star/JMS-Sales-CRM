@@ -4925,3 +4925,89 @@ ${todaySummary()}
   setTimeout(apply,1200);
   setInterval(apply,1000);
 })();
+
+
+
+/* AI CLICK FIX: force panel open on click */
+(function(){
+  function ensureAsk(){
+    if(typeof window.askJmsAI === 'function') return;
+    window.askJmsAI=function(q){
+      const input=document.getElementById('jmsAiInput');
+      q=String(q||input?.value||'').trim();
+      if(!q) return;
+      const d=(typeof db!=='undefined')?db:{customers:[],reps:[],visits:[],quotes:[],orders:[],collections:[]};
+      const body=document.getElementById('jmsAiBody');
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">ملخص النظام:\n- العملاء: ${d.customers?.length||0}\n- المناديب: ${d.reps?.length||0}\n- الزيارات: ${d.visits?.length||0}\n- العروض: ${d.quotes?.length||0}\n- الطلبات: ${d.orders?.length||0}</div>`);
+      body.scrollTop=body.scrollHeight;
+      if(input) input.value='';
+    };
+  }
+
+  function ensurePanel(){
+    let btn=document.getElementById('jmsAiLaunch');
+    let panel=document.getElementById('jmsAiPanel');
+    if(!btn) return;
+
+    if(!panel){
+      panel=document.createElement('div');
+      panel.id='jmsAiPanel';
+      panel.className='jms-ai-panel';
+      panel.innerHTML=`
+        <div class="jms-ai-head">
+          <div><b>JMS AI</b><small>مساعد ذكي يحلل بيانات النظام</small></div>
+          <button class="jms-ai-close" type="button">×</button>
+        </div>
+        <div id="jmsAiBody" class="jms-ai-body">
+          <div class="jms-ai-msg bot">أهلاً، اسألني عن العملاء، المناديب، الزيارات، التحصيلات، أو الأداء.</div>
+        </div>
+        <div class="jms-ai-quick">
+          <button type="button" onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+          <button type="button" onclick="askJmsAI('تحليل المبيعات')">تحليل المبيعات</button>
+          <button type="button" onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+          <button type="button" onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+        </div>
+        <div class="jms-ai-input">
+          <input id="jmsAiInput" placeholder="اكتب سؤالك هنا...">
+          <button type="button" id="jmsAiSendBtn">إرسال</button>
+        </div>`;
+      document.body.appendChild(panel);
+    }
+
+    ensureAsk();
+
+    btn.onclick=null;
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      const p=document.getElementById('jmsAiPanel');
+      if(!p) return;
+      p.classList.add('open');
+      p.style.display='block';
+      p.style.visibility='visible';
+      p.style.opacity='1';
+      const input=document.getElementById('jmsAiInput');
+      setTimeout(()=>input && input.focus(),80);
+    }, true);
+
+    panel.querySelector('.jms-ai-close')?.addEventListener('click', function(e){
+      e.preventDefault();
+      panel.classList.remove('open');
+      panel.style.display='';
+    });
+
+    document.getElementById('jmsAiSendBtn')?.addEventListener('click', function(){
+      const input=document.getElementById('jmsAiInput');
+      askJmsAI(input?.value||'');
+    });
+
+    document.getElementById('jmsAiInput')?.addEventListener('keydown', function(e){
+      if(e.key==='Enter') askJmsAI(this.value);
+    });
+  }
+
+  setTimeout(ensurePanel,300);
+  setTimeout(ensurePanel,1000);
+  setInterval(ensurePanel,1500);
+})();

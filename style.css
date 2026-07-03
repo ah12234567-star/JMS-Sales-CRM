@@ -753,3 +753,15 @@ body:not(.jms-logged-in) #jmsAiLaunch,
 body:not(.jms-logged-in) #jmsAiPanel{
   display:none!important;
 }
+
+
+/* AI Click Fix */
+#jmsAiPanel.open{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  z-index:999999!important;
+}
+#jmsAiLaunch{
+  z-index:999999!important;
+}

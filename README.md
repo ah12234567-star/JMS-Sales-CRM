@@ -245,3 +245,6 @@ window.JMS_CLOUD = {
 ## AI CurrentUser Fix
 - إصلاح سبب اختفاء AI بسبب استخدام window.currentUser بدلاً من currentUser الحقيقي.
 - يظهر AI بعد تسجيل الدخول ويختفي في شاشة الدخول.
+
+## AI Click Fix
+- إصلاح ضغط زر JMS AI وفتح نافذة المساعد بالقوة.
