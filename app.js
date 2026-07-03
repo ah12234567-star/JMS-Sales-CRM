@@ -4410,3 +4410,121 @@ askJmsAI = async function(q){
 
   body.scrollTop = body.scrollHeight;
 };
+
+/* JMS WOW CUSTOMER MAGNET UPGRADE - added by ChatGPT */
+(function(){
+  const STYLE_ID = 'jmsWowCustomerMagnetStyle';
+  if(!document.getElementById(STYLE_ID)){
+    const st=document.createElement('style');
+    st.id=STYLE_ID;
+    st.textContent=`
+      .jms-wow-score{display:flex;align-items:center;gap:10px;margin:10px 0 4px;padding:10px 12px;border-radius:16px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;box-shadow:0 10px 24px rgba(15,23,42,.16);}
+      .jms-wow-score .ring{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:conic-gradient(#22c55e calc(var(--score)*1%),rgba(255,255,255,.18) 0);position:relative;}
+      .jms-wow-score .ring:after{content:'';position:absolute;inset:5px;background:#0f172a;border-radius:50%;}
+      .jms-wow-score .ring span{position:relative;z-index:1;font-size:13px;}
+      .jms-wow-score b{display:block;font-size:13px}.jms-wow-score small{opacity:.85;font-size:12px}
+      .jms-wow-btn{background:linear-gradient(135deg,#7c3aed,#2563eb)!important;color:white!important;border:0!important;box-shadow:0 8px 18px rgba(37,99,235,.24)!important;}
+      .jms-wow-modal{direction:rtl}.jms-wow-hero{border-radius:24px;padding:18px;background:linear-gradient(135deg,#08111f,#123b9a);color:#fff;margin-bottom:14px}.jms-wow-hero h2{margin:0 0 8px}.jms-wow-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}.jms-wow-kpi{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:14px}.jms-wow-kpi b{font-size:22px;color:#111827}.jms-wow-kpi span{display:block;color:#64748b;margin-top:4px}.jms-wow-action{border-radius:18px;padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;margin:12px 0}.jms-wow-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.jms-wow-actions button{border:0;border-radius:999px;padding:10px 14px;cursor:pointer;background:#0f172a;color:#fff}.jms-wow-actions button.green{background:#16a34a}.jms-wow-actions button.blue{background:#2563eb}.jms-wow-actions button.orange{background:#ea580c}.jms-wow-actions button.purple{background:#7c3aed}
+      .customer-card{position:relative;overflow:hidden}.customer-card:before{content:'';position:absolute;top:-80px;left:-80px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.10),transparent 65%);pointer-events:none}
+    `;
+    document.head.appendChild(st);
+  }
+  const money = window.money || (n => Number(n||0).toLocaleString('ar-SA')+' ريال');
+  const todayStr = () => (typeof today==='function'?today():new Date().toISOString().slice(0,10));
+  const rep = id => (window.db?.reps||[]).find(r=>r.id===id)?.name || '-';
+  const custName = id => (window.db?.customers||[]).find(c=>c.id===id)?.name || '-';
+  const phoneDigits = c => String(c?.phone||c?.mobile||'').replace(/\D/g,'');
+  const normalizedPhone = c => {let p=phoneDigits(c); if(!p) return ''; return p.startsWith('966')?p:('966'+p.replace(/^0/,''));};
+  const lastVisitDate = id => (window.db?.visits||[]).filter(v=>v.customer_id===id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]?.date || '';
+  const daysFromDate = d => d?Math.max(0,Math.floor((new Date(todayStr())-new Date(d))/86400000)):999;
+  const customerOrders = id => (window.db?.orders||[]).filter(o=>o.customer_id===id);
+  const customerCollections = id => (window.db?.collections||[]).filter(x=>x.customer_id===id);
+  function scoreCustomer(c){
+    const late=daysFromDate(lastVisitDate(c.id));
+    const debt=Number(c.debt_balance||0);
+    const orders=customerOrders(c.id).length;
+    let s=100;
+    if(late>30) s-=30; else if(late>20) s-=15;
+    if(debt>0) s-=Math.min(28,Math.round(debt/500));
+    if(!phoneDigits(c)) s-=10;
+    if(orders>3) s+=6;
+    return Math.max(5,Math.min(100,s));
+  }
+  function priorityText(c){
+    const late=daysFromDate(lastVisitDate(c.id));
+    const debt=Number(c.debt_balance||0);
+    if(debt>0 && late>20) return 'أولوية عالية: تحصيل + زيارة متابعة';
+    if(late>=30) return 'زيارة عاجلة: العميل لم يُزار منذ فترة';
+    if(debt>0) return 'متابعة تحصيل ودية';
+    if(customerOrders(c.id).length===0) return 'فرصة بيع: لا توجد طلبات مسجلة';
+    return 'عميل مستقر: حافظ على العلاقة';
+  }
+  function findCardCustomer(card){
+    const title=card.querySelector('h3')?.textContent?.trim();
+    return (window.db?.customers||[]).find(c=>String(c.name||'').trim()===title);
+  }
+  window.jmsSmartWhatsApp = function(id,type='follow'){
+    const c=(window.db?.customers||[]).find(x=>x.id===id); if(!c) return alert('لم يتم العثور على العميل');
+    const phone=normalizedPhone(c); if(!phone) return alert('لا يوجد رقم جوال للعميل');
+    const msgs={
+      follow:`السلام عليكم ${c.name}\nمعك شركة جدة النموذجية للصناعة. سعدنا بخدمتكم ونحب نتابع احتياجكم القادم من الأكياس أو التغليف.`,
+      collection:`السلام عليكم ${c.name}\nنود تذكيركم بوجود مبلغ مستحق قدره ${money(c.debt_balance||0)}. شاكرين تعاونكم الدائم.`,
+      thanks:`السلام عليكم ${c.name}\nنشكر لكم ثقتكم في شركة جدة النموذجية للصناعة. رأيكم يهمنا، كيف كانت تجربتكم معنا؟`
+    };
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msgs[type]||msgs.follow)}`,'_blank');
+  };
+  window.jmsCopyCustomerCard = async function(id){
+    const c=(window.db?.customers||[]).find(x=>x.id===id); if(!c) return;
+    const txt=`بطاقة عميل JMS\nالعميل: ${c.name}\nالمندوب: ${rep(c.rep_id)}\nالجوال: ${c.phone||'-'}\nالمدينة: ${c.city||'-'}\nآخر زيارة: ${lastVisitDate(c.id)||'-'}\nالمديونية: ${money(c.debt_balance||0)}\nالإجراء المقترح: ${priorityText(c)}`;
+    try{await navigator.clipboard.writeText(txt); alert('تم نسخ بطاقة العميل');}catch(e){prompt('انسخ بطاقة العميل',txt);}
+  };
+  window.openCustomer360 = function(id){
+    const c=(window.db?.customers||[]).find(x=>x.id===id); if(!c) return alert('لم يتم العثور على العميل');
+    const visits=(window.db?.visits||[]).filter(v=>v.customer_id===id);
+    const orders=customerOrders(id);
+    const collections=customerCollections(id);
+    const totalSales=orders.reduce((s,o)=>s+Number(o.amount_value||o.total_amount||0),0);
+    const totalColl=collections.reduce((s,x)=>s+Number(x.amount||0),0);
+    const score=scoreCustomer(c);
+    const html=`<div class="jms-wow-modal">
+      <div class="jms-wow-hero"><h2>ملف العميل 360° — ${c.name}</h2><p>نظرة تنفيذية جاهزة للمندوب والإدارة قبل الاتصال أو الزيارة.</p></div>
+      <div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small>تقييم ذكي مبني على الزيارات، المديونية، الطلبات وبيانات التواصل</small></div></div>
+      <div class="jms-wow-kpis">
+        <div class="jms-wow-kpi"><b>${money(c.debt_balance||0)}</b><span>مديونية حالية</span></div>
+        <div class="jms-wow-kpi"><b>${lastVisitDate(id)||'-'}</b><span>آخر زيارة</span></div>
+        <div class="jms-wow-kpi"><b>${orders.length}</b><span>عدد الطلبات</span></div>
+        <div class="jms-wow-kpi"><b>${money(totalSales)}</b><span>إجمالي المبيعات</span></div>
+        <div class="jms-wow-kpi"><b>${money(totalColl)}</b><span>إجمالي التحصيل</span></div>
+        <div class="jms-wow-kpi"><b>${rep(c.rep_id)}</b><span>المندوب المسؤول</span></div>
+      </div>
+      <div class="jms-wow-action"><b>الإجراء الذكي المقترح:</b><br>${priorityText(c)}<br><small>المدينة: ${c.city||'-'} · الجوال: ${c.phone||'-'} · موعد قادم: ${c.next_date||'-'}</small></div>
+      <div class="jms-wow-actions">
+        <button class="green" onclick="jmsSmartWhatsApp('${id}','follow')">رسالة متابعة واتساب</button>
+        <button class="orange" onclick="jmsSmartWhatsApp('${id}','collection')">رسالة تحصيل</button>
+        <button class="blue" onclick="jmsSmartWhatsApp('${id}','thanks')">رسالة شكر وتقييم</button>
+        <button class="purple" onclick="jmsCopyCustomerCard('${id}')">نسخ بطاقة العميل</button>
+        <button onclick="openQuoteForm && openQuoteForm('${id}')">إنشاء عرض سعر</button>
+      </div>
+    </div>`;
+    if(window.modalBody && window.modal){ modalBody.innerHTML=html; modal.classList.remove('hidden'); }
+    else alert(priorityText(c));
+  };
+  function enhanceCards(){
+    document.querySelectorAll('.customer-card').forEach(card=>{
+      const c=findCardCustomer(card); if(!c || card.dataset.jmsWow==='1') return;
+      card.dataset.jmsWow='1';
+      const score=scoreCustomer(c);
+      const head=card.querySelector('.customer-head')||card.firstElementChild;
+      if(head){
+        head.insertAdjacentHTML('afterend',`<div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small>ملف ذكي يجذب العميل ويقوي المتابعة</small></div></div>`);
+      }
+      const actions=card.querySelector('.customer-actions-clean')||card.querySelector('.customer-actions')||card;
+      if(actions && !actions.querySelector('.jms-wow-btn')) actions.insertAdjacentHTML('beforeend',`<button type="button" class="jms-wow-btn" onclick="openCustomer360('${c.id}')">ملف العميل 360°</button>`);
+    });
+  }
+  const oldRenderCustomers=window.renderCustomers;
+  if(typeof oldRenderCustomers==='function') window.renderCustomers=function(){ oldRenderCustomers.apply(this,arguments); setTimeout(enhanceCards,250); };
+  const oldRenderAll=window.renderAll;
+  if(typeof oldRenderAll==='function') window.renderAll=function(){ oldRenderAll.apply(this,arguments); setTimeout(enhanceCards,300); };
+  setTimeout(enhanceCards,1000);
+})();
