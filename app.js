@@ -3942,3 +3942,166 @@ function renderJmsAI(){
   const count=document.getElementById('jmsAiCustomers');
   if(count)count.textContent=db.customers.length;
 }
+
+
+
+/* JMS AI ADVANCED LOCAL ENGINE */
+function jmsAiScoreCustomer(c){
+  const visits=(db.visits||[]).filter(v=>v.customer_id===c.id).length;
+  const quotes=(db.quotes||[]).filter(q=>q.customer_id===c.id).length;
+  const orders=(db.orders||[]).filter(o=>o.customer_id===c.id).length;
+  const debt=Number(c.debt_balance||0);
+  return (orders*5)+(quotes*3)+(visits*1)+(debt>0?2:0);
+}
+
+function jmsAiLastVisitDate(c){
+  const v=(db.visits||[]).filter(x=>x.customer_id===c.id).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+  return v ? String(v.date||v.checkin_at||'').slice(0,10) : '';
+}
+
+function jmsAiDaysSince(dateStr){
+  if(!dateStr)return 9999;
+  const d=new Date(dateStr);
+  if(isNaN(d))return 9999;
+  return Math.floor((new Date()-d)/(1000*60*60*24));
+}
+
+function jmsAiTopCustomers(limit=15){
+  return db.customers
+    .map(c=>({...c,score:jmsAiScoreCustomer(c),lastVisit:jmsAiLastVisitDate(c)}))
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,limit);
+}
+
+function jmsAiVisitPlan(limit=12){
+  return db.customers
+    .map(c=>({...c,lastVisit:jmsAiLastVisitDate(c)}))
+    .map(c=>({...c,days:jmsAiDaysSince(c.lastVisit),score:jmsAiScoreCustomer(c)}))
+    .sort((a,b)=>(b.days*2+b.score)-(a.days*2+a.score))
+    .slice(0,limit);
+}
+
+function jmsAiCollectionPlan(limit=15){
+  return db.customers
+    .filter(c=>Number(c.debt_balance||0)>0)
+    .sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0))
+    .slice(0,limit);
+}
+
+function jmsAiQuoteFollowup(limit=15){
+  return (db.quotes||[]).filter(q=>{
+    const s=String(q.status||'').toLowerCase();
+    return !s || s.includes('انتظار') || s.includes('pending') || s.includes('draft') || s.includes('اعتماد');
+  }).slice(0,limit);
+}
+
+function jmsAiWhatsAppMessage(type, customer){
+  if(type==='visit'){
+    return `السلام عليكم ${customer.name||''}\nمعكم شركة جدة النموذجية للصناعة، نرغب بتحديد زيارة لمتابعة احتياجكم وخدمتكم بشكل أفضل.`;
+  }
+  if(type==='debt'){
+    return `السلام عليكم ${customer.name||''}\nنذكركم بوجود رصيد مستحق بقيمة ${jmsAiMoney(customer.debt_balance||0)} ريال، ونأمل التكرم بالسداد أو التواصل معنا للتنسيق.`;
+  }
+  return `السلام عليكم ${customer.name||''}\nنشكر لكم التعامل مع شركة جدة النموذجية للصناعة. نأمل تقييم خدمتنا من 1 إلى 5 نجوم.`;
+}
+
+function jmsAiAdvancedAnswer(q){
+  q=String(q||'').trim();
+
+  if(q.includes('خطة') || q.includes('زيارات اليوم') || q.includes('مين أزور') || q.includes('ازور')){
+    const rows=jmsAiVisitPlan(12);
+    return `خطة زيارات مقترحة اليوم:\n${rows.map((c,i)=>`${i+1}. ${c.name} - ${c.city||'-'} - ${jmsAiRepName(c.rep_id)} - آخر زيارة: ${c.lastVisit||'لا توجد'} - أولوية ${c.score}`).join('\n')}`;
+  }
+
+  if(q.includes('مهم') || q.includes('أفضل العملاء') || q.includes('افضل العملاء') || q.includes('عملاء مهمين')){
+    const rows=jmsAiTopCustomers(15);
+    return `أفضل العملاء حسب النشاط والأولوية:\n${rows.map((c,i)=>`${i+1}. ${c.name} - ${c.city||'-'} - ${jmsAiRepName(c.rep_id)} - نقاط ${c.score} - الرصيد ${jmsAiMoney(c.debt_balance||0)} ريال`).join('\n')}`;
+  }
+
+  if(q.includes('أولوية التحصيل') || q.includes('اولويات التحصيل') || q.includes('تحصيلات مهمة')){
+    const rows=jmsAiCollectionPlan(15);
+    return `أولويات التحصيل:\n${rows.map((c,i)=>`${i+1}. ${c.name} - ${jmsAiMoney(c.debt_balance||0)} ريال - ${c.phone||'لا يوجد جوال'} - ${jmsAiRepName(c.rep_id)}`).join('\n') || 'لا توجد مديونيات مسجلة.'}`;
+  }
+
+  if(q.includes('متابعة العروض') || q.includes('العروض المعلقة') || q.includes('عروض معلقة')){
+    const rows=jmsAiQuoteFollowup(15);
+    return `عروض تحتاج متابعة:\n${rows.map((q,i)=>`${i+1}. ${q.quote_no||q.id} - ${jmsAiCustomerName(q.customer_id)} - ${jmsAiRepName(q.rep_id)} - الحالة: ${q.status||'بدون حالة'}`).join('\n') || 'لا توجد عروض تحتاج متابعة.'}`;
+  }
+
+  if(q.includes('رسالة') || q.includes('واتساب')){
+    const c=jmsAiTopCustomers(1)[0] || db.customers[0];
+    if(!c)return 'لا يوجد عملاء لإنشاء رسالة.';
+    return `رسالة واتساب مقترحة:\n${jmsAiWhatsAppMessage(q.includes('تحصيل')?'debt':q.includes('زيارة')?'visit':'survey', c)}`;
+  }
+
+  if(q.includes('مخاطر') || q.includes('تنبيهات') || q.includes('مشاكل')){
+    const stale=jmsAiVisitPlan(10).filter(c=>c.days>=30);
+    const debt=jmsAiCollectionPlan(10);
+    const pending=jmsAiQuoteFollowup(10);
+    return `تقرير المخاطر والتنبيهات:\n- عملاء متأخرون عن الزيارة: ${stale.length}\n- عملاء لديهم مديونية: ${debt.length}\n- عروض تحتاج متابعة: ${pending.length}\n\nأهم تنبيه:\n${stale[0]?`العميل ${stale[0].name} لم تتم زيارته منذ ${stale[0].days} يوم.`:'لا يوجد تنبيه زيارة مهم.'}`;
+  }
+
+  return null;
+}
+
+const oldJmsAiAnswer = (typeof jmsAiAnswer === 'function') ? jmsAiAnswer : null;
+jmsAiAnswer = function(q){
+  const advanced=jmsAiAdvancedAnswer(q);
+  if(advanced)return advanced;
+  return oldJmsAiAnswer ? oldJmsAiAnswer(q) : 'لم أجد إجابة مناسبة.';
+};
+
+function jmsAiAppendTools(){
+  const body=document.getElementById('jmsAiBody');
+  if(!body || document.getElementById('jmsAiToolsRow'))return;
+  const row=document.createElement('div');
+  row.id='jmsAiToolsRow';
+  row.className='jms-ai-tools';
+  row.innerHTML=`
+    <button class="blue" onclick="askJmsAI('خطة زيارات اليوم')">خطة زيارات</button>
+    <button class="orange" onclick="askJmsAI('أولوية التحصيل')">أولوية التحصيل</button>
+    <button onclick="askJmsAI('أفضل العملاء')">أفضل العملاء</button>
+    <button onclick="askJmsAI('متابعة العروض المعلقة')">متابعة العروض</button>
+    <button class="green" onclick="jmsAiCopyLast()">نسخ آخر تقرير</button>
+    <button onclick="jmsAiPrintReport()">طباعة</button>
+  `;
+  const chat=document.querySelector('.jms-ai-chat');
+  if(chat)chat.insertBefore(row, chat.querySelector('.jms-ai-input'));
+}
+
+let jmsAiLastText='';
+const oldAskJmsAI = (typeof askJmsAI === 'function') ? askJmsAI : null;
+askJmsAI=function(q){
+  const input=document.getElementById('jmsAiInput');
+  q=String(q||input?.value||'').trim();
+  if(!q)return;
+  const body=document.getElementById('jmsAiBody');
+  if(!body)return;
+  const ans=jmsAiAnswer(q);
+  jmsAiLastText=ans;
+  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg user">${q}</div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${ans}</div>`);
+  body.scrollTop=body.scrollHeight;
+  if(input)input.value='';
+  jmsAiAppendTools();
+};
+
+function jmsAiCopyLast(){
+  if(!jmsAiLastText)return alert('لا يوجد تقرير لنسخه');
+  navigator.clipboard?.writeText(jmsAiLastText);
+  alert('تم نسخ التقرير');
+}
+
+function jmsAiPrintReport(){
+  const txt=jmsAiLastText || document.getElementById('jmsAiBody')?.innerText || '';
+  const w=window.open('','_blank');
+  w.document.write(`<html dir="rtl"><head><title>JMS AI Report</title><style>body{font-family:Tahoma,Arial;padding:30px;line-height:1.9;white-space:pre-line}</style></head><body><h2>تقرير JMS AI</h2>${txt.replace(/</g,'&lt;')}</body></html>`);
+  w.document.close();
+  w.print();
+}
+
+const oldRenderJmsAI = (typeof renderJmsAI === 'function') ? renderJmsAI : null;
+renderJmsAI=function(){
+  if(oldRenderJmsAI)oldRenderJmsAI();
+  jmsAiAppendTools();
+};

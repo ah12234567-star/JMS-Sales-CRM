@@ -743,3 +743,19 @@ html[dir="ltr"] textarea{
   .jms-ai-hero{flex-direction:column;align-items:flex-start}
   .jms-ai-msg.user{margin-right:20px}
 }
+
+
+/* JMS AI Advanced Local */
+.jms-ai-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.jms-ai-tools button{
+  border:0;border-radius:999px;background:#0f172a;color:#fff;
+  padding:8px 12px;font-weight:900;cursor:pointer;font-size:12px
+}
+.jms-ai-tools button.green{background:#16a34a;color:#052e16}
+.jms-ai-tools button.blue{background:#2563eb}
+.jms-ai-tools button.orange{background:#c2410c}
+.jms-ai-insight{
+  background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px;margin:8px 0;
+  box-shadow:0 8px 18px rgba(15,23,42,.05)
+}
+.jms-ai-insight b{display:block;margin-bottom:6px}
