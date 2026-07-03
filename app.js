@@ -4279,3 +4279,74 @@ askJmsAI = async function(q){
   }
   body.scrollTop = body.scrollHeight;
 };
+
+
+
+
+
+
+/* JMS AI BACKEND CONNECTOR FINAL */
+window.jmsAiApiDataFinal = function(){
+  return {
+    customers: db.customers || [],
+    reps: db.reps || [],
+    visits: db.visits || [],
+    quotes: db.quotes || [],
+    orders: db.orders || [],
+    collections: db.collections || []
+  };
+};
+
+window.jmsAiQuestionNeedsWebFinal = function(q){
+  q = String(q || "");
+  return ["ابحث","برا","خارج","الإنترنت","انترنت","سعر","أسعار","التصنيع","مواد","خام","HDPE","LDPE","LLDPE","سابك"].some(w => q.includes(w));
+};
+
+window.jmsAiBackendFinal = async function(q){
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      question: q,
+      allowWeb: window.jmsAiQuestionNeedsWebFinal(q),
+      data: window.jmsAiApiDataFinal()
+    })
+  });
+  return await res.json();
+};
+
+window.jmsAiLocalAnswerFinal = (typeof jmsAiAnswer === "function") ? jmsAiAnswer : function(){
+  return "تعذر الاتصال بالـ Backend. تحقق من نشر مجلد api.";
+};
+
+askJmsAI = async function(q){
+  const input = document.getElementById("jmsAiInput");
+  q = String(q || input?.value || "").trim();
+  if(!q) return;
+
+  const body = document.getElementById("jmsAiBody");
+  if(!body) return;
+
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg user">${q}</div>`);
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinkingFinal">جارٍ الاتصال بـ JMS AI...</div>`);
+  body.scrollTop = body.scrollHeight;
+  if(input) input.value = "";
+
+  try {
+    const result = await window.jmsAiBackendFinal(q);
+    const thinking = document.getElementById("jmsAiThinkingFinal");
+    if(thinking) thinking.remove();
+
+    if(result.ok){
+      body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${result.answer}<div class="jms-ai-backend-status ok">تم الرد عبر Backend آمن ${result.mode==="openai_web_search" ? "مع بحث خارجي" : ""}</div></div>`);
+    } else {
+      body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${window.jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn">${result.error || result.answer || "تم استخدام التحليل المحلي"}</div></div>`);
+    }
+  } catch(e) {
+    const thinking = document.getElementById("jmsAiThinkingFinal");
+    if(thinking) thinking.remove();
+    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${window.jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
+  }
+
+  body.scrollTop = body.scrollHeight;
+};
