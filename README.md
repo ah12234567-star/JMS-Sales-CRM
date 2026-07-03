@@ -270,24 +270,18 @@ ALLOWED_ORIGIN=https://your-domain.vercel.app
 - إرسال واتساب يحتاج إعداد Meta Cloud API.
 
 
-## JMS AI Real Backend Integration
+## JMS AI API FINAL
+This version includes the required `/api` folder:
+- `/api/ai.js`
+- `/api/web-search.js`
+- `/api/whatsapp-send.js`
+- `/api/_helpers.js`
 
-### New API routes
-- `/api/ai.js` calls OpenAI securely from Vercel.
-- `/api/web-search.js` uses OpenAI web search for external manufacturing/material questions.
-- `/api/whatsapp-send.js` sends WhatsApp through Meta Cloud API, or falls back to a `wa.me` link if WhatsApp variables are missing.
-
-### Required Vercel Environment Variables
+Vercel variables:
 ```text
 OPENAI_API_KEY=sk-proj-...
 OPENAI_MODEL=gpt-4.1-mini
+WHATSAPP_TOKEN=optional
+WHATSAPP_PHONE_NUMBER_ID=optional
 ```
-
-### Optional WhatsApp Variables
-```text
-WHATSAPP_TOKEN=...
-WHATSAPP_PHONE_NUMBER_ID=...
-ALLOWED_ORIGIN=https://jms-sales-crm.vercel.app
-```
-
-After adding variables, redeploy the project.
+After upload to GitHub, Vercel must redeploy.
