@@ -186,7 +186,6 @@ function saveUser(){const u={id:id(),name:muName.value,email:muEmail.value,passw
 function renderUsers(){
   usersList.innerHTML=`<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td>${roleText(u.role)}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions"><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button><button onclick="resetPass('${u.id}')">إعادة كلمة المرور</button></div></td></tr>`).join('')}</table>`;
 }
-function roleText(r){return r==='admin'?'مدير النظام':r==='sales'?'مدير مبيعات':'مندوب'}
 function toggleUser(uid){let u=db.users.find(x=>x.id===uid);u.status=u.status==='active'?'disabled':'active';let r=db.reps.find(x=>x.id===uid);if(r)r.status=u.status;save();renderUsers()}
 function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة','123456');if(!p)return;u.password=p;save();alert('تم تغيير كلمة المرور')}
 function changeMyPassword(){let u=db.users.find(x=>x.email===currentUser.email);if(!u)return;if(oldPassword.value!==u.password)return alert('كلمة المرور الحالية غير صحيحة');if(!newPassword.value)return alert('اكتب كلمة مرور جديدة');u.password=newPassword.value;save();alert('تم تغيير كلمة المرور')}
@@ -4104,4 +4103,112 @@ const oldRenderJmsAI = (typeof renderJmsAI === 'function') ? renderJmsAI : null;
 renderJmsAI=function(){
   if(oldRenderJmsAI)oldRenderJmsAI();
   jmsAiAppendTools();
+};
+
+
+
+/* JMS AI BACKEND READY */
+function jmsAiExportData(){
+  return {
+    customers: db.customers || [],
+    reps: db.reps || [],
+    visits: db.visits || [],
+    quotes: db.quotes || [],
+    orders: db.orders || [],
+    collections: db.collections || []
+  };
+}
+
+async function jmsAiAskBackend(question, allowWeb=false){
+  const res = await fetch('/api/ai', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ question, allowWeb, data: jmsAiExportData() })
+  });
+  return await res.json();
+}
+
+async function jmsAiSendWhatsAppBackend(phone, message){
+  const res = await fetch('/api/whatsapp-send', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ phone, message })
+  });
+  return await res.json();
+}
+
+const oldAskJmsAIBackendBase = (typeof askJmsAI === 'function') ? askJmsAI : null;
+askJmsAI = async function(q){
+  const input=document.getElementById('jmsAiInput');
+  q=String(q||input?.value||'').trim();
+  if(!q)return;
+  const body=document.getElementById('jmsAiBody');
+  if(!body)return;
+
+  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg user">${q}</div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot" id="jmsAiLoading">جارٍ تحليل السؤال...</div>`);
+  body.scrollTop=body.scrollHeight;
+  if(input)input.value='';
+
+  const allowWeb = q.includes('ابحث') || q.includes('برا') || q.includes('خارج') || q.includes('سعر') || q.includes('التصنيع') || q.includes('مواد');
+  try{
+    const result = await jmsAiAskBackend(q, allowWeb);
+    const loading=document.getElementById('jmsAiLoading');
+    if(loading) loading.remove();
+
+    if(result.ok){
+      body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${result.answer}<div class="jms-ai-backend-status ok">تم الرد عبر Backend آمن ${allowWeb?'مع بحث خارجي':''}</div></div>`);
+    }else{
+      const local = (typeof jmsAiAnswer==='function') ? jmsAiAnswer(q) : (result.answer || 'لم يتم ضبط Backend بعد.');
+      body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${local}<div class="jms-ai-backend-status warn">Backend غير مفعل بالكامل: ${result.error||result.answer||'تحليل محلي'}</div></div>`);
+      if(result.url){
+        body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot"><a href="${result.url}" target="_blank">فتح واتساب يدويًا</a></div>`);
+      }
+    }
+  }catch(e){
+    const loading=document.getElementById('jmsAiLoading');
+    if(loading) loading.remove();
+    const local = (typeof jmsAiAnswer==='function') ? jmsAiAnswer(q) : 'تعذر الاتصال بالـ Backend.';
+    body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${local}<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend، تم استخدام التحليل المحلي.</div></div>`);
+  }
+  body.scrollTop=body.scrollHeight;
+};
+
+function jmsAiBuildCustomerMessage(customerId, type='survey'){
+  const c=db.customers.find(x=>x.id===customerId);
+  if(!c)return '';
+  if(type==='debt') return `السلام عليكم ${c.name}\nنذكركم بوجود رصيد مستحق بقيمة ${jmsAiMoney(c.debt_balance||0)} ريال، ونأمل التكرم بالسداد أو التواصل معنا للتنسيق.`;
+  if(type==='visit') return `السلام عليكم ${c.name}\nمعكم شركة جدة النموذجية للصناعة، نرغب بتحديد زيارة لمتابعة احتياجكم وخدمتكم بشكل أفضل.`;
+  return `السلام عليكم ${c.name}\nنشكر لكم التعامل مع شركة جدة النموذجية للصناعة. نأمل تقييم خدمتنا من 1 إلى 5 نجوم.`;
+}
+
+async function jmsAiSendCustomerMessage(customerId, type='survey'){
+  const c=db.customers.find(x=>x.id===customerId);
+  if(!c)return alert('لم يتم العثور على العميل');
+  if(!c.phone)return alert('لا يوجد رقم جوال للعميل');
+  const msg=jmsAiBuildCustomerMessage(customerId,type);
+  const result=await jmsAiSendWhatsAppBackend(c.phone,msg);
+  if(result.ok){
+    alert('تم إرسال رسالة واتساب');
+  }else if(result.url){
+    window.open(result.url,'_blank');
+  }else{
+    alert('لم يتم الإرسال: '+(result.error||'تحقق من إعدادات واتساب'));
+  }
+}
+
+function jmsAiAppendBackendTools(){
+  const row=document.getElementById('jmsAiToolsRow');
+  if(!row || row.dataset.backend==='1')return;
+  row.dataset.backend='1';
+  row.insertAdjacentHTML('beforeend',`
+    <button class="backend" onclick="askJmsAI('ابحث برا عن أسعار مواد التصنيع HDPE و LLDPE اليوم')">بحث خارجي تصنيع</button>
+    <button class="backend" onclick="askJmsAI('حلل لي إنتاج المصنع والمبيعات واقترح قرارات')">تحليل إداري متقدم</button>
+  `);
+}
+
+const oldRenderJmsAIBackend = (typeof renderJmsAI === 'function') ? renderJmsAI : null;
+renderJmsAI=function(){
+  if(oldRenderJmsAIBackend)oldRenderJmsAIBackend();
+  setTimeout(jmsAiAppendBackendTools,100);
 };

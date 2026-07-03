@@ -759,3 +759,10 @@ html[dir="ltr"] textarea{
   box-shadow:0 8px 18px rgba(15,23,42,.05)
 }
 .jms-ai-insight b{display:block;margin-bottom:6px}
+
+
+/* AI Backend Ready */
+.jms-ai-backend-status{font-size:12px;color:#64748b;margin-top:8px}
+.jms-ai-backend-status.ok{color:#166534}
+.jms-ai-backend-status.warn{color:#b45309}
+.jms-ai-actions button.backend{background:#0f172a;color:#fff}

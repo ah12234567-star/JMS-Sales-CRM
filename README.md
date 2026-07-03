@@ -241,3 +241,30 @@ window.JMS_CLOUD = {
 - تقرير مخاطر وتنبيهات.
 - توليد رسائل واتساب.
 - نسخ وطباعة تقرير AI.
+
+## JMS AI Backend Ready
+
+### الملفات الجديدة
+- `/api/ai.js` للذكاء الاصطناعي الآمن من السيرفر.
+- `/api/whatsapp-send.js` لإرسال رسائل واتساب عبر Meta Cloud API.
+- `/api/web-search.js` للبحث الخارجي عبر OpenAI Web Search.
+- `/api/_helpers.js` دوال مساعدة.
+
+### Environment Variables المطلوبة في Vercel
+ضعها من:
+Project Settings → Environment Variables
+
+```text
+OPENAI_API_KEY=ضع مفتاح OpenAI هنا
+OPENAI_MODEL=gpt-4.1-mini
+WHATSAPP_TOKEN=ضع Meta WhatsApp Cloud API Token هنا
+WHATSAPP_PHONE_NUMBER_ID=ضع Phone Number ID هنا
+ALLOWED_ORIGIN=https://your-domain.vercel.app
+```
+
+### طريقة العمل
+- إذا المفاتيح غير موجودة، النظام لا ينكسر ويستخدم التحليل المحلي.
+- إذا OpenAI مفعّل، JMS AI يرد من Backend آمن.
+- إذا السؤال يحتاج خارج النظام، أرسل سؤال مثل:
+  "ابحث برا عن أسعار مواد HDPE اليوم"
+- إرسال واتساب يحتاج إعداد Meta Cloud API.
