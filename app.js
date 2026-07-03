@@ -4760,3 +4760,168 @@ ${todaySummary()}
   setTimeout(forceAI,1500);
   setInterval(forceAI,1000);
 })();
+
+
+
+/* AI CURRENTUSER FIX: use real lexical currentUser, not window.currentUser */
+(function(){
+  function realUser(){
+    try{
+      if(typeof currentUser !== 'undefined' && currentUser && (currentUser.id || currentUser.email || currentUser.name || currentUser.role)){
+        return currentUser;
+      }
+    }catch(e){}
+    try{
+      const u = JSON.parse(sessionStorage.getItem('jms_current_user') || 'null');
+      if(u && (u.id || u.email || u.name || u.role)) return u;
+    }catch(e){}
+    return null;
+  }
+
+  function loginIsHidden(){
+    const lv = document.getElementById('loginView');
+    if(!lv) return !!realUser();
+    return lv.classList.contains('hidden') || getComputedStyle(lv).display === 'none';
+  }
+
+  function appIsVisible(){
+    const av = document.getElementById('appView');
+    if(!av) return !!realUser();
+    return !av.classList.contains('hidden') && getComputedStyle(av).display !== 'none';
+  }
+
+  function shouldShowAI(){
+    return !!realUser() && loginIsHidden() && appIsVisible();
+  }
+
+  function fallbackAnswer(q){
+    const d = (typeof db !== 'undefined') ? db : {};
+    d.customers ||= []; d.reps ||= []; d.visits ||= []; d.quotes ||= []; d.orders ||= []; d.collections ||= [];
+    const money=n=>Number(n||0).toLocaleString('ar-SA');
+    q=String(q||'');
+    if(q.includes('مندوب')){
+      const map={};
+      d.reps.forEach(r=>map[r.id]={name:r.name,visits:0,quotes:0,orders:0});
+      d.visits.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].visits++; });
+      d.quotes.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].quotes++; });
+      d.orders.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].orders++; });
+      return Object.values(map).sort((a,b)=>(b.visits+b.quotes+b.orders)-(a.visits+a.quotes+a.orders)).map((r,i)=>`${i+1}. ${r.name}: زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders}`).join('\n') || 'لا توجد بيانات مناديب.';
+    }
+    if(q.includes('تحصيل')){
+      const total=d.collections.reduce((s,c)=>s+Number(c.amount||0),0);
+      return `إجمالي التحصيل: ${money(total)} ريال`;
+    }
+    if(q.includes('30') || q.includes('زيارة')){
+      return `عدد الزيارات المسجلة: ${d.visits.length}\nعدد العملاء: ${d.customers.length}`;
+    }
+    return `ملخص النظام:\n- العملاء: ${d.customers.length}\n- المناديب: ${d.reps.length}\n- الزيارات: ${d.visits.length}\n- العروض: ${d.quotes.length}\n- الطلبات: ${d.orders.length}`;
+  }
+
+  function ensureAsk(){
+    if(typeof window.askJmsAI === 'function') return;
+    window.askJmsAI=function(q){
+      const input=document.getElementById('jmsAiInput');
+      q=String(q||input?.value||'').trim();
+      if(!q) return;
+      const body=document.getElementById('jmsAiBody');
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${fallbackAnswer(q)}</div>`);
+      body.scrollTop=body.scrollHeight;
+      if(input) input.value='';
+    };
+  }
+
+  function createAI(){
+    if(document.getElementById('jmsAiLaunch') && document.getElementById('jmsAiPanel')) return;
+    const btn=document.createElement('button');
+    btn.id='jmsAiLaunch';
+    btn.className='jms-ai-launch';
+    btn.textContent='JMS AI';
+    btn.onclick=function(){
+      const p=document.getElementById('jmsAiPanel');
+      if(p) p.classList.toggle('open');
+    };
+
+    const panel=document.createElement('div');
+    panel.id='jmsAiPanel';
+    panel.className='jms-ai-panel';
+    panel.innerHTML=`
+      <div class="jms-ai-head">
+        <div><b>JMS AI</b><small>مساعد ذكي يحلل بيانات النظام</small></div>
+        <button class="jms-ai-close" onclick="jmsAiPanel.classList.remove('open')">×</button>
+      </div>
+      <div id="jmsAiBody" class="jms-ai-body">
+        <div class="jms-ai-msg bot">أهلاً، اسألني عن العملاء، المناديب، الزيارات، التحصيلات، أو الأداء.</div>
+      </div>
+      <div class="jms-ai-quick">
+        <button onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+        <button onclick="askJmsAI('تحليل المبيعات')">تحليل المبيعات</button>
+        <button onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+        <button onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+      </div>
+      <div class="jms-ai-input">
+        <input id="jmsAiInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter') askJmsAI(this.value)">
+        <button onclick="askJmsAI(jmsAiInput.value)">إرسال</button>
+      </div>`;
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+  }
+
+  function apply(){
+    const ok=shouldShowAI();
+    document.body.classList.toggle('jms-logged-in', ok);
+    document.body.classList.toggle('jms-login-screen', !ok);
+
+    if(ok){
+      ensureAsk();
+      createAI();
+    }
+
+    const btn=document.getElementById('jmsAiLaunch');
+    const panel=document.getElementById('jmsAiPanel');
+
+    if(ok){
+      if(btn){
+        btn.style.display='block';
+        btn.style.visibility='visible';
+        btn.style.opacity='1';
+      }
+      if(panel){
+        panel.style.visibility='visible';
+        panel.style.opacity='1';
+        if(!panel.classList.contains('open')) panel.style.display='';
+      }
+    }else{
+      if(btn) btn.style.display='none';
+      if(panel){
+        panel.classList.remove('open');
+        panel.style.display='none';
+      }
+    }
+  }
+
+  const oldShowApp = (typeof showApp === 'function') ? showApp : null;
+  if(oldShowApp && !window.__aiCurrentUserShowAppPatched){
+    window.__aiCurrentUserShowAppPatched = true;
+    showApp = function(){
+      oldShowApp.apply(this, arguments);
+      setTimeout(apply,100);
+      setTimeout(apply,500);
+      setTimeout(apply,1000);
+    };
+  }
+
+  const oldRenderAll = (typeof renderAll === 'function') ? renderAll : null;
+  if(oldRenderAll && !window.__aiCurrentUserRenderPatched){
+    window.__aiCurrentUserRenderPatched = true;
+    renderAll = function(){
+      oldRenderAll.apply(this, arguments);
+      setTimeout(apply,150);
+    };
+  }
+
+  setTimeout(apply,100);
+  setTimeout(apply,500);
+  setTimeout(apply,1200);
+  setInterval(apply,1000);
+})();

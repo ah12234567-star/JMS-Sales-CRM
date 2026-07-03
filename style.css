@@ -734,3 +734,22 @@ body.jms-login-screen #jmsAiLaunch,
 body.jms-login-screen #jmsAiPanel{
   display:none!important;
 }
+
+
+/* AI CurrentUser Fix */
+body.jms-logged-in #jmsAiLaunch{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  z-index:99999!important;
+}
+body.jms-logged-in #jmsAiPanel{
+  visibility:visible!important;
+  opacity:1!important;
+  z-index:99999!important;
+}
+body:not(.jms-logged-in) #jmsAiLaunch,
+body:not(.jms-logged-in) #jmsAiPanel{
+  display:none!important;
+}
