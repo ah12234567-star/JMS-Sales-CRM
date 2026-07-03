@@ -5011,3 +5011,92 @@ ${todaySummary()}
   setTimeout(ensurePanel,1000);
   setInterval(ensurePanel,1500);
 })();
+
+
+
+/* JMS AI SIDEBAR PAGE FIX: reliable AI page inside nav */
+(function(){
+  function jmsData(){
+    try { return (typeof db !== 'undefined') ? db : {}; } catch(e){ return {}; }
+  }
+  function money(n){ return Number(n||0).toLocaleString('ar-SA'); }
+  function today(){ return new Date().toISOString().slice(0,10); }
+  function dateOf(x){ return String(x.date || x.created_at || x.checkin_at || x.quote_date || x.order_date || '').slice(0,10); }
+  function repNameSafe(d,id){ return (d.reps||[]).find(r=>r.id===id)?.name || '-'; }
+  function customerNameSafe(d,id){ return (d.customers||[]).find(c=>c.id===id)?.name || '-'; }
+
+  function answer(q){
+    const d=jmsData();
+    d.customers ||= []; d.reps ||= []; d.visits ||= []; d.quotes ||= []; d.orders ||= []; d.collections ||= [];
+    q=String(q||'').trim();
+    const t=today();
+
+    if(q.includes('مندوب') || q.includes('أفضل') || q.includes('افضل')){
+      const map={};
+      d.reps.forEach(r=>map[r.id]={name:r.name,visits:0,quotes:0,orders:0,collection:0});
+      d.visits.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].visits++; });
+      d.quotes.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].quotes++; });
+      d.orders.forEach(v=>{ if(map[v.rep_id]) map[v.rep_id].orders++; });
+      d.collections.forEach(c=>{
+        const cust=d.customers.find(x=>x.id===c.customer_id);
+        if(cust && map[cust.rep_id]) map[cust.rep_id].collection += Number(c.amount||0);
+      });
+      const rows=Object.values(map).sort((a,b)=>(b.visits+b.quotes+b.orders+b.collection)-(a.visits+a.quotes+a.orders+a.collection));
+      return rows.length ? 'ترتيب المناديب:\n'+rows.map((r,i)=>`${i+1}. ${r.name}: زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders} | تحصيل ${money(r.collection)} ريال`).join('\n') : 'لا توجد بيانات مناديب.';
+    }
+
+    if(q.includes('30') || q.includes('لم تتم') || q.includes('مازار') || q.includes('لم يزر')){
+      const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+      const rows=d.customers.filter(c=>{
+        const last=d.visits.filter(v=>v.customer_id===c.id).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0];
+        if(!last) return true;
+        return new Date(last.date||last.checkin_at) < cutoff;
+      }).slice(0,25);
+      return rows.length ? 'عملاء لم تتم زيارتهم منذ 30 يوم:\n'+rows.map((c,i)=>`${i+1}. ${c.name} - ${c.phone||'لا يوجد جوال'} - ${repNameSafe(d,c.rep_id)}`).join('\n') : 'لا يوجد عملاء متأخرين عن الزيارة.';
+    }
+
+    if(q.includes('مديون') || q.includes('تحصيل')){
+      const total=d.collections.reduce((s,c)=>s+Number(c.amount||0),0);
+      const todayAmount=d.collections.filter(c=>dateOf(c)===t).reduce((s,c)=>s+Number(c.amount||0),0);
+      const debts=d.customers.filter(c=>Number(c.debt_balance||0)>0).sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0)).slice(0,10);
+      return `التحصيلات:\n- إجمالي التحصيل: ${money(total)} ريال\n- تحصيل اليوم: ${money(todayAmount)} ريال\n- عملاء عليهم مديونية: ${debts.length}\n\nأعلى مديونيات:\n${debts.map((c,i)=>`${i+1}. ${c.name} - ${money(c.debt_balance)} ريال`).join('\n') || 'لا توجد مديونيات.'}`;
+    }
+
+    if(q.includes('عرض') || q.includes('عروض')){
+      const pending=d.quotes.filter(x=>String(x.status||'').includes('انتظار') || String(x.status||'').includes('pending') || !x.status);
+      return `عروض الأسعار:\n- إجمالي العروض: ${d.quotes.length}\n- عروض تحتاج متابعة: ${pending.length}\n${pending.slice(0,10).map((x,i)=>`${i+1}. ${x.quote_no||x.id} - ${customerNameSafe(d,x.customer_id)}`).join('\n')}`;
+    }
+
+    return `ملخص اليوم ${t}:\n- العملاء: ${d.customers.length}\n- المناديب: ${d.reps.length}\n- الزيارات: ${d.visits.length}\n- العروض: ${d.quotes.length}\n- الطلبات: ${d.orders.length}\n- التحصيلات: ${d.collections.length}`;
+  }
+
+  window.askJmsAIPage=function(q){
+    const input=document.getElementById('jmsAIPageInput');
+    q=String(q||input?.value||'').trim();
+    if(!q) return;
+    const body=document.getElementById('jmsAIPageBody');
+    if(!body) return;
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${answer(q)}</div>`);
+    body.scrollTop=body.scrollHeight;
+    if(input) input.value='';
+  };
+
+  function updateAIPage(){
+    const d=jmsData();
+    const el=document.getElementById('aiPageCustomerCount');
+    if(el) el.textContent=(d.customers||[]).length;
+  }
+
+  const oldRenderAll = (typeof renderAll === 'function') ? renderAll : null;
+  if(oldRenderAll && !window.__jmsAIPageRenderPatched){
+    window.__jmsAIPageRenderPatched=true;
+    renderAll=function(){
+      oldRenderAll.apply(this,arguments);
+      setTimeout(updateAIPage,100);
+    };
+  }
+
+  setTimeout(updateAIPage,500);
+  setInterval(updateAIPage,1500);
+})();

@@ -55,6 +55,7 @@
 
     <nav>
       <button class="nav active" data-page="dashboard">لوحة التحكم</button>
+      <button class="nav" data-page="jmsAIPage">JMS AI</button>
       <button class="nav manager-only" data-page="repsControl">المناديب</button>
         <button class="nav" data-page="smartVisits">الزيارات الذكية</button>
         <button class="nav" data-page="customers">العملاء</button>
@@ -477,6 +478,49 @@
       </div>
     </section>
   </main>
+
+    <section id="jmsAIPage" class="page">
+      <div class="page-head">
+        <div>
+          <h1>JMS AI</h1>
+          <p>مساعد ذكي لتحليل العملاء والمناديب والزيارات والتحصيلات</p>
+        </div>
+      </div>
+
+      <div class="jms-ai-fullpage">
+        <div class="jms-ai-full-hero">
+          <div>
+            <span>JMS ERP AI</span>
+            <h2>اسأل النظام عن الأداء والمبيعات والعملاء</h2>
+            <p>هذه الصفحة تعمل داخل البرنامج بعد تسجيل الدخول ولا تظهر في شاشة الدخول.</p>
+          </div>
+          <div class="jms-ai-full-kpi">
+            <b id="aiPageCustomerCount">0</b>
+            <small>عميل</small>
+          </div>
+        </div>
+
+        <div class="jms-ai-full-grid">
+          <button onclick="askJmsAIPage('ملخص اليوم')">ملخص اليوم</button>
+          <button onclick="askJmsAIPage('من أفضل مندوب؟')">أفضل مندوب</button>
+          <button onclick="askJmsAIPage('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+          <button onclick="askJmsAIPage('ما هي المديونيات؟')">المديونيات</button>
+          <button onclick="askJmsAIPage('تحليل المبيعات')">تحليل المبيعات</button>
+          <button onclick="askJmsAIPage('عروض الأسعار المعلقة')">العروض المعلقة</button>
+        </div>
+
+        <div class="jms-ai-full-chat">
+          <div id="jmsAIPageBody" class="jms-ai-full-body">
+            <div class="jms-ai-msg bot">أهلاً، أنا JMS AI. اسألني عن العملاء أو المناديب أو الزيارات أو التحصيل.</div>
+          </div>
+          <div class="jms-ai-full-input">
+            <input id="jmsAIPageInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter') askJmsAIPage(this.value)">
+            <button onclick="askJmsAIPage(jmsAIPageInput.value)">إرسال</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
 </section>
 
 <div id="modal" class="modal hidden">
