@@ -4212,3 +4212,130 @@ renderJmsAI=function(){
   if(oldRenderJmsAIBackend)oldRenderJmsAIBackend();
   setTimeout(jmsAiAppendBackendTools,100);
 };
+
+
+
+/* JMS AI REAL BACKEND INTEGRATION */
+function jmsAiBackendData(){
+  return {
+    customers: db.customers || [],
+    reps: db.reps || [],
+    visits: db.visits || [],
+    quotes: db.quotes || [],
+    orders: db.orders || [],
+    collections: db.collections || []
+  };
+}
+
+function jmsAiNeedsWeb(question){
+  question = String(question || "");
+  return (
+    question.includes("ابحث") ||
+    question.includes("برا") ||
+    question.includes("خارج") ||
+    question.includes("الإنترنت") ||
+    question.includes("انترنت") ||
+    question.includes("سعر") ||
+    question.includes("أسعار") ||
+    question.includes("التصنيع") ||
+    question.includes("مواد") ||
+    question.includes("خام") ||
+    question.includes("HDPE") ||
+    question.includes("LDPE") ||
+    question.includes("LLDPE") ||
+    question.includes("سابك")
+  );
+}
+
+async function jmsAiCallBackend(question){
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      question,
+      allowWeb: jmsAiNeedsWeb(question),
+      data: jmsAiBackendData()
+    })
+  });
+  return await res.json();
+}
+
+async function jmsAiSendWhatsApp(phone, message){
+  const res = await fetch("/api/whatsapp-send", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ phone, message })
+  });
+  return await res.json();
+}
+
+function jmsAiLocalFallback(question){
+  if(typeof jmsAiAnswer === "function") return jmsAiAnswer(question);
+  return "تعذر الوصول إلى AI حالياً. تأكد من إعداد OPENAI_API_KEY وإعادة نشر المشروع.";
+}
+
+askJmsAI = async function(question){
+  const input = document.getElementById("jmsAiInput");
+  question = String(question || input?.value || "").trim();
+  if(!question) return;
+
+  const body = document.getElementById("jmsAiBody");
+  if(!body) return;
+
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg user">${question}</div>`);
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinking">جارٍ الاتصال بـ JMS AI...</div>`);
+  body.scrollTop = body.scrollHeight;
+  if(input) input.value = "";
+
+  try {
+    const result = await jmsAiCallBackend(question);
+    const thinking = document.getElementById("jmsAiThinking");
+    if(thinking) thinking.remove();
+
+    if(result.ok) {
+      body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${result.answer}
+<div class="jms-ai-backend-status ok">تم الرد عبر Backend آمن ${result.mode === "openai_web_search" ? "مع بحث خارجي" : ""}</div></div>`);
+    } else {
+      const fallback = jmsAiLocalFallback(question);
+      body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${fallback}
+<div class="jms-ai-backend-status warn">تنبيه: ${result.error || result.answer || "تم استخدام التحليل المحلي"}</div></div>`);
+    }
+  } catch(err) {
+    const thinking = document.getElementById("jmsAiThinking");
+    if(thinking) thinking.remove();
+    const fallback = jmsAiLocalFallback(question);
+    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${fallback}
+<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
+  }
+
+  body.scrollTop = body.scrollHeight;
+};
+
+function jmsAiMessageForCustomer(customerId, type){
+  const c = db.customers.find(x => x.id === customerId);
+  if(!c) return "";
+  if(type === "debt") {
+    return `السلام عليكم ${c.name}\nنذكركم بوجود رصيد مستحق بقيمة ${jmsAiMoney ? jmsAiMoney(c.debt_balance||0) : Number(c.debt_balance||0).toLocaleString("ar-SA")} ريال، ونأمل التكرم بالسداد أو التواصل معنا للتنسيق.`;
+  }
+  if(type === "visit") {
+    return `السلام عليكم ${c.name}\nمعكم شركة جدة النموذجية للصناعة، نرغب بتحديد زيارة لمتابعة احتياجكم وخدمتكم بشكل أفضل.`;
+  }
+  return `السلام عليكم ${c.name}\nنشكر لكم التعامل مع شركة جدة النموذجية للصناعة. نأمل تقييم خدمتنا من 1 إلى 5 نجوم.`;
+}
+
+jmsAiSendCustomerMessage = async function(customerId, type="survey"){
+  const c = db.customers.find(x => x.id === customerId);
+  if(!c) return alert("لم يتم العثور على العميل");
+  if(!c.phone && !c.mobile) return alert("لا يوجد رقم جوال للعميل");
+
+  const message = jmsAiMessageForCustomer(customerId, type);
+  const result = await jmsAiSendWhatsApp(c.phone || c.mobile, message);
+
+  if(result.ok) {
+    alert("تم إرسال رسالة واتساب");
+  } else if(result.url) {
+    window.open(result.url, "_blank");
+  } else {
+    alert("تعذر إرسال واتساب: " + (result.error || "تحقق من الإعدادات"));
+  }
+};

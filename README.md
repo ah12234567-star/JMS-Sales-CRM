@@ -268,3 +268,26 @@ ALLOWED_ORIGIN=https://your-domain.vercel.app
 - إذا السؤال يحتاج خارج النظام، أرسل سؤال مثل:
   "ابحث برا عن أسعار مواد HDPE اليوم"
 - إرسال واتساب يحتاج إعداد Meta Cloud API.
+
+
+## JMS AI Real Backend Integration
+
+### New API routes
+- `/api/ai.js` calls OpenAI securely from Vercel.
+- `/api/web-search.js` uses OpenAI web search for external manufacturing/material questions.
+- `/api/whatsapp-send.js` sends WhatsApp through Meta Cloud API, or falls back to a `wa.me` link if WhatsApp variables are missing.
+
+### Required Vercel Environment Variables
+```text
+OPENAI_API_KEY=sk-proj-...
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+### Optional WhatsApp Variables
+```text
+WHATSAPP_TOKEN=...
+WHATSAPP_PHONE_NUMBER_ID=...
+ALLOWED_ORIGIN=https://jms-sales-crm.vercel.app
+```
+
+After adding variables, redeploy the project.

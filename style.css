@@ -766,3 +766,9 @@ html[dir="ltr"] textarea{
 .jms-ai-backend-status.ok{color:#166534}
 .jms-ai-backend-status.warn{color:#b45309}
 .jms-ai-actions button.backend{background:#0f172a;color:#fff}
+
+
+/* JMS AI Backend Status */
+.jms-ai-backend-status{font-size:12px;margin-top:8px;color:#64748b}
+.jms-ai-backend-status.ok{color:#166534}
+.jms-ai-backend-status.warn{color:#b45309}
