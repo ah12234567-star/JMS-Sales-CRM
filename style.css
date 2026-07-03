@@ -715,3 +715,22 @@ body.jms-login-screen #jmsAiPanel{
 body.jms-app-screen #jmsAiLaunch{
   display:block!important;
 }
+
+
+/* AI Force Show Fix */
+body.jms-logged-in #jmsAiLaunch,
+body.jms-app-screen #jmsAiLaunch{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+body.jms-logged-in #jmsAiPanel,
+body.jms-app-screen #jmsAiPanel{
+  visibility:visible!important;
+  opacity:1!important;
+}
+body.jms-login-screen #jmsAiLaunch,
+body.jms-login-screen #jmsAiPanel{
+  display:none!important;
+}

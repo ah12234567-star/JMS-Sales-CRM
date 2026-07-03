@@ -4605,3 +4605,158 @@ ${todaySummary()}
   setTimeout(updateAIVisibility,1000);
   setInterval(updateAIVisibility,1500);
 })();
+
+
+
+/* AI FORCE SHOW FIX: add jms-logged-in and force AI after app loads */
+(function(){
+  function hasUser(){
+    return !!(window.currentUser && (currentUser.id || currentUser.email || currentUser.name || currentUser.role));
+  }
+  function loginVisible(){
+    const login = document.getElementById('login') || document.querySelector('#loginScreen') || document.querySelector('.login-card')?.closest('section') || document.querySelector('.login');
+    if(!login) return !hasUser();
+    const st=getComputedStyle(login);
+    return st.display !== 'none' && st.visibility !== 'hidden' && !login.classList.contains('hidden');
+  }
+  function inApp(){
+    return hasUser() && !loginVisible();
+  }
+
+  function createAIIfMissing(){
+    if(!inApp()) return;
+    if(document.getElementById('jmsAiLaunch') && document.getElementById('jmsAiPanel')) return;
+
+    const btn=document.createElement('button');
+    btn.id='jmsAiLaunch';
+    btn.className='jms-ai-launch';
+    btn.textContent='JMS AI';
+    btn.onclick=function(){
+      const p=document.getElementById('jmsAiPanel');
+      if(p) p.classList.toggle('open');
+    };
+
+    const panel=document.createElement('div');
+    panel.id='jmsAiPanel';
+    panel.className='jms-ai-panel';
+    panel.innerHTML=`
+      <div class="jms-ai-head">
+        <div><b>JMS AI</b><small>مساعد ذكي يحلل بيانات النظام</small></div>
+        <button class="jms-ai-close" onclick="jmsAiPanel.classList.remove('open')">×</button>
+      </div>
+      <div id="jmsAiBody" class="jms-ai-body">
+        <div class="jms-ai-msg bot">أهلاً، اسألني عن العملاء، المناديب، الزيارات، التحصيلات، أو الأداء.</div>
+      </div>
+      <div class="jms-ai-quick">
+        <button onclick="askJmsAI('ملخص اليوم')">ملخص اليوم</button>
+        <button onclick="askJmsAI('تحليل المبيعات')">تحليل المبيعات</button>
+        <button onclick="askJmsAI('من أفضل مندوب؟')">أفضل مندوب</button>
+        <button onclick="askJmsAI('عملاء لم تتم زيارتهم منذ 30 يوم')">عملاء 30 يوم</button>
+      </div>
+      <div class="jms-ai-input">
+        <input id="jmsAiInput" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter') askJmsAI(this.value)">
+        <button onclick="askJmsAI(jmsAiInput.value)">إرسال</button>
+      </div>`;
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+  }
+
+  function fallbackAnswer(q){
+    const d=window.db||{};
+    d.customers ||= []; d.reps ||= []; d.visits ||= []; d.quotes ||= []; d.orders ||= []; d.collections ||= [];
+    const money=n=>Number(n||0).toLocaleString('ar-SA');
+    q=String(q||'');
+    if(q.includes('مندوب')){
+      const map={};
+      d.reps.forEach(r=>map[r.id]={name:r.name,visits:0,quotes:0,orders:0});
+      d.visits.forEach(v=>{if(map[v.rep_id])map[v.rep_id].visits++});
+      d.quotes.forEach(v=>{if(map[v.rep_id])map[v.rep_id].quotes++});
+      d.orders.forEach(v=>{if(map[v.rep_id])map[v.rep_id].orders++});
+      return Object.values(map).sort((a,b)=>(b.visits+b.quotes+b.orders)-(a.visits+a.quotes+a.orders)).map((r,i)=>`${i+1}. ${r.name}: زيارات ${r.visits} | عروض ${r.quotes} | طلبات ${r.orders}`).join('\n') || 'لا توجد بيانات مناديب.';
+    }
+    if(q.includes('تحصيل')){
+      const total=d.collections.reduce((s,c)=>s+Number(c.amount||0),0);
+      return `إجمالي التحصيل: ${money(total)} ريال`;
+    }
+    return `ملخص النظام:\n- العملاء: ${d.customers.length}\n- المناديب: ${d.reps.length}\n- الزيارات: ${d.visits.length}\n- العروض: ${d.quotes.length}\n- الطلبات: ${d.orders.length}`;
+  }
+
+  if(typeof window.askJmsAI !== 'function'){
+    window.askJmsAI=function(q){
+      const input=document.getElementById('jmsAiInput');
+      q=String(q||input?.value||'').trim();
+      if(!q) return;
+      const body=document.getElementById('jmsAiBody');
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${q}</div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${fallbackAnswer(q)}</div>`);
+      body.scrollTop=body.scrollHeight;
+      if(input) input.value='';
+    };
+  }
+
+  function forceAI(){
+    const ok=inApp();
+    document.body.classList.toggle('jms-logged-in', ok);
+    document.body.classList.toggle('jms-app-screen', ok);
+    document.body.classList.toggle('jms-login-screen', !ok);
+
+    if(ok) createAIIfMissing();
+
+    const btn=document.getElementById('jmsAiLaunch');
+    const panel=document.getElementById('jmsAiPanel');
+
+    if(ok){
+      if(btn){
+        btn.style.display='block';
+        btn.style.visibility='visible';
+        btn.style.opacity='1';
+      }
+      if(panel){
+        panel.style.visibility='visible';
+        panel.style.opacity='1';
+        if(!panel.classList.contains('open')) panel.style.display='';
+      }
+    }else{
+      if(btn) btn.style.display='none';
+      if(panel){
+        panel.classList.remove('open');
+        panel.style.display='none';
+      }
+    }
+  }
+
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){
+    window.showApp=function(){
+      oldShowApp.apply(this,arguments);
+      setTimeout(forceAI,100);
+      setTimeout(forceAI,500);
+      setTimeout(forceAI,1200);
+    };
+  }
+
+  const oldRenderAll=window.renderAll;
+  if(typeof oldRenderAll==='function'){
+    window.renderAll=function(){
+      oldRenderAll.apply(this,arguments);
+      setTimeout(forceAI,100);
+      setTimeout(forceAI,500);
+    };
+  }
+
+  ['logout','signOut','doLogout'].forEach(fn=>{
+    if(typeof window[fn]==='function'){
+      const old=window[fn];
+      window[fn]=function(){
+        const r=old.apply(this,arguments);
+        setTimeout(forceAI,100);
+        return r;
+      };
+    }
+  });
+
+  setTimeout(forceAI,100);
+  setTimeout(forceAI,700);
+  setTimeout(forceAI,1500);
+  setInterval(forceAI,1000);
+})();
