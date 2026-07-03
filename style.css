@@ -778,3 +778,14 @@ html[dir="ltr"] textarea{
 .jms-ai-backend-status{font-size:12px;margin-top:8px;color:#64748b}
 .jms-ai-backend-status.ok{color:#166534}
 .jms-ai-backend-status.warn{color:#b45309}
+
+/* CUSTOMER DIRECT ACTIONS FIX */
+.customer-actions-clean{grid-template-columns:repeat(4,1fr)!important;gap:8px!important}
+.customer-actions-clean .collection,
+.customer-actions-clean .note,
+.customer-actions-clean .map,
+.customer-actions-clean .edit{
+  display:inline-block!important;
+}
+.customer-actions-clean .edit{background:#7c3aed!important;color:#fff!important}
+@media(max-width:800px){.customer-actions-clean{grid-template-columns:repeat(2,1fr)!important}}

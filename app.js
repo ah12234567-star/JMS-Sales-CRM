@@ -3708,18 +3708,18 @@ function convertQuoteToOrder(qid){
       actions.innerHTML = `
         <button type="button" class="done" onclick="quickVisit('${id}')">تمت الزيارة</button>
         <button type="button" class="order" onclick="openQuoteForm('${id}')">طلب جديد</button>
-        <button type="button" class="meeting" onclick="openCustomerMeeting ? openCustomerMeeting('${id}') : alert('سيتم إضافة المواعيد قريباً')">موعد</button>
+        <button type="button" class="meeting" onclick="appointment('${id}')">موعد</button>
+        <button type="button" class="collection" onclick="collect('${id}')">التحصيل</button>
+        <button type="button" class="note" onclick="note('${id}')">ملاحظة</button>
+        <button type="button" class="map" onclick="openCustomerMap('${id}')">موقع العميل</button>
+        <button type="button" class="edit" onclick="editCustomerPro('${id}')">تعديل العميل</button>
         <button type="button" class="more" onclick="toggleCustomerMore('${id}')">المزيد</button>
       `;
       const more = document.createElement('div');
       more.id = 'more_' + id;
       more.className = 'customer-more-menu';
       more.innerHTML = `
-        <button type="button" onclick="openCollection ? openCollection('${id}') : alert('سيتم إضافة التحصيل قريباً')">💰 التحصيل</button>
-        <button type="button" onclick="openCustomerMap('${id}')">📍 موقع العميل</button>
-        <button type="button" onclick="openCustomerNote ? openCustomerNote('${id}') : alert('سيتم إضافة الملاحظات قريباً')">📝 ملاحظة</button>
         ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">💬 رسالة تقييم واتساب</button>` : `<button type="button" disabled>💬 لا يوجد رقم جوال</button>`}
-        <button type="button" onclick="editCustomerPro ? editCustomerPro('${id}') : alert('تعديل العميل غير متاح في هذه النسخة')">✏️ تعديل العميل</button>
         <button type="button" onclick="openQuoteForm('${id}')">📄 إنشاء عرض سعر</button>
       `;
       card.appendChild(actions);
@@ -3765,6 +3765,66 @@ function convertQuoteToOrder(qid){
 
 
 
+
+
+
+/* CUSTOMER ACTIONS DIRECT FIX: collection, notes, edit customer */
+(function(){
+  function getCustomer(customerId){
+    db.customers ||= [];
+    return db.customers.find(x => x.id === customerId);
+  }
+
+  window.openCollection = window.openCollection || function(customerId){
+    if(typeof collect === 'function') return collect(customerId);
+  };
+
+  window.openCustomerNote = window.openCustomerNote || function(customerId){
+    if(typeof note === 'function') return note(customerId);
+  };
+
+  window.openCustomerMeeting = window.openCustomerMeeting || function(customerId){
+    if(typeof appointment === 'function') return appointment(customerId);
+  };
+
+  window.editCustomerPro = window.editCustomerPro || function(customerId){
+    const c = getCustomer(customerId);
+    if(!c){ alert('لم يتم العثور على العميل'); return; }
+    const reps = db.reps || [];
+    modalBody.innerHTML = `<h2>تعديل العميل</h2>
+      <div class="form-grid two">
+        <label>اسم العميل<input id="ecName" value="${String(c.name||'').replace(/"/g,'&quot;')}"></label>
+        <label>الجوال<input id="ecPhone" value="${String(c.phone||c.mobile||'').replace(/"/g,'&quot;')}"></label>
+        <label>المدينة<input id="ecCity" value="${String(c.city||'جدة').replace(/"/g,'&quot;')}"></label>
+        <label>المندوب<select id="ecRep">${reps.map(r=>`<option value="${r.id}" ${r.id===c.rep_id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label>الموقع<input id="ecLocation" value="${String(c.location||c.district||'').replace(/"/g,'&quot;')}"></label>
+        <label>تصنيف العميل<input id="ecCategory" value="${String(c.category||'عميل').replace(/"/g,'&quot;')}"></label>
+        <label>المديونية<input id="ecDebt" type="number" value="${Number(c.debt_balance||0)}"></label>
+        <label>الحالة<select id="ecStatus"><option value="active" ${c.status!=='inactive'?'selected':''}>نشط</option><option value="inactive" ${c.status==='inactive'?'selected':''}>غير نشط</option></select></label>
+      </div>
+      <label>ملاحظات العميل<textarea id="ecNotes" rows="3">${String(c.notes||'').replace(/</g,'&lt;')}</textarea></label>
+      <br><button class="primary" onclick="saveCustomerEditPro('${customerId}')">حفظ التعديل</button>
+      <button onclick="closeModal()">إلغاء</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  window.saveCustomerEditPro = function(customerId){
+    const c = getCustomer(customerId);
+    if(!c){ alert('لم يتم العثور على العميل'); return; }
+    c.name = ecName.value.trim();
+    c.phone = ecPhone.value.trim();
+    c.city = ecCity.value.trim();
+    c.rep_id = ecRep.value;
+    c.location = ecLocation.value.trim();
+    c.category = ecCategory.value.trim();
+    c.debt_balance = Number(ecDebt.value || 0);
+    c.status = ecStatus.value;
+    c.notes = ecNotes.value.trim();
+    save();
+    closeModal();
+    renderAll();
+  };
+})();
 
 /* ARABIC STABLE LOCK: force full Arabic UI */
 (function(){
