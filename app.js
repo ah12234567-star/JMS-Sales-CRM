@@ -1,3 +1,10 @@
+
+// JMS login safety fix: never render dashboard before a valid currentUser exists.
+if(location.pathname.startsWith('/api/')){
+  document.body.innerHTML = '<pre>{"ok":false,"error":"api_route_not_reached"}</pre>';
+  throw new Error('api route not reached by Vercel function');
+}
+
 const DENSITY={HDPE:.95,LDPE:.92,LLDPE:.92,PP:.90,MIX:.93};
 const STORE='jms_factory_crm_pro_v4';
 let db=load();
@@ -35,8 +42,16 @@ function today(){return new Date().toISOString().slice(0,10)}
 function month(){return today().slice(0,7)}
 function money(n){return Number(n||0).toLocaleString('ar-SA')}
 function roleText(r){return r==='admin'?'مدير النظام':r==='sales'?'مدير مبيعات':'مندوب'}
-function allowedCustomers(){return currentUser.role==='rep'?db.customers.filter(c=>c.rep_id===currentUser.id):db.customers}
-function allowedOrders(){return currentUser.role==='rep'?db.orders.filter(o=>o.rep_id===currentUser.id):db.orders}
+function allowedCustomers(){return (currentUser&&currentUser.role)==='rep'?db.customers.filter(c=>c.rep_id===(currentUser&&currentUser.id)):db.customers}
+function allowedOrders(){return (currentUser&&currentUser.role)==='rep'?db.orders.filter(o=>o.rep_id===(currentUser&&currentUser.id)):db.orders}
+function requireLogin(){
+  if(!currentUser || !currentUser.role){
+    if(typeof appView!=='undefined' && appView) appView.classList.add('hidden');
+    if(typeof loginView!=='undefined' && loginView) loginView.classList.remove('hidden');
+    return false;
+  }
+  return true;
+}
 
 document.querySelectorAll('input[name=loginRole]').forEach(x=>x.onchange=()=>{
   loginEmail.value='';
@@ -126,27 +141,28 @@ window.confirmPasswordReset=async function(){
 logoutBtn.onclick=()=>{sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
 
 function showApp(){
+  if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
   loginView.classList.add('hidden');
   appView.classList.remove('hidden');
-  currentUserName.textContent=currentUser.name;
-  currentUserRole.textContent=roleText(currentUser.role);
+  currentUserName.textContent=((currentUser&&currentUser.name)||"");
+  currentUserRole.textContent=roleText((currentUser&&currentUser.role));
 
   const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
   document.querySelectorAll('.nav').forEach(btn=>{
     const page = btn.dataset.page;
     const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
-    if(currentUser.role === 'rep' && !repAllowed.includes(page)){
+    if((currentUser&&currentUser.role) === 'rep' && !repAllowed.includes(page)){
       btn.style.display='none';
-    } else if(btn.classList.contains('admin-only') && currentUser.role !== 'admin'){
+    } else if(btn.classList.contains('admin-only') && (currentUser&&currentUser.role) !== 'admin'){
       btn.style.display='none';
-    } else if(btn.classList.contains('manager-only') && !['admin','sales'].includes(currentUser.role)){
+    } else if(btn.classList.contains('manager-only') && !['admin','sales'].includes((currentUser&&currentUser.role))){
       btn.style.display='none';
     } else {
       btn.style.display='block';
     }
   });
 
-  if(currentUser.role === 'rep'){
+  if((currentUser&&currentUser.role) === 'rep'){
     document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
     const first = document.querySelector('.nav[data-page="customers"]');
     const page = document.getElementById('customers');
@@ -165,14 +181,14 @@ document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   renderAll();
 });
 
-function renderAll(){renderStats();renderCustomers();renderSelects();if(typeof renderVisitFilters==='function')renderVisitFilters();if(typeof renderVisits==='function')renderVisits();if(typeof renderQuotes==='function')renderQuotes();if(typeof renderVisitNotes==='function')renderVisitNotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc();if(typeof renderJmsAI==='function')renderJmsAI()}
+function renderAll(){if(!requireLogin()) return; renderStats();renderCustomers();renderSelects();if(typeof renderVisitFilters==='function')renderVisitFilters();if(typeof renderVisits==='function')renderVisits();if(typeof renderQuotes==='function')renderQuotes();if(typeof renderVisitNotes==='function')renderVisitNotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc();if(typeof renderJmsAI==='function')renderJmsAI()}
 function repName(id){return db.reps.find(r=>r.id===id)?.name||'-'}
 function customerName(id){return db.customers.find(c=>c.id===id)?.name||'-'}
 function lastVisit(cid){return db.visits.filter(v=>v.customer_id===cid).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||''}
 function daysFrom(d){return d?Math.floor((new Date(today())-new Date(d))/86400000):999}
 function customerState(c){let d=daysFrom(lastVisit(c.id));if(d>=30)return ['متأخر '+d+' يوم','late'];if(d>=20)return ['قريب '+d+' يوم','warn'];return ['منتظم','ok']}
 function monthOrders(){return allowedOrders().filter(o=>String(o.date).startsWith(month()))}
-function monthCollections(){return db.collections.filter(c=>String(c.date).startsWith(month())&&(currentUser.role!=='rep'||c.rep_id===currentUser.id))}
+function monthCollections(){return db.collections.filter(c=>String(c.date).startsWith(month())&&((currentUser&&currentUser.role)!=='rep'||c.rep_id===(currentUser&&currentUser.id)))}
 
 function renderStats(){
   const sales=monthOrders().reduce((s,o)=>s+Number(o.amount_value||0),0);
@@ -212,7 +228,7 @@ function saveCustomer(){db.customers.unshift({id:id(),name:mcName.value,phone:mc
 
 function renderSelects(){
   const cs=allowedCustomers();orderCustomer.innerHTML='<option value="">اختر العميل</option>'+cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;orderRep.innerHTML=reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;orderRep.innerHTML=reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
 }
 ['width','length','thickness','sizeUnit','thicknessUnit','material','totalKg','priceKg'].forEach(x=>$(x).addEventListener('input',calc));
 ['sizeUnit','thicknessUnit','material'].forEach(x=>$(x).addEventListener('change',calc));
@@ -241,12 +257,12 @@ function renderAlerts(){
   alertsList.innerHTML=list.map(c=>`<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — لم تتم زيارته منذ ${daysFrom(lastVisit(c.id))} يوم <div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`).join('')||'<div class="panel">لا توجد تنبيهات</div>';
 }
 function createRoute(){
-  const repId=currentUser.role==='rep'?currentUser.id:prompt('اكتب ID المندوب: rep-yaser أو rep-demo','rep-yaser');
+  const repId=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):prompt('اكتب ID المندوب: rep-yaser أو rep-demo','rep-yaser');
   const customers=allowedCustomers().filter(c=>c.rep_id===repId).slice(0,10);
   db.routes.unshift({id:id(),date:today(),rep_id:repId,items:customers.map((c,i)=>({customer_id:c.id,order:i+1,status:'pending'}))});save();renderRoutes();
 }
 function renderRoutes(){
-  routesList.innerHTML=db.routes.filter(r=>currentUser.role!=='rep'||r.rep_id===currentUser.id).map(r=>`<div class="route-card"><b>مسار ${r.date} - ${repName(r.rep_id)}</b><div class="route-items">${r.items.map(i=>`<div class="route-item">${i.order}. ${customerName(i.customer_id)} <button onclick="visit('${i.customer_id}')">تمت الزيارة</button></div>`).join('')}</div></div>`).join('')||'<div class="panel">لا توجد مسارات</div>';
+  routesList.innerHTML=db.routes.filter(r=>(currentUser&&currentUser.role)!=='rep'||r.rep_id===(currentUser&&currentUser.id)).map(r=>`<div class="route-card"><b>مسار ${r.date} - ${repName(r.rep_id)}</b><div class="route-items">${r.items.map(i=>`<div class="route-item">${i.order}. ${customerName(i.customer_id)} <button onclick="visit('${i.customer_id}')">تمت الزيارة</button></div>`).join('')}</div></div>`).join('')||'<div class="panel">لا توجد مسارات</div>';
 }
 function openUserForm(){
   modalBody.innerHTML=`<h2>إضافة مستخدم / مندوب</h2><p class="muted">سيتم حفظ كلمة المرور مشفرة في السيرفر، ولن تظهر في الصفحة أو الكود.</p><div class="form-grid two"><label>الاسم<input id="muName"></label><label>البريد<input id="muEmail" type="email" autocomplete="username"></label><label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label><label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة"></label><label>الدور<select id="muRole"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label></div><br><button class="primary" onclick="saveUser()">حفظ</button>`;modal.classList.remove('hidden');
@@ -257,7 +273,7 @@ function renderUsers(){
 }
 function toggleUser(uid){let u=db.users.find(x=>x.id===uid);u.status=u.status==='active'?'disabled':'active';let r=db.reps.find(x=>x.id===uid);if(r)r.status=u.status;save();renderUsers()}
 async function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة');if(!p)return;try{await jmsPostJson('/api/auth-admin-reset-password',{userId:uid,newPassword:p});alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('تعذر تغيير كلمة المرور في السيرفر')}}
-async function changeMyPassword(){if(!currentUser)return;if(!oldPassword.value||!newPassword.value)return alert('اكتب كلمة المرور الحالية والجديدة');try{await jmsPostJson('/api/auth-change-password',{email:currentUser.email,oldPassword:oldPassword.value,newPassword:newPassword.value});oldPassword.value='';newPassword.value='';alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('كلمة المرور الحالية غير صحيحة أو تعذر الحفظ')}}
+async function changeMyPassword(){if(!currentUser)return;if(!oldPassword.value||!newPassword.value)return alert('اكتب كلمة المرور الحالية والجديدة');try{await jmsPostJson('/api/auth-change-password',{email:((currentUser&&currentUser.email)||""),oldPassword:oldPassword.value,newPassword:newPassword.value});oldPassword.value='';newPassword.value='';alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('كلمة المرور الحالية غير صحيحة أو تعذر الحفظ')}}
 function closeModal(){modal.classList.add('hidden');modalBody.innerHTML=''}
 
 
@@ -279,7 +295,7 @@ function renderVisitFilters(){
   if(!window.visitFrom) return;
   if(!visitFrom.value) visitFrom.value=today();
   if(!visitTo.value) visitTo.value=today();
-  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   const current=visitRepFilter.value;
   visitRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   if(current) visitRepFilter.value=current;
@@ -299,7 +315,7 @@ function visitsInPeriod(){
   if(!window.visitFrom) return [];
   const repId=visitRepFilter.value||'all';
   let vs=db.visits.filter(v=>inRange(v.date,visitFrom.value,visitTo.value));
-  if(currentUser.role==='rep') vs=vs.filter(v=>v.rep_id===currentUser.id);
+  if((currentUser&&currentUser.role)==='rep') vs=vs.filter(v=>v.rep_id===(currentUser&&currentUser.id));
   if(repId!=='all') vs=vs.filter(v=>v.rep_id===repId);
   return vs;
 }
@@ -339,7 +355,7 @@ function renderVisits(){
 }
 function renderRepVisitSummary(){
   if(!window.repVisitSummary) return;
-  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   repVisitSummary.innerHTML='<div class="summary-grid">'+reps.map(r=>{
     const cs=allowedCustomers().filter(c=>c.rep_id===r.id);
     const vs=db.visits.filter(v=>v.rep_id===r.id && (!window.visitFrom || inRange(v.date,visitFrom.value,visitTo.value)));
@@ -358,7 +374,7 @@ function openVisitForm(){
   modalBody.innerHTML=`<h2>تسجيل زيارة يدوية</h2>
     <div class="form-grid two">
       <label>العميل<select id="mvCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
-      <label>المندوب<select id="mvRep">${(currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
+      <label>المندوب<select id="mvRep">${((currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
       <label>التاريخ<input id="mvDate" type="date" value="${today()}"></label>
       <label>نتيجة الزيارة<select id="mvResult"><option>متابعة</option><option>طلب جديد</option><option>تحصيل</option><option>بدون طلب</option></select></label>
       <label>وقت الوصول<input id="mvArrive" type="time"></label>
@@ -392,11 +408,11 @@ function quoteStatusText(s){
 }
 function allowedQuotes(){
   ensureQuotes();
-  return currentUser.role==='rep' ? db.quotes.filter(q=>q.rep_id===currentUser.id) : db.quotes;
+  return (currentUser&&currentUser.role)==='rep' ? db.quotes.filter(q=>q.rep_id===(currentUser&&currentUser.id)) : db.quotes;
 }
 function renderQuoteFilters(){
   if(!window.quoteRepFilter) return;
-  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   const cur=quoteRepFilter.value;
   quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   if(cur) quoteRepFilter.value=cur;
@@ -427,7 +443,7 @@ function renderQuotes(){
   quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
 }
 function quoteCard(q){
-  const canApprove=currentUser.role==='admin'||currentUser.role==='sales';
+  const canApprove=(currentUser&&currentUser.role)==='admin'||(currentUser&&currentUser.role)==='sales';
   const canSend=q.status==='approved'||q.status==='sent';
   const canConvert=q.status==='approved'||q.status==='sent';
   return `<div class="quote-card">
@@ -465,7 +481,7 @@ function quoteCard(q){
 function openQuoteForm(){
   ensureQuotes();
   const cs=allowedCustomers();
-  const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+  const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
     <div class="form-grid two">
       <label>العميل<select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
@@ -531,20 +547,20 @@ function saveQuote(){
     width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
     total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
     payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,
-    created_by:currentUser.name,created_at:new Date().toISOString()
+    created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()
   });
   save();closeModal();renderAll();alert('تم حفظ العرض وإرساله للمدير للاعتماد');
 }
 function approveQuote(qid){
   const q=db.quotes.find(x=>x.id===qid); if(!q) return;
-  q.status='approved'; q.approved_by=currentUser.name; q.approved_at=today();
+  q.status='approved'; q.approved_by=((currentUser&&currentUser.name)||""); q.approved_at=today();
   save();renderQuotes();alert('تم اعتماد عرض السعر');
 }
 function rejectQuote(qid){
   const q=db.quotes.find(x=>x.id===qid); if(!q) return;
   const reason=prompt('سبب الرفض');
   if(!reason) return;
-  q.status='rejected'; q.reject_reason=reason; q.rejected_by=currentUser.name; q.rejected_at=today();
+  q.status='rejected'; q.reject_reason=reason; q.rejected_by=((currentUser&&currentUser.name)||""); q.rejected_at=today();
   save();renderQuotes();alert('تم رفض العرض وإرجاعه للمندوب');
 }
 function sendQuote(qid){
@@ -608,7 +624,7 @@ function convertQuoteToOrder(qid){
   window.renderStats = function(){
     const ord=(typeof allowedOrders==='function'?allowedOrders():db.orders||[]).filter(o=>String(o.date||'').startsWith(safeMonth()));
     const sales=ord.reduce((s,o)=>s+Number(o.amount_value||0),0);
-    const coll=(db.collections||[]).filter(c=>String(c.date||'').startsWith(safeMonth())&&(currentUser.role!=='rep'||c.rep_id===currentUser.id)).reduce((s,c)=>s+Number(c.amount||0),0);
+    const coll=(db.collections||[]).filter(c=>String(c.date||'').startsWith(safeMonth())&&((currentUser&&currentUser.role)!=='rep'||c.rep_id===(currentUser&&currentUser.id))).reduce((s,c)=>s+Number(c.amount||0),0);
     if(window.mSales) mSales.textContent=Number(sales||0).toLocaleString('ar-SA');
     if(window.mCollected) mCollected.textContent=Number(coll||0).toLocaleString('ar-SA');
     if(window.collectionRate) collectionRate.textContent=sales?Math.round(coll/sales*100)+'%':'0%';
@@ -641,11 +657,11 @@ function convertQuoteToOrder(qid){
 
   window.ensureQuotes = function(){ db.quotes ||= []; saveDB(); };
   window.quoteStatusText = function(s){ return s==='pending'?'بانتظار اعتماد المدير':s==='approved'?'معتمد':s==='rejected'?'مرفوض':s==='sent'?'مرسل للعميل':'-'; };
-  window.allowedQuotes = function(){ ensureQuotes(); return currentUser.role==='rep' ? db.quotes.filter(q=>q.rep_id===currentUser.id) : db.quotes; };
+  window.allowedQuotes = function(){ ensureQuotes(); return (currentUser&&currentUser.role)==='rep' ? db.quotes.filter(q=>q.rep_id===(currentUser&&currentUser.id)) : db.quotes; };
 
   window.renderQuoteFilters = function(){
     if(!window.quoteRepFilter) return;
-    const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
+    const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
     const cur=quoteRepFilter.value;
     quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
     if(cur) quoteRepFilter.value=cur;
@@ -671,7 +687,7 @@ function convertQuoteToOrder(qid){
   };
 
   window.quoteCard=function(q){
-    const canApprove=currentUser.role==='admin'||currentUser.role==='sales';
+    const canApprove=(currentUser&&currentUser.role)==='admin'||(currentUser&&currentUser.role)==='sales';
     const canSend=q.status==='approved'||q.status==='sent';
     const canConvert=q.status==='approved'||q.status==='sent';
     return `<div class="quote-card">
@@ -687,8 +703,8 @@ function convertQuoteToOrder(qid){
   window.openQuoteForm=function(){
     ensureQuotes();
     const cs=typeof allowedCustomers==='function'?allowedCustomers():db.customers||[];
-    const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
-    const defaultRep=currentUser.role==='rep'?currentUser.id:(reps[0]?.id||'');
+    const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
+    const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
     modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
       <div class="quote-customer-mode">
         <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
@@ -755,7 +771,7 @@ function convertQuoteToOrder(qid){
     ensureQuotes();
     const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
     let customerId='';
-    let repId=(window.mqRep && mqRep.value) ? mqRep.value : currentUser.id;
+    let repId=(window.mqRep && mqRep.value) ? mqRep.value : (currentUser&&currentUser.id);
     if(mode==='new'){
       const name=(mqNewCustomerName.value||'').trim();
       if(!name) return alert('اكتب اسم العميل الجديد');
@@ -767,12 +783,12 @@ function convertQuoteToOrder(qid){
       if(!customerId) return alert('اختر العميل');
     }
     const no='Q-'+String((db.quotes||[]).length+1).padStart(5,'0');
-    db.quotes.unshift({id:newLocalId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser.name,created_at:new Date().toISOString()});
+    db.quotes.unshift({id:newLocalId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()});
     saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
   };
 
-  window.approveQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;q.status='approved';q.approved_by=currentUser.name;q.approved_at=safeToday();saveDB();renderQuotes();alert('تم اعتماد عرض السعر');};
-  window.rejectQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;const reason=prompt('سبب الرفض');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=currentUser.name;q.rejected_at=safeToday();saveDB();renderQuotes();alert('تم رفض العرض');};
+  window.approveQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;q.status='approved';q.approved_by=((currentUser&&currentUser.name)||"");q.approved_at=safeToday();saveDB();renderQuotes();alert('تم اعتماد عرض السعر');};
+  window.rejectQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;const reason=prompt('سبب الرفض');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=((currentUser&&currentUser.name)||"");q.rejected_at=safeToday();saveDB();renderQuotes();alert('تم رفض العرض');};
   window.sendQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن الإرسال قبل اعتماد المدير');q.status='sent';q.sent_at=safeToday();saveDB();renderQuotes();const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit}%0Aالسماكة: ${q.thickness} ${q.thickness_unit}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي: ${q.total_amount} ريال`;window.open(`https://wa.me/?text=${msg}`,'_blank');};
   window.viewQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;modalBody.innerHTML=`<div class="quote-print"><div class="print-head"><div><h1>عرض سعر</h1><p>شركة جدة النموذجية للصناعة</p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div><p><b>العميل:</b> ${customerName(q.customer_id)}<br><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}</p><table><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الخامة</th><th>الكمية</th><th>سعر الكيلو</th><th>الإجمالي</th></tr><tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table><p><b>شروط الدفع:</b> ${q.payment_terms||'-'}<br><b>التسليم:</b> ${q.delivery_terms||'-'}<br><b>ملاحظات:</b> ${q.notes||'-'}</p><button class="primary" onclick="window.print()">طباعة / PDF</button></div>`;modal.classList.remove('hidden');};
   window.convertQuoteToOrder=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن تحويل عرض غير معتمد إلى طلب');db.orders.unshift({id:newLocalId(),date:safeToday(),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,width:q.width,length:q.length,thickness:q.thickness,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:q.total_amount+' ريال',amount_value:Number(q.total_amount||0),status:'جديد',notes:'تم التحويل من عرض السعر '+q.quote_no});q.converted_to_order=true;q.converted_at=safeToday();saveDB();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');};
@@ -807,7 +823,7 @@ function convertQuoteToOrder(qid){
 
   window.renderVisitNoteFilters = function(){
     if(!window.visitNoteRepFilter) return;
-    const reps = currentUser.role === 'rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    const reps = (currentUser&&currentUser.role) === 'rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
     const cur = visitNoteRepFilter.value;
     visitNoteRepFilter.innerHTML = '<option value="all">كل المناديب</option>' + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
     if(cur) visitNoteRepFilter.value = cur;
@@ -818,7 +834,7 @@ function convertQuoteToOrder(qid){
     ensureVisitReports();
     renderVisitNoteFilters();
 
-    let reports = currentUser.role === 'rep' ? db.visitReports.filter(r=>r.rep_id===currentUser.id) : db.visitReports;
+    let reports = (currentUser&&currentUser.role) === 'rep' ? db.visitReports.filter(r=>r.rep_id===(currentUser&&currentUser.id)) : db.visitReports;
     const type = visitNoteTypeFilter.value || 'all';
     const rep = visitNoteRepFilter.value || 'all';
     const search = (visitNoteSearch.value || '').trim();
@@ -891,7 +907,7 @@ function convertQuoteToOrder(qid){
     ensureVisitReports();
     const c = db.customers.find(x=>x.id===customerId);
     if(!c) return;
-    const repId = c.rep_id || currentUser.id;
+    const repId = c.rep_id || (currentUser&&currentUser.id);
     const report = {
       id: localId(),
       customer_id: customerId,
@@ -906,7 +922,7 @@ function convertQuoteToOrder(qid){
       followup_date: vrFollowup.value || '',
       needs_action: noteNeedsAction(vrType.value),
       status: noteNeedsAction(vrType.value) ? 'open' : 'info',
-      created_by: currentUser.name,
+      created_by: ((currentUser&&currentUser.name)||""),
       created_at: new Date().toISOString()
     };
     db.visitReports.unshift(report);
@@ -934,7 +950,7 @@ function convertQuoteToOrder(qid){
     const r = db.visitReports.find(x=>x.id===id);
     if(!r) return;
     r.status = 'closed';
-    r.closed_by = currentUser.name;
+    r.closed_by = ((currentUser&&currentUser.name)||"");
     r.closed_at = tdy();
     saveDb(); renderVisitNotes();
   };
@@ -1170,8 +1186,8 @@ function convertQuoteToOrder(qid){
   window.openQuoteForm = function(){
     if(typeof ensureQuotes === 'function') ensureQuotes();
     const cs = allowedCs();
-    const reps = currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;
-    const defaultRep=currentUser.role==='rep'?currentUser.id:(reps[0]?.id||'');
+    const reps = (currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
+    const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
 
     modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
       <div class="quote-customer-mode">
@@ -1253,7 +1269,7 @@ function convertQuoteToOrder(qid){
     if(typeof ensureQuotes === 'function') ensureQuotes();
     const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing';
     let customerId='';
-    let repId=(window.mqRep && mqRep.value) ? mqRep.value : currentUser.id;
+    let repId=(window.mqRep && mqRep.value) ? mqRep.value : (currentUser&&currentUser.id);
 
     if(mode==='new'){
       const name=(mqNewCustomerName.value||'').trim();
@@ -1273,7 +1289,7 @@ function convertQuoteToOrder(qid){
       product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
       width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
       total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
-      payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser.name,created_at:new Date().toISOString()
+      payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()
     });
     saveDb();
     closeModal();
@@ -1454,22 +1470,23 @@ function convertQuoteToOrder(qid){
   window.roleText = function(r){return r==='admin'?'مدير النظام':r==='sales'?'مدير المبيعات':'مندوب مبيعات'};
   window.ensureQuotes = function(){db.quotes ||= [];saveDB();};
   window.quoteStatusText = function(s){return s==='pending'?'بانتظار اعتماد المدير':s==='approved'?'معتمد':s==='sent'?'مرسل للعميل':s==='accepted'?'مقبول من العميل':s==='cancelled'?'ملغي - العميل لم يوافق':s==='rejected'?'مرفوض من المدير':'-'};
-  window.allowedQuotes = function(){ensureQuotes();return currentUser && currentUser.role==='rep'?db.quotes.filter(q=>q.rep_id===currentUser.id):db.quotes;};
+  window.allowedQuotes = function(){ensureQuotes();return currentUser && (currentUser&&currentUser.role)==='rep'?db.quotes.filter(q=>q.rep_id===(currentUser&&currentUser.id)):db.quotes;};
   function customerObj(id){return (db.customers||[]).find(c=>c.id===id)||{};}
   function quoteNo(){return 'Q-'+String((db.quotes||[]).length+1).padStart(5,'0');}
 
   window.showApp = function(){
+    if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
     loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
-    currentUserName.textContent=currentUser.name; currentUserRole.textContent=roleText(currentUser.role);
+    currentUserName.textContent=((currentUser&&currentUser.name)||""); currentUserRole.textContent=roleText((currentUser&&currentUser.role));
     const repAllowed=['customers','visits','orders','quotes','routes','profile'];
     document.querySelectorAll('.nav').forEach(btn=>{
       const page=btn.dataset.page;
-      if(currentUser.role==='rep'&&!repAllowed.includes(page)) btn.style.display='none';
-      else if(btn.classList.contains('admin-only')&&currentUser.role!=='admin') btn.style.display='none';
-      else if(btn.classList.contains('manager-only')&&!['admin','sales'].includes(currentUser.role)) btn.style.display='none';
+      if((currentUser&&currentUser.role)==='rep'&&!repAllowed.includes(page)) btn.style.display='none';
+      else if(btn.classList.contains('admin-only')&&(currentUser&&currentUser.role)!=='admin') btn.style.display='none';
+      else if(btn.classList.contains('manager-only')&&!['admin','sales'].includes((currentUser&&currentUser.role))) btn.style.display='none';
       else btn.style.display='block';
     });
-    if(currentUser.role==='rep'){
+    if((currentUser&&currentUser.role)==='rep'){
       document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
       const first=document.querySelector('.nav[data-page="customers"]'); const page=document.getElementById('customers');
       if(first) first.classList.add('active'); if(page) page.classList.add('active');
@@ -1515,7 +1532,7 @@ function convertQuoteToOrder(qid){
     mqPiece.value=gram?gram.toFixed(2)+' جرام':''; const kg=num(mqKg.value); mqPieces.value=gram?Math.floor(kg/(gram/1000)).toLocaleString('ar-SA')+' حبة':''; mqTotal.value=(kg*num(mqPriceKg.value))?(kg*num(mqPriceKg.value)).toFixed(2):'';
   };
   window.openQuoteForm=function(){
-    ensureQuotes(); const cs=allowedCustomers(); const reps=currentUser.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps; const defaultRep=currentUser.role==='rep'?currentUser.id:(reps[0]?.id||'');
+    ensureQuotes(); const cs=allowedCustomers(); const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps; const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
     modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2><div class="quote-customer-mode"><label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label><label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label></div>
     <div id="existingCustomerBox" class="form-grid two"><label>بحث باسم العميل<div class="customer-search-picker"><input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()"><div id="mqCustomerSearchResults" class="customer-search-results"></div><div id="selectedQuoteCustomer" class="selected-customer-pill"></div></div><input id="mqCustomer" type="hidden" value=""></label><label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label></div>
     <div id="newCustomerBox" class="form-grid two hidden"><label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label><label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label><label>المدينة<input id="mqNewCustomerCity" value="جدة"></label><label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label></div>
@@ -1524,19 +1541,19 @@ function convertQuoteToOrder(qid){
     modal.classList.remove('hidden'); ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{const el=document.getElementById(x);if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm)}}); if(cs[0]){mqCustomer.value=cs[0].id;selectedQuoteCustomer.textContent='العميل الافتراضي: '+cs[0].name;selectedQuoteCustomer.classList.add('active')} calcQuoteForm();
   };
   window.saveQuote=function(){
-    ensureQuotes(); const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing'; let customerId=''; let repId=(window.mqRep&&mqRep.value)?mqRep.value:currentUser.id;
+    ensureQuotes(); const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing'; let customerId=''; let repId=(window.mqRep&&mqRep.value)?mqRep.value:(currentUser&&currentUser.id);
     if(mode==='new'){const name=(mqNewCustomerName.value||'').trim(); if(!name)return alert('اكتب اسم العميل الجديد'); const c={id:safeId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من عرض سعر'}; db.customers.unshift(c); customerId=c.id}else{customerId=mqCustomer.value;if(!customerId)return alert('اكتب اسم العميل واختره من نتائج البحث')}
-    db.quotes.unshift({id:safeId(),quote_no:quoteNo(),status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser.name,created_at:new Date().toISOString()}); saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+    db.quotes.unshift({id:safeId(),quote_no:quoteNo(),status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()}); saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
   };
   window.renderQuotes=function(){
     if(!window.quotesList)return; ensureQuotes(); if(typeof renderQuoteFilters==='function')renderQuoteFilters(); const st=window.quoteStatusFilter?.value||'all',rep=window.quoteRepFilter?.value||'all',txt=(window.quoteSearch?.value||'').trim(); let list=allowedQuotes().filter(q=>{if(st!=='all'&&q.status!==st)return false;if(rep!=='all'&&q.rep_id!==rep)return false;const cname=customerName(q.customer_id);return !txt||String(q.quote_no).includes(txt)||cname.includes(txt)});
     if(window.quotesTotal){quotesTotal.textContent=allowedQuotes().length;quotesPending.textContent=allowedQuotes().filter(q=>q.status==='pending').length;quotesApproved.textContent=allowedQuotes().filter(q=>q.status==='approved'||q.status==='sent'||q.status==='accepted').length;quotesRejected.textContent=allowedQuotes().filter(q=>q.status==='rejected'||q.status==='cancelled').length}
-    quotesList.innerHTML=list.map(q=>{const canApprove=['admin','sales'].includes(currentUser.role);const canSend=q.status==='approved'||q.status==='sent'||q.status==='accepted';const canCancel=q.status==='sent'||q.status==='approved';return `<div class="quote-card-pro"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div><p>المنتج: ${safe(q.product)}<br>المقاس: ${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}<br>السماكة: ${safe(q.thickness)} ${safe(q.thickness_unit)} · الخامة: ${safe(q.material)}<br>الكمية: ${safe(q.total_kg)} كجم · سعر الكيلو: ${safe(q.price_kg)} ريال<br>${q.cancel_reason?'سبب الإلغاء: '+q.cancel_reason:''}</p><div class="quote-total-pro"><span>إجمالي العرض</span><b>${fmt(q.total_amount)} ريال</b></div><div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="cancel" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${q.status==='sent'?`<button class="approve" onclick="acceptQuote('${q.id}')">العميل وافق</button>`:''}${canCancel?`<button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${q.status==='accepted'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div></div>`}).join('')||'<div class="panel">لا توجد عروض أسعار</div>';
+    quotesList.innerHTML=list.map(q=>{const canApprove=['admin','sales'].includes((currentUser&&currentUser.role));const canSend=q.status==='approved'||q.status==='sent'||q.status==='accepted';const canCancel=q.status==='sent'||q.status==='approved';return `<div class="quote-card-pro"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div><p>المنتج: ${safe(q.product)}<br>المقاس: ${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}<br>السماكة: ${safe(q.thickness)} ${safe(q.thickness_unit)} · الخامة: ${safe(q.material)}<br>الكمية: ${safe(q.total_kg)} كجم · سعر الكيلو: ${safe(q.price_kg)} ريال<br>${q.cancel_reason?'سبب الإلغاء: '+q.cancel_reason:''}</p><div class="quote-total-pro"><span>إجمالي العرض</span><b>${fmt(q.total_amount)} ريال</b></div><div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="cancel" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${q.status==='sent'?`<button class="approve" onclick="acceptQuote('${q.id}')">العميل وافق</button>`:''}${canCancel?`<button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${q.status==='accepted'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div></div>`}).join('')||'<div class="panel">لا توجد عروض أسعار</div>';
   };
-  window.approveQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;q.status='approved';q.approved_by=currentUser.name;q.approved_at=safeToday();saveDB();renderAll();alert('تم اعتماد عرض السعر')};
-  window.rejectQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;const reason=prompt('سبب رفض المدير');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=currentUser.name;q.rejected_at=safeToday();saveDB();renderAll()};
+  window.approveQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;q.status='approved';q.approved_by=((currentUser&&currentUser.name)||"");q.approved_at=safeToday();saveDB();renderAll();alert('تم اعتماد عرض السعر')};
+  window.rejectQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;const reason=prompt('سبب رفض المدير');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=((currentUser&&currentUser.name)||"");q.rejected_at=safeToday();saveDB();renderAll()};
   window.acceptQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;q.status='accepted';q.accepted_at=safeToday();saveDB();renderAll();alert('تم تسجيل موافقة العميل')};
-  window.cancelQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;const reason=prompt('سبب الإلغاء لأن العميل لم يوافق');if(!reason)return;q.status='cancelled';q.cancel_reason=reason;q.cancelled_by=currentUser.name;q.cancelled_at=safeToday();saveDB();renderAll();alert('تم إلغاء العرض وتسجيل السبب')};
+  window.cancelQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;const reason=prompt('سبب الإلغاء لأن العميل لم يوافق');if(!reason)return;q.status='cancelled';q.cancel_reason=reason;q.cancelled_by=((currentUser&&currentUser.name)||"");q.cancelled_at=safeToday();saveDB();renderAll();alert('تم إلغاء العرض وتسجيل السبب')};
   window.sendQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;if(!['approved','sent','accepted'].includes(q.status))return alert('لا يمكن الإرسال قبل اعتماد المدير');q.status='sent';q.sent_at=safeToday();saveDB();renderAll();const grand=num(q.total_amount)*1.15;const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit}%0Aالسماكة: ${q.thickness} ${q.thickness_unit}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي شامل الضريبة: ${fmt(grand)} ريال`;window.open(`https://wa.me/?text=${encodeURI(msg)}`,'_blank')};
   window.downloadQuotePDF=function(){setTimeout(()=>window.print(),100)};
   window.viewQuote=function(qid){
@@ -1812,7 +1829,7 @@ function convertQuoteToOrder(qid){
   }
 
   function repOptions(selected=''){
-    const reps = currentUser && currentUser.role === 'rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    const reps = currentUser && (currentUser&&currentUser.role) === 'rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
     return reps.map(r=>`<option value="${r.id}" ${selected===r.id?'selected':''}>${r.name}</option>`).join('');
   }
 
@@ -1873,7 +1890,7 @@ function convertQuoteToOrder(qid){
   window.openQuoteForm = function(defaultCustomerId=''){
     ensureDbShape();
     db.quotes ||= [];
-    const defaultRep = currentUser && currentUser.role === 'rep' ? currentUser.id : (db.reps[0]?.id || '');
+    const defaultRep = currentUser && (currentUser&&currentUser.role) === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || '');
     modalBody.innerHTML = `<h2>إنشاء عرض سعر</h2>
       <div class="quote-customer-mode">
         <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
@@ -2022,7 +2039,7 @@ function convertQuoteToOrder(qid){
   // Override production/order form with customer search + same calculator.
   window.openOrderForm = function(defaultCustomerId=''){
     ensureDbShape();
-    const defaultRep = currentUser && currentUser.role === 'rep' ? currentUser.id : (db.reps[0]?.id || '');
+    const defaultRep = currentUser && (currentUser&&currentUser.role) === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || '');
     modalBody.innerHTML = `<h2>طلب تصنيع جديد</h2>
       <div class="form-grid two">
         <label>بحث عن العميل ${searchCustomerHtml('o', defaultCustomerId, 'oRep')}</label>
@@ -2125,7 +2142,7 @@ function convertQuoteToOrder(qid){
     return true;
   }
   function getRepOptions(selected=''){
-    const reps = currentUser?.role === 'rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    const reps = currentUser?.role === 'rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
     return reps.map(r=>`<option value="${r.id}" ${selected===r.id?'selected':''}>${r.name}</option>`).join('');
   }
   function customerNameById(cid){
@@ -2151,7 +2168,7 @@ function convertQuoteToOrder(qid){
   function quoteFormHtml(q=null){
     ensure();
     const isEdit = !!q;
-    const defaultRep = q?.rep_id || (currentUser?.role === 'rep' ? currentUser.id : (db.reps[0]?.id || ''));
+    const defaultRep = q?.rep_id || (currentUser?.role === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || ''));
     return `<h2>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
       <div class="quote-customer-mode">
         <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
@@ -2421,11 +2438,11 @@ function convertQuoteToOrder(qid){
   function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
   function fv(id){ return document.getElementById(id)?.value || ''; }
   function ensure(){ db.quotes ||= []; db.customers ||= []; db.reps ||= []; db.orders ||= []; }
-  function canManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function canManager(){ return currentUser && ((currentUser&&currentUser.role) === 'admin' || (currentUser&&currentUser.role) === 'sales'); }
   function calcIfPossible(){ if(typeof jmsCalcQuote === 'function') jmsCalcQuote(); else if(typeof calcQuoteForm === 'function') calcQuoteForm(); }
   function req(id){ const el=document.getElementById(id); const v=(el?.value||'').trim(); if(!v){ if(el) el.style.borderColor='#b91c1c'; return false; } if(el) el.style.borderColor=''; return true; }
   function reqNum(id){ const el=document.getElementById(id); const n=Number(String(el?.value||'').replace(/[^\d.]/g,'')); if(!n){ if(el) el.style.borderColor='#b91c1c'; return false; } if(el) el.style.borderColor=''; return true; }
-  function repsOptions(selected=''){ const reps = currentUser?.role==='rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps; return reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join(''); }
+  function repsOptions(selected=''){ const reps = currentUser?.role==='rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps; return reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join(''); }
   function customerOptions(selected=''){ return (typeof allowedCustomers==='function'?allowedCustomers():db.customers).map(c=>`<option value="${c.id}" ${c.id===selected?'selected':''}>${c.name}</option>`).join(''); }
   function fillSelect(id,val){ const el=document.getElementById(id); if(el && val) el.value=val; }
 
@@ -2450,7 +2467,7 @@ function convertQuoteToOrder(qid){
   window.forceQuoteForm = function(q){
     ensure();
     const isEdit=!!q;
-    const defaultRep=q?.rep_id || (currentUser?.role==='rep'?currentUser.id:(db.reps[0]?.id||''));
+    const defaultRep=q?.rep_id || (currentUser?.role==='rep'?(currentUser&&currentUser.id):(db.reps[0]?.id||''));
     modalBody.innerHTML = `<h2>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
       <div class="form-grid two">
         <label>العميل<select id="mqCustomer"><option value="">اختر العميل</option>${customerOptions(q?.customer_id || '')}</select></label>
@@ -2522,7 +2539,7 @@ function convertQuoteToOrder(qid){
 
   window.renderQuotes = function(){
     if(!window.quotesList) return; ensure(); if(typeof renderQuoteFilters==='function') renderQuoteFilters();
-    const all = currentUser?.role==='rep' ? db.quotes.filter(q=>q.rep_id===currentUser.id) : db.quotes;
+    const all = currentUser?.role==='rep' ? db.quotes.filter(q=>q.rep_id===(currentUser&&currentUser.id)) : db.quotes;
     if(window.quotesTotal) quotesTotal.textContent=all.length; if(window.quotesPending) quotesPending.textContent=all.filter(q=>q.status==='pending').length; if(window.quotesApproved) quotesApproved.textContent=all.filter(q=>q.status==='approved').length; if(window.quotesRejected) quotesRejected.textContent=all.filter(q=>q.status==='rejected').length;
     const st=window.quoteStatusFilter?.value||'all'; const rep=window.quoteRepFilter?.value||'all'; const txt=(window.quoteSearch?.value||'').trim();
     const list=all.filter(q=>{ if(st!=='all' && q.status!==st) return false; if(rep!=='all' && q.rep_id!==rep) return false; if(txt && !String(q.quote_no).includes(txt) && !customerName(q.customer_id).includes(txt)) return false; return true; });
@@ -2553,7 +2570,7 @@ function convertQuoteToOrder(qid){
   function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
   function nowIso(){ return new Date().toISOString(); }
   function timeOnly(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
-  function roleIsManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function roleIsManager(){ return currentUser && ((currentUser&&currentUser.role) === 'admin' || (currentUser&&currentUser.role) === 'sales'); }
   function repObj(repId){ return db.reps.find(r=>r.id===repId) || db.users.find(u=>u.id===repId) || {}; }
   function statusText(s){ return s==='on_duty'?'على الدوام':s==='in_visit'?'في زيارة':'خارج الدوام'; }
   function todayVisits(repId){ return db.visits.filter(v=>v.rep_id===repId && String(v.date||v.visit_date||'').startsWith(tdy())).length; }
@@ -2758,17 +2775,17 @@ function convertQuoteToOrder(qid){
   window.renderCustomers = function(){
     if(typeof oldRenderCustomers === 'function') oldRenderCustomers();
     if(currentUser?.role==='rep' && window.customersGrid && !document.getElementById('repSelfPanel')){
-      const status=getRepStatus(currentUser.id);
+      const status=getRepStatus((currentUser&&currentUser.id));
       const panel=document.createElement('div');
       panel.id='repSelfPanel';
       panel.className='rep-self-panel';
       panel.innerHTML=`<b>لوحة المندوب السريعة</b><br>
         الحالة الحالية: ${statusText(status)}
         <div class="rep-actions">
-          <button class="start" onclick="startRepWork('${currentUser.id}')">بدء الدوام</button>
-          <button class="stop" onclick="endRepWork('${currentUser.id}')">إنهاء الدوام</button>
-          <button class="loc" onclick="updateRepLocation('${currentUser.id}')">تحديث موقعي</button>
-          <button class="visit" onclick="markRepInVisit('${currentUser.id}')">أنا في زيارة</button>
+          <button class="start" onclick="startRepWork('${(currentUser&&currentUser.id)}')">بدء الدوام</button>
+          <button class="stop" onclick="endRepWork('${(currentUser&&currentUser.id)}')">إنهاء الدوام</button>
+          <button class="loc" onclick="updateRepLocation('${(currentUser&&currentUser.id)}')">تحديث موقعي</button>
+          <button class="visit" onclick="markRepInVisit('${(currentUser&&currentUser.id)}')">أنا في زيارة</button>
         </div>`;
       customersGrid.parentNode.insertBefore(panel, customersGrid);
     }
@@ -2809,7 +2826,7 @@ function convertQuoteToOrder(qid){
   function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
   function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
   function nowIso(){ return new Date().toISOString(); }
-  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function isManager(){ return currentUser && ((currentUser&&currentUser.role) === 'admin' || (currentUser&&currentUser.role) === 'sales'); }
   function customerObj(id){ return db.customers.find(c=>c.id===id) || {}; }
   function customerNm(id){ return (typeof customerName==='function') ? customerName(id) : (customerObj(id).name || '-'); }
   function repNm(id){ return (typeof repName==='function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
@@ -2819,11 +2836,11 @@ function convertQuoteToOrder(qid){
     return ({quote:'عرض سعر',sale:'تم البيع',collection:'تحصيل',no_manager:'لا يوجد مسؤول',closed:'العميل مغلق',postponed:'مؤجل',none:'بدون نتيجة'})[r||'none'] || 'بدون نتيجة';
   }
   function allowedReps(){
-    return currentUser?.role==='rep' ? db.reps.filter(r=>r.id===currentUser.id) : db.reps;
+    return currentUser?.role==='rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
   }
   function allowedVisitList(){
     ensureVisitData();
-    return currentUser?.role==='rep' ? db.visits.filter(v=>v.rep_id===currentUser.id) : db.visits;
+    return currentUser?.role==='rep' ? db.visits.filter(v=>v.rep_id===(currentUser&&currentUser.id)) : db.visits;
   }
   function setRepStatus(repId,status){
     db.repStatus ||= {};
@@ -3080,7 +3097,7 @@ function convertQuoteToOrder(qid){
   }
   function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
   function isRep(){ return currentUser?.role === 'rep'; }
-  function isManager(){ return currentUser && (currentUser.role === 'admin' || currentUser.role === 'sales'); }
+  function isManager(){ return currentUser && ((currentUser&&currentUser.role) === 'admin' || (currentUser&&currentUser.role) === 'sales'); }
   function cn(id){ return (typeof customerName === 'function') ? customerName(id) : ((db.customers.find(c=>c.id===id)||{}).name || '-'); }
   function rn(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
   function timeStr(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
@@ -3103,7 +3120,7 @@ function convertQuoteToOrder(qid){
     return (document.getElementById('smartVisitSearch')?.value || document.getElementById('visitSearch')?.value || '').trim();
   }
   function allRepsForFilter(){
-    if(isRep()) return db.reps.filter(r=>r.id===currentUser.id);
+    if(isRep()) return db.reps.filter(r=>r.id===(currentUser&&currentUser.id));
     return db.reps || [];
   }
   function normalizeVisit(v){
@@ -3129,7 +3146,7 @@ function convertQuoteToOrder(qid){
     const result=selectedResult();
     const q=qText();
     return db.visits.map(normalizeVisit).filter(v=>{
-      if(isRep() && v.rep_id !== currentUser.id) return false;
+      if(isRep() && v.rep_id !== (currentUser&&currentUser.id)) return false;
       if(from && v.date < from) return false;
       if(to && v.date > to) return false;
       if(rep && rep !== 'all' && v.rep_id !== rep) return false;
@@ -3148,7 +3165,7 @@ function convertQuoteToOrder(qid){
       if(!el) return;
       const old=el.value || 'all';
       el.innerHTML = `<option value="all">كل المناديب</option>` + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
-      if(isRep()) el.value=currentUser.id;
+      if(isRep()) el.value=(currentUser&&currentUser.id);
       else el.value = [...el.options].some(o=>o.value===old) ? old : 'all';
     });
   }
@@ -3400,7 +3417,7 @@ function convertQuoteToOrder(qid){
   function clean(v){ return String(v ?? '').trim(); }
   function num(v){ const n=Number(String(v ?? '').replace(/[^\d.-]/g,'')); return isNaN(n)?0:n; }
   function defaultRepId(){
-    if(currentUser?.role==='rep') return currentUser.id;
+    if(currentUser?.role==='rep') return (currentUser&&currentUser.id);
     return db.reps?.[0]?.id || 'rep-yaser';
   }
   function findRep(row){
@@ -3598,7 +3615,7 @@ function convertQuoteToOrder(qid){
   window.openCustomerMap=function(id){const c=db.customers.find(x=>x.id===id);if(!c)return alert('لم يتم العثور على العميل');window.open(`https://www.google.com/maps/search/?api=1&query=${mapQuery(c)}`,'_blank')}
   window.openRepRoute=function(repId){ensure();const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,10);if(!cs.length)return alert('لا يوجد عملاء مربوطين بهذا المندوب');const dest=mapQuery(cs[cs.length-1]);const way=cs.slice(0,-1).map(mapQuery).join('|');window.open(`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${dest}${way?`&waypoints=${way}`:''}&travelmode=driving`,'_blank')}
   window.saveRepRoute=function(repId){ensure();const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,20);db.repRoutes.unshift({id:rid(),rep_id:repId,date:tdy(),customer_ids:cs.map(c=>c.id),created_at:new Date().toISOString()});if(typeof save==='function')save();if(typeof renderAll==='function')renderAll();alert('تم حفظ مسار اليوم للمندوب')}
-  window.openRoutesPanel=function(repId=''){ensure();const reps=currentUser?.role==='rep'?db.reps.filter(r=>r.id===currentUser.id):db.reps;const selected=repId||currentUser?.id||reps[0]?.id||'';modalBody.innerHTML=`<h2>مسارات المناديب</h2><label>المندوب<select id="routeRep">${reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join('')}</select></label><div class="field-upgrade-actions"><button class="route" onclick="saveRepRoute(routeRep.value)">حفظ مسار اليوم</button><button class="map" onclick="openRepRoute(routeRep.value)">فتح المسار في Google Maps</button></div><div id="routeCustomerList"></div>`;modal.classList.remove('hidden');routeRep.onchange=renderRouteCustomers;renderRouteCustomers()}
+  window.openRoutesPanel=function(repId=''){ensure();const reps=currentUser?.role==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;const selected=repId||currentUser?.id||reps[0]?.id||'';modalBody.innerHTML=`<h2>مسارات المناديب</h2><label>المندوب<select id="routeRep">${reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join('')}</select></label><div class="field-upgrade-actions"><button class="route" onclick="saveRepRoute(routeRep.value)">حفظ مسار اليوم</button><button class="map" onclick="openRepRoute(routeRep.value)">فتح المسار في Google Maps</button></div><div id="routeCustomerList"></div>`;modal.classList.remove('hidden');routeRep.onchange=renderRouteCustomers;renderRouteCustomers()}
   window.renderRouteCustomers=function(){const repId=document.getElementById('routeRep')?.value;const box=document.getElementById('routeCustomerList');if(!box)return;const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,20);box.innerHTML=cs.map((c,i)=>`<div class="customer-route-card"><b>${i+1}. ${c.name}</b><small>${c.phone||'-'} · ${c.city||'-'} · ${c.location||c.district||'-'}</small><div class="field-upgrade-actions"><button class="map" onclick="openCustomerMap('${c.id}')">موقع العميل</button></div></div>`).join('')||'<div class="panel">لا يوجد عملاء لهذا المندوب</div>'}
   window.sendSatisfactionWhatsApp=function(customerId,visitId=''){const c=db.customers.find(x=>x.id===customerId);if(!c)return alert('لم يتم العثور على العميل');const phone=String(c.phone||'').replace(/\D/g,'');if(!phone)return alert('لا يوجد رقم جوال للعميل');const sa=phone.startsWith('966')?phone:('966'+phone.replace(/^0/,''));const msg='السلام عليكم%0Aنشكر لكم التعامل مع شركة جدة النموذجية للصناعة.%0Aنأمل تقييم خدمتنا وزيارة المندوب من 1 إلى 5:%0A⭐⭐⭐⭐⭐%0Aملاحظاتكم تهمنا.';db.satisfaction.unshift({id:rid(),customer_id:customerId,visit_id:visitId,date:tdy(),phone:sa,status:'sent',created_at:new Date().toISOString()});if(typeof save==='function')save();window.open(`https://wa.me/${sa}?text=${msg}`,'_blank')}
   function addButtons(){const head=document.querySelector('#repsControl .page-head .head-actions')||document.querySelector('#repsControl .page-head');if(head&&!document.getElementById('routesPanelButton')){const b=document.createElement('button');b.id='routesPanelButton';b.className='primary';b.textContent='مسار اليوم';b.onclick=()=>openRoutesPanel();head.appendChild(b)}document.querySelectorAll('.customer-card').forEach(card=>{if(card.querySelector('.field-upgrade-actions'))return;const name=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===name);if(!c)return;const div=document.createElement('div');div.className='field-upgrade-actions';div.innerHTML=`<button class="map" onclick="openCustomerMap('${c.id}')">موقع العميل</button><button class="wa" onclick="sendSatisfactionWhatsApp('${c.id}')">رسالة تقييم</button>`;card.appendChild(div)});document.querySelectorAll('.visit-report-card,.visit-card').forEach(card=>{if(card.querySelector('.wa-survey-added'))return;const title=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===title);if(!c)return;const actions=card.querySelector('.visit-report-actions,.visit-actions')||card;const b=document.createElement('button');b.className='wa wa-survey-added';b.textContent='رسالة تقييم';b.onclick=()=>sendSatisfactionWhatsApp(c.id);actions.appendChild(b)})}
