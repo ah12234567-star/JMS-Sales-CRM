@@ -1,0 +1,17 @@
+{
+  "name": "JMS Sales CRM",
+  "short_name": "JMS CRM",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#b91c1c",
+  "background_color": "#f4f6f8",
+  "icons": [
+    {
+      "src": "assets/jms-logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

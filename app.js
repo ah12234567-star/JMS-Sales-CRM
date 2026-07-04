@@ -9,6 +9,7 @@ const DENSITY={HDPE:.95,LDPE:.92,LLDPE:.92,PP:.90,MIX:.93};
 const STORE='jms_factory_crm_pro_v4';
 let db=load();
 let currentUser=JSON.parse(sessionStorage.getItem('jms_current_user')||'null');
+window.currentUser = currentUser;
 
 function load(){
   const saved=localStorage.getItem(STORE);
@@ -82,6 +83,7 @@ loginForm.onsubmit=async e=>{
     const u=data.user;
     if(!u) return alert('بيانات الدخول غير صحيحة');
     currentUser={id:u.id,name:u.name,email:u.email,role:u.role};
+    window.currentUser=currentUser;
     sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
     if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
     // Keep a local copy only for display/permissions; password is not stored in browser.
@@ -90,6 +92,7 @@ loginForm.onsubmit=async e=>{
     save();
     showApp();
   }catch(err){
+    console.error('JMS login error', err);
     alert('بيانات الدخول غير صحيحة أو تعذر الاتصال بخدمة الدخول');
   }
 };
@@ -138,7 +141,7 @@ window.confirmPasswordReset=async function(){
     alert('رمز غير صحيح أو منتهي الصلاحية');
   }
 }
-logoutBtn.onclick=()=>{sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
+logoutBtn.onclick=()=>{currentUser=null;window.currentUser=null;sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
 
 function showApp(){
   if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
@@ -4613,4 +4616,63 @@ askJmsAI = async function(q){
   const oldRenderAll=window.renderAll;
   if(typeof oldRenderAll==='function') window.renderAll=function(){ oldRenderAll.apply(this,arguments); setTimeout(enhanceCards,300); };
   setTimeout(enhanceCards,1000);
+})();
+
+
+/* JMS Phase 1 final stability guard - added by ChatGPT */
+(function(){
+  function readCurrentUser(){
+    try{
+      const u = JSON.parse(sessionStorage.getItem('jms_current_user') || 'null');
+      if(u && u.role){ currentUser = u; window.currentUser = u; return u; }
+    }catch(e){}
+    currentUser = null; window.currentUser = null; return null;
+  }
+  window.jmsIsLoggedIn = function(){ return !!readCurrentUser(); };
+  window.jmsShowLoginOnly = function(){
+    const login = document.getElementById('loginView');
+    const app = document.getElementById('appView');
+    if(login) login.classList.remove('hidden');
+    if(app) app.classList.add('hidden');
+  };
+  window.addEventListener('error', function(ev){
+    const msg = String(ev.message || '');
+    if(msg.includes("Cannot read properties of null") && msg.includes("role")){
+      console.warn('JMS ignored render before login:', msg);
+      ev.preventDefault();
+      window.jmsShowLoginOnly();
+      return true;
+    }
+  });
+  const guarded = ['renderStats','renderCustomers','renderSelects','renderVisitFilters','renderVisits','renderQuotes','renderVisitNotes','renderOrders','renderRoutes','renderAlerts','renderUsers','calc','renderJmsAI','renderRepsControl','renderSmartVisits'];
+  guarded.forEach(function(name){
+    const fn = window[name];
+    if(typeof fn === 'function' && !fn.__jmsGuarded){
+      const wrapped = function(){
+        if(!readCurrentUser()){ window.jmsShowLoginOnly(); return; }
+        try{ return fn.apply(this, arguments); }
+        catch(e){ console.error('JMS render error in '+name, e); }
+      };
+      wrapped.__jmsGuarded = true;
+      window[name] = wrapped;
+    }
+  });
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll === 'function'){
+    window.renderAll = function(){
+      if(!readCurrentUser()){ window.jmsShowLoginOnly(); return; }
+      try{ return oldRenderAll.apply(this, arguments); }
+      catch(e){ console.error('JMS renderAll error', e); }
+    };
+  }
+  const oldShowApp = window.showApp;
+  if(typeof oldShowApp === 'function'){
+    window.showApp = function(){
+      if(!readCurrentUser()){ window.jmsShowLoginOnly(); return; }
+      return oldShowApp.apply(this, arguments);
+    };
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    if(!readCurrentUser()) window.jmsShowLoginOnly();
+  });
 })();

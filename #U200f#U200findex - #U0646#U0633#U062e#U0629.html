@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JMS CRM</title>
+<meta name="theme-color" content="#b91c1c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JMS CRM">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/jms-logo.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loginView" class="login-page">
+  <div class="login-card">
+    <img src="assets/jms-logo.svg" class="login-logo" alt="JMS">
+    <h1>JMS Sales CRM</h1>
+    <p>شركة جدة النموذجي للصناعة</p>
+    <form id="loginForm" class="login-form">
+      <label>البريد الإلكتروني</label>
+      <input id="loginEmail" type="email" value="admin@jms.local" required>
+      <label>كلمة المرور</label>
+      <input id="loginPassword" type="password" value="123456" required>
+      <button class="primary full" type="submit">دخول النظام</button>
+    </form>
+    <div class="hint">المدير: admin@jms.local / 123456<br>حسابات المناديب تُنشأ من صفحة المستخدمين.</div>
+  </div>
+</div>
+
+<div id="appView" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand"><img src="assets/jms-logo.svg" class="brand-logo" alt="JMS"><div><h1>JMS Sales CRM</h1><p>شركة جدة النموذجي للصناعة</p></div></div>
+    <div class="user-box"><span>المستخدم الحالي</span><strong id="currentUserName">مدير النظام</strong><small id="currentUserRole">مدير</small></div>
+    <nav>
+      <button class="nav-item active" data-tab="dashboard">لوحة التحكم</button>
+      <button class="nav-item" data-tab="customers">العملاء</button>
+      <button class="nav-item admin-only" data-tab="reps">المناديب</button>
+      <button class="nav-item admin-only" data-tab="users">المستخدمين</button>
+      <button class="nav-item" data-tab="visits">الزيارات</button>
+      <button class="nav-item" data-tab="orders">الطلبات</button>
+      <button class="nav-item" data-tab="alerts">تنبيهات 30 يوم</button>
+      <button class="nav-item" data-tab="settings">حالة النظام</button>
+    </nav>
+    <button class="logout" onclick="logout()">تسجيل الخروج</button>
+  </aside>
+
+  <main class="main">
+    <header class="header">
+      <div><h2 id="pageTitle">لوحة التحكم</h2><p id="pageSubtitle">متابعة المناديب والعملاء والزيارات والطلبات</p></div>
+      <div class="actions">
+        <button class="secondary" onclick="refreshAll()">تحديث</button>
+        <button class="secondary admin-only" onclick="exportCustomersCSV()">تصدير العملاء</button>
+        <button class="primary" onclick="goTab('visits')">+ زيارة</button>
+        <button class="primary red" onclick="goTab('orders')">+ طلب</button>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="stat-card"><span>إجمالي العملاء</span><strong id="totalCustomers">0</strong><small>عميل</small></div>
+      <div class="stat-card danger-card"><span>متأخر 30+ يوم</span><strong id="lateCustomers">0</strong><small>متابعة عاجلة</small></div>
+      <div class="stat-card"><span>زيارات اليوم</span><strong id="todayVisits">0</strong><small>زيارة</small></div>
+      <div class="stat-card"><span>إجمالي الطلبات</span><strong id="totalOrders">0</strong><small>طلب</small></div>
+      <div class="stat-card"><span>قيمة الطلبات</span><strong id="salesTotal">0</strong><small>ريال</small></div>
+    </section>
+
+    <section id="dashboard" class="page active">
+      <div class="dash-grid">
+        <div class="panel wide"><div class="panel-head"><h3>زيارات اليوم</h3><span class="pill">اليوم</span></div><div id="todayVisitsTable" class="table-wrap"></div></div>
+        <div class="panel"><div class="panel-head"><h3>تنبيهات عاجلة</h3><span class="pill red-pill">30 يوم</span></div><div id="quickAlerts" class="list"></div></div>
+        <div class="panel admin-only"><div class="panel-head"><h3>أفضل المناديب</h3><span class="pill">الأداء</span></div><div id="topReps" class="rank-list"></div></div>
+        <div class="panel"><div class="panel-head"><h3>آخر الطلبات</h3><span class="pill">مبيعات</span></div><div id="latestOrders" class="table-wrap"></div></div>
+      </div>
+    </section>
+
+    <section id="customers" class="page">
+      <div class="panel admin-only"><h3>إضافة عميل</h3><form id="customerForm" class="form-grid">
+        <input id="customerName" required placeholder="اسم العميل"><input id="customerPhone" placeholder="رقم الجوال"><input id="customerCity" placeholder="المدينة">
+        <input id="customerActivity" placeholder="النشاط"><input id="customerLocation" placeholder="رابط Google Maps"><select id="customerRep"></select>
+        <textarea id="customerNotes" placeholder="ملاحظات العميل"></textarea><button class="primary" type="submit">حفظ العميل</button>
+      </form></div>
+      <div class="panel"><div class="panel-head"><h3>قائمة العملاء</h3><input class="search" id="customerSearch" oninput="renderCustomers()" placeholder="بحث..."></div><div id="customersList" class="table-wrap"></div></div>
+    </section>
+
+    <section id="reps" class="page admin-page">
+      <div class="panel"><h3>إضافة مندوب</h3><form id="repForm" class="form-grid">
+        <input id="repName" required placeholder="اسم المندوب"><input id="repPhone" placeholder="رقم الجوال"><input id="repEmail" placeholder="البريد الإلكتروني">
+        <select id="repStatus"><option>نشط</option><option>موقوف</option></select><button class="primary" type="submit">حفظ المندوب</button>
+      </form></div>
+      <div class="panel"><h3>قائمة المناديب</h3><div id="repsList" class="table-wrap"></div></div>
+    </section>
+
+    <section id="users" class="page admin-page">
+      <div class="panel"><h3>إنشاء حساب مندوب</h3><form id="userForm" class="form-grid">
+        <input id="userName" required placeholder="اسم المستخدم"><input id="userEmail" required type="email" placeholder="البريد الإلكتروني"><input id="userPassword" required placeholder="كلمة المرور">
+        <select id="userRole"><option value="rep">مندوب</option><option value="admin">مدير</option></select><select id="userRep"></select>
+        <button class="primary" type="submit">حفظ الحساب</button>
+      </form><div class="notice small">ملاحظة: في الوضع المحلي الحسابات محفوظة داخل نفس المتصفح. للحسابات الحقيقية لجميع الأجهزة سنربطها مع Supabase في الخطوة التالية.</div></div>
+      <div class="panel"><h3>قائمة المستخدمين</h3><div id="usersList" class="table-wrap"></div></div>
+    </section>
+
+    <section id="visits" class="page">
+      <div class="panel"><h3>تسجيل زيارة</h3><form id="visitForm" class="form-grid">
+        <select id="visitCustomer" required></select><select id="visitRep" required></select><input id="visitDate" required type="date">
+        <select id="visitStatus"><option>تمت الزيارة</option><option>لم يتم مقابلة العميل</option><option>طلب عرض سعر</option><option>طلب توريد</option><option>تحصيل</option></select>
+        <input id="visitLocation" placeholder="موقع الزيارة / رابط الخريطة"><textarea id="visitNotes" placeholder="ملاحظات الزيارة"></textarea><button class="primary" type="submit">حفظ الزيارة</button>
+      </form></div>
+      <div class="panel"><h3>سجل الزيارات</h3><div id="visitsList" class="table-wrap"></div></div>
+    </section>
+
+    <section id="orders" class="page">
+      <div class="panel"><h3>إضافة طلب</h3><form id="orderForm" class="form-grid">
+        <select id="orderCustomer" required></select><select id="orderRep" required></select><input id="orderDate" required type="date">
+        <input id="orderProduct" placeholder="الصنف / المنتج"><input id="orderQuantity" type="number" step="0.01" placeholder="الكمية">
+        <input id="orderAmount" type="number" step="0.01" placeholder="قيمة الطلب">
+        <select id="orderStatus"><option>جديد</option><option>قيد التنفيذ</option><option>تم التسليم</option><option>ملغي</option></select>
+        <button class="primary red" type="submit">حفظ الطلب</button>
+      </form></div>
+      <div class="panel"><h3>قائمة الطلبات</h3><div id="ordersList" class="table-wrap"></div></div>
+    </section>
+
+    <section id="alerts" class="page"><div class="panel"><div class="panel-head"><h3>العملاء المتأخرون عن الزيارة</h3><button class="secondary" onclick="requestNotifications()">تفعيل إشعارات المتصفح</button></div><div id="alertsList" class="list"></div></div></section>
+    <section id="settings" class="page"><div class="panel"><h3>حالة النظام</h3><div id="cloudStatus" class="notice">جاري فحص الاتصال...</div><button class="secondary" onclick="refreshAll()">فحص وتحديث</button><button class="secondary admin-only" onclick="seedDemoData()">إضافة بيانات تجربة</button></div></section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
