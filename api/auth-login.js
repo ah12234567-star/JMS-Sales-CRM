@@ -1,9 +1,17 @@
 import { json, pbkdf2, getUserByEmail, upsertUser, sign } from './auth-utils.js';
 
-async function createInitialAdmin(){
-  const email = String(process.env.INIT_ADMIN_EMAIL || 'admin@jms.local').trim().toLowerCase();
-  const password = process.env.INIT_ADMIN_PASSWORD || 'Jms2026Admin';
-  const phone = process.env.INIT_ADMIN_PHONE || '966500000000';
+function makeAdminUser(email, phone){
+  return {
+    id: 'u-admin',
+    name: 'مدير النظام',
+    email,
+    phone: phone || '966500000000',
+    role: 'admin',
+    status: 'active'
+  };
+}
+
+async function createOrUpdateInitialAdmin(email, password, phone){
   const salt = 'jms-admin-phase1-salt-2026';
   const data = {
     name: 'مدير النظام',
@@ -12,7 +20,13 @@ async function createInitialAdmin(){
     password_salt: salt,
     password_hash: pbkdf2(password, salt)
   };
-  await upsertUser({ id: 'u-admin', email, phone, data, updated_at: new Date().toISOString() });
+  await upsertUser({
+    id: 'u-admin',
+    email,
+    phone: phone || '966500000000',
+    data,
+    updated_at: new Date().toISOString()
+  });
 }
 
 export default async function handler(req, res){
@@ -27,21 +41,28 @@ export default async function handler(req, res){
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { body = {}; }
 
     const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
+    const password = String(body.password || '').trim();
     const requestedRole = String(body.role || '').trim();
 
     if(!email || !password){
       return json(res, 400, { ok:false, error:'missing_credentials' });
     }
 
-    let row = await getUserByEmail(email);
     const initEmail = String(process.env.INIT_ADMIN_EMAIL || 'admin@jms.local').trim().toLowerCase();
+    const initPassword = String(process.env.INIT_ADMIN_PASSWORD || 'Jms2026Admin').trim();
+    const initPhone = String(process.env.INIT_ADMIN_PHONE || '966500000000').trim();
 
-    if(!row && email === initEmail){
-      await createInitialAdmin();
-      row = await getUserByEmail(email);
+    // Emergency/bootstrap path: if the initial admin credentials match the Vercel env
+    // (or the default bootstrap password), allow login and sync the user into Supabase.
+    // This prevents being locked out when Supabase has an old password hash.
+    const isInitialAdmin = email === initEmail && (password === initPassword || password === 'Jms2026Admin');
+    if(isInitialAdmin){
+      try { await createOrUpdateInitialAdmin(initEmail, password, initPhone); } catch(e) { console.error('admin upsert failed:', e); }
+      const user = makeAdminUser(initEmail, initPhone);
+      return json(res, 200, { ok:true, user, token: sign({ id:user.id, email:user.email, role:user.role }) });
     }
 
+    const row = await getUserByEmail(email);
     if(!row || !row.data){
       return json(res, 401, { ok:false, error:'invalid_login' });
     }
@@ -63,18 +84,14 @@ export default async function handler(req, res){
 
     const user = {
       id: row.id,
-      name: data.name || 'مدير النظام',
+      name: data.name || 'مستخدم',
       email: row.email,
       phone: row.phone || '',
-      role: data.role || 'admin',
+      role: data.role || 'rep',
       status: data.status || 'active'
     };
 
-    return json(res, 200, {
-      ok: true,
-      user,
-      token: sign({ id:user.id, email:user.email, role:user.role })
-    });
+    return json(res, 200, { ok:true, user, token: sign({ id:user.id, email:user.email, role:user.role }) });
   }catch(e){
     console.error('auth-login failed:', e);
     return json(res, 500, { ok:false, error:'server_error', message:e.message });
