@@ -114,3 +114,31 @@ drop policy if exists "public write smart visits" on jms_smart_visits;
 
 create policy "public read smart visits" on jms_smart_visits for select using (true);
 create policy "public write smart visits" on jms_smart_visits for all using (true) with check (true);
+
+-- JMS secure authentication tables
+create table if not exists jms_users (
+  id text primary key,
+  email text unique not null,
+  phone text,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
+create table if not exists jms_password_resets (
+  id text primary key,
+  user_id text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  used boolean default false,
+  used_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create index if not exists jms_users_email_idx on jms_users(email);
+create index if not exists jms_users_phone_idx on jms_users(phone);
+create index if not exists jms_password_resets_user_idx on jms_password_resets(user_id, used, created_at desc);
+
+alter table jms_users enable row level security;
+alter table jms_password_resets enable row level security;
+
+-- No public policies for auth tables. Access only from Vercel API using SUPABASE_SERVICE_ROLE_KEY.
