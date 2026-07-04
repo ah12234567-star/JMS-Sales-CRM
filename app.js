@@ -8,13 +8,13 @@ function load(){
   if(saved) return JSON.parse(saved);
   const yaserNames=(window.JMS_IMPORTED_CUSTOMERS||[]).slice(0,160);
   const reps=[
-    {id:'rep-yaser',name:'ياسر الحسني',email:'yaser@jms.local',password:'123456',role:'rep',status:'active'},
-    {id:'rep-demo',name:'مندوب جدة',email:'rep@jms.local',password:'123456',role:'rep',status:'active'}
+    {id:'rep-yaser',name:'ياسر الحسني',email:'yaser@jms.local',role:'rep',status:'active'},
+    {id:'rep-demo',name:'مندوب جدة',email:'rep@jms.local',role:'rep',status:'active'}
   ];
   return {
     users:[
-      {id:'u-admin',name:'مدير النظام',email:'admin@jms.local',password:'123456',role:'admin',status:'active'},
-      {id:'u-sales',name:'مدير المبيعات',email:'sales@jms.local',password:'123456',role:'sales',status:'active'},
+      {id:'u-admin',name:'مدير النظام',email:'admin@jms.local',role:'admin',status:'active'},
+      {id:'u-sales',name:'مدير المبيعات',email:'sales@jms.local',role:'sales',status:'active'},
       ...reps.map(r=>({...r}))
     ],
     reps,
@@ -39,22 +39,91 @@ function allowedCustomers(){return currentUser.role==='rep'?db.customers.filter(
 function allowedOrders(){return currentUser.role==='rep'?db.orders.filter(o=>o.rep_id===currentUser.id):db.orders}
 
 document.querySelectorAll('input[name=loginRole]').forEach(x=>x.onchange=()=>{
-  const r=document.querySelector('input[name=loginRole]:checked').value;
-  if(r==='admin'){loginEmail.value='admin@jms.local';loginHint.textContent='مدير النظام: admin@jms.local / 123456'}
-  if(r==='sales'){loginEmail.value='sales@jms.local';loginHint.textContent='مدير المبيعات: sales@jms.local / 123456'}
-  if(r==='rep'){loginEmail.value='yaser@jms.local';loginHint.textContent='المندوب: yaser@jms.local / 123456'}
-  loginPassword.value='123456';
+  loginEmail.value='';
+  loginPassword.value='';
+  loginHint.textContent='لن تظهر بيانات الدخول على الصفحة حفاظًا على الأمان';
 });
-loginForm.onsubmit=e=>{
+
+async function jmsPostJson(url, payload){
+  const token=sessionStorage.getItem('jms_auth_token')||'';
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{})},
+    body:JSON.stringify(payload||{})
+  });
+  const data = await res.json().catch(()=>({ok:false,error:'bad_response'}));
+  if(!res.ok || data.ok === false) throw new Error(data.message || data.error || 'request_failed');
+  return data;
+}
+
+loginForm.onsubmit=async e=>{
   e.preventDefault();
-  const u=db.users.find(u=>u.email===loginEmail.value.trim()&&u.password===loginPassword.value);
-  if(!u) return alert('بيانات الدخول غير صحيحة');
-  if(u.status!=='active') return alert('هذا الحساب موقوف');
-  currentUser={id:u.id,name:u.name,email:u.email,role:u.role};
-  sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
-  showApp();
+  const email=loginEmail.value.trim();
+  const password=loginPassword.value;
+  const role=document.querySelector('input[name=loginRole]:checked')?.value||'';
+  if(!email || !password) return alert('اكتب البريد وكلمة المرور');
+  try{
+    const data=await jmsPostJson('/api/auth-login',{email,password,role});
+    const u=data.user;
+    if(!u) return alert('بيانات الدخول غير صحيحة');
+    currentUser={id:u.id,name:u.name,email:u.email,role:u.role};
+    sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
+    if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
+    // Keep a local copy only for display/permissions; password is not stored in browser.
+    db.users = (db.users||[]).filter(x=>x.email!==u.email);
+    db.users.push({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active'});
+    save();
+    showApp();
+  }catch(err){
+    alert('بيانات الدخول غير صحيحة أو تعذر الاتصال بخدمة الدخول');
+  }
 };
-logoutBtn.onclick=()=>{sessionStorage.removeItem('jms_current_user');location.reload()};
+
+function openPasswordReset(){
+  modalBody.innerHTML=`<h2>استعادة كلمة المرور</h2>
+    <p class="muted">اكتب البريد المسجل. سنرسل رمز تحقق عبر واتساب أو رسالة SMS حسب الإعدادات.</p>
+    <div class="form-grid">
+      <label>البريد الإلكتروني<input id="resetEmail" type="email" placeholder="name@example.com" autocomplete="username"></label>
+      <label>رقم الجوال / واتساب اختياري<input id="resetPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
+    </div>
+    <br><button class="primary" onclick="requestPasswordReset()">إرسال رمز التحقق</button>
+    <hr>
+    <div class="form-grid">
+      <label>رمز التحقق<input id="resetCode" inputmode="numeric" maxlength="6"></label>
+      <label>كلمة المرور الجديدة<input id="resetNewPassword" type="password" autocomplete="new-password"></label>
+    </div>
+    <br><button onclick="confirmPasswordReset()">تغيير كلمة المرور</button>`;
+  modal.classList.remove('hidden');
+}
+window.openPasswordReset=openPasswordReset;
+
+window.requestPasswordReset=async function(){
+  const email=resetEmail.value.trim();
+  const phone=resetPhone.value.trim();
+  if(!email && !phone) return alert('اكتب البريد أو رقم الجوال');
+  try{
+    const data=await jmsPostJson('/api/auth-reset-request',{email,phone});
+    alert(data.message || 'تم إرسال رمز التحقق إذا كان الحساب موجودًا');
+  }catch(e){
+    alert('تعذر إرسال رمز التحقق. تأكد من إعداد واتساب/SMS في Vercel.');
+  }
+}
+
+window.confirmPasswordReset=async function(){
+  const email=resetEmail.value.trim();
+  const phone=resetPhone.value.trim();
+  const code=resetCode.value.trim();
+  const newPassword=resetNewPassword.value;
+  if(!code || !newPassword) return alert('اكتب الرمز وكلمة المرور الجديدة');
+  try{
+    const data=await jmsPostJson('/api/auth-reset-confirm',{email,phone,code,newPassword});
+    alert(data.message || 'تم تغيير كلمة المرور');
+    closeModal();
+  }catch(e){
+    alert('رمز غير صحيح أو منتهي الصلاحية');
+  }
+}
+logoutBtn.onclick=()=>{sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
 
 function showApp(){
   loginView.classList.add('hidden');
@@ -180,15 +249,15 @@ function renderRoutes(){
   routesList.innerHTML=db.routes.filter(r=>currentUser.role!=='rep'||r.rep_id===currentUser.id).map(r=>`<div class="route-card"><b>مسار ${r.date} - ${repName(r.rep_id)}</b><div class="route-items">${r.items.map(i=>`<div class="route-item">${i.order}. ${customerName(i.customer_id)} <button onclick="visit('${i.customer_id}')">تمت الزيارة</button></div>`).join('')}</div></div>`).join('')||'<div class="panel">لا توجد مسارات</div>';
 }
 function openUserForm(){
-  modalBody.innerHTML=`<h2>إضافة مستخدم / مندوب</h2><div class="form-grid two"><label>الاسم<input id="muName"></label><label>البريد<input id="muEmail"></label><label>كلمة المرور<input id="muPass" value="123456"></label><label>الدور<select id="muRole"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label></div><br><button class="primary" onclick="saveUser()">حفظ</button>`;modal.classList.remove('hidden');
+  modalBody.innerHTML=`<h2>إضافة مستخدم / مندوب</h2><p class="muted">سيتم حفظ كلمة المرور مشفرة في السيرفر، ولن تظهر في الصفحة أو الكود.</p><div class="form-grid two"><label>الاسم<input id="muName"></label><label>البريد<input id="muEmail" type="email" autocomplete="username"></label><label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label><label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة"></label><label>الدور<select id="muRole"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label></div><br><button class="primary" onclick="saveUser()">حفظ</button>`;modal.classList.remove('hidden');
 }
-function saveUser(){const u={id:id(),name:muName.value,email:muEmail.value,password:muPass.value,role:muRole.value,status:'active'};db.users.push(u);if(u.role==='rep')db.reps.push({...u});save();closeModal();renderAll()}
+async function saveUser(){const u={id:id(),name:muName.value.trim(),email:muEmail.value.trim(),phone:muPhone.value.trim(),password:muPass.value,role:muRole.value,status:'active'};if(!u.name||!u.email||!u.password)return alert('اكتب الاسم والبريد وكلمة المرور المؤقتة');try{await jmsPostJson('/api/auth-create-user',{id:u.id,name:u.name,email:u.email,phone:u.phone,password:u.password,role:u.role,status:u.status});}catch(e){return alert('تعذر إنشاء المستخدم في السيرفر. تأكد أنك داخل بحساب مدير النظام وأن متغيرات Vercel مضبوطة.');}delete u.password;db.users.push(u);if(u.role==='rep')db.reps.push({...u});save();closeModal();renderAll()}
 function renderUsers(){
   usersList.innerHTML=`<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td>${roleText(u.role)}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions"><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button><button onclick="resetPass('${u.id}')">إعادة كلمة المرور</button></div></td></tr>`).join('')}</table>`;
 }
 function toggleUser(uid){let u=db.users.find(x=>x.id===uid);u.status=u.status==='active'?'disabled':'active';let r=db.reps.find(x=>x.id===uid);if(r)r.status=u.status;save();renderUsers()}
-function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة','123456');if(!p)return;u.password=p;save();alert('تم تغيير كلمة المرور')}
-function changeMyPassword(){let u=db.users.find(x=>x.email===currentUser.email);if(!u)return;if(oldPassword.value!==u.password)return alert('كلمة المرور الحالية غير صحيحة');if(!newPassword.value)return alert('اكتب كلمة مرور جديدة');u.password=newPassword.value;save();alert('تم تغيير كلمة المرور')}
+async function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة');if(!p)return;try{await jmsPostJson('/api/auth-admin-reset-password',{userId:uid,newPassword:p});alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('تعذر تغيير كلمة المرور في السيرفر')}}
+async function changeMyPassword(){if(!currentUser)return;if(!oldPassword.value||!newPassword.value)return alert('اكتب كلمة المرور الحالية والجديدة');try{await jmsPostJson('/api/auth-change-password',{email:currentUser.email,oldPassword:oldPassword.value,newPassword:newPassword.value});oldPassword.value='';newPassword.value='';alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('كلمة المرور الحالية غير صحيحة أو تعذر الحفظ')}}
 function closeModal(){modal.classList.add('hidden');modalBody.innerHTML=''}
 
 
@@ -2528,7 +2597,7 @@ function convertQuoteToOrder(qid){
         <label>اسم المندوب<input id="mrName" placeholder="اسم المندوب"></label>
         <label>الجوال<input id="mrPhone" placeholder="05xxxxxxxx"></label>
         <label>الإيميل<input id="mrEmail" placeholder="rep@jms.local"></label>
-        <label>كلمة المرور<input id="mrPass" value="123456"></label>
+        <label>كلمة مرور مؤقتة<input id="mrPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة"></label>
         <label>السيارة<input id="mrCar" placeholder="مثال: تويوتا رايز"></label>
         <label>المنطقة<input id="mrArea" value="جدة"></label>
         <label>الهدف الشهري<input id="mrTarget" type="number" placeholder="مثال: 100000"></label>
@@ -2544,7 +2613,7 @@ function convertQuoteToOrder(qid){
     const name=(mrName.value||'').trim();
     if(!name) return alert('اكتب اسم المندوب');
     const repId='rep-'+Date.now();
-    const rep={id:repId,name,phone:mrPhone.value||'',email:mrEmail.value||('rep'+Date.now()+'@jms.local'),password:mrPass.value||'123456',role:'rep',status:mrStatus.value||'active',car:mrCar.value||'',area:mrArea.value||'جدة',monthly_target:Number(mrTarget.value||0)};
+    const rep={id:repId,name,phone:mrPhone.value||'',email:mrEmail.value||('rep'+Date.now()+'@jms.local'),password:mrPass.value,role:'rep',status:mrStatus.value||'active',car:mrCar.value||'',area:mrArea.value||'جدة',monthly_target:Number(mrTarget.value||0)};
     db.reps ||= [];
     db.users ||= [];
     db.reps.push(rep);

@@ -28,11 +28,12 @@
 
     <form id="loginForm">
       <label>البريد الإلكتروني</label>
-      <input id="loginEmail" type="email" value="admin@jms.local">
+      <input id="loginEmail" type="email" placeholder="اكتب بريدك الإلكتروني" autocomplete="username">
       <label>كلمة المرور</label>
-      <input id="loginPassword" type="password" value="123456">
+      <input id="loginPassword" type="password" placeholder="اكتب كلمة المرور" autocomplete="current-password">
       <button class="primary full" type="submit">دخول النظام</button>
-      <div id="loginHint" class="hint">مدير النظام: admin@jms.local / 123456</div>
+      <button type="button" class="link-btn" onclick="openPasswordReset()">نسيت كلمة المرور؟ استعادة عبر واتساب / رسالة</button>
+      <div id="loginHint" class="hint secure-login-note">لن تظهر بيانات الدخول على الصفحة حفاظًا على الأمان</div>
     </form>
   </div>
 </section>

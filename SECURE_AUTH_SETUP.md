@@ -1,31 +1,64 @@
-# JMS CRM Secure Auth Setup
+# JMS CRM - إعداد المرحلة الأولى للأمان
 
-هذه النسخة أزالت بيانات الدخول من الشاشة، وأصبحت كلمة المرور تعمل عبر Backend وليس عبر LocalStorage.
+## ما تم تعديله
+- إزالة أي كلمة مرور افتراضية من شاشة الدخول والكود المحلي.
+- تسجيل الدخول أصبح عبر `/api/auth-login` من السيرفر.
+- كلمات المرور تُحفظ مشفرة داخل جدول `jms_users` في Supabase.
+- تغيير كلمة المرور يعمل على جميع الأجهزة عبر `/api/auth-change-password`.
+- إنشاء المستخدمين وإعادة تعيين كلمة المرور من لوحة المدير يعمل عبر السيرفر فقط.
+- استعادة كلمة المرور برمز تحقق عبر WhatsApp Cloud API أو SMS Twilio.
 
-## 1) شغل SQL في Supabase
-افتح Supabase > SQL Editor وشغل ملف `supabase_schema.sql` كاملًا.
+## 1) شغّل SQL في Supabase
+افتح Supabase → SQL Editor وشغّل ملف:
 
-## 2) أضف Environment Variables في Vercel
-إجباري:
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`  ⚠️ لا تضعه في `config.js`
-- `AUTH_SECRET` أي نص طويل عشوائي
-- `INIT_ADMIN_EMAIL` مثال: `admin@jms.local`
-- `INIT_ADMIN_PASSWORD` كلمة مرور أولية قوية، وليست 123456
-- `INIT_ADMIN_PHONE` رقم واتساب المدير بصيغة دولية مثل `9665xxxxxxxx`
+`supabase_schema.sql`
 
-للاستعادة عبر واتساب Cloud API:
-- `WHATSAPP_ACCESS_TOKEN`
-- `WHATSAPP_PHONE_NUMBER_ID`
+هذا ينشئ الجداول:
+- `jms_users`
+- `jms_password_resets`
 
-أو عبر SMS Twilio:
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM`
+## 2) أضف متغيرات Vercel
+Project → Settings → Environment Variables
 
-## 3) أول دخول
-بعد النشر، سجل الدخول بـ `INIT_ADMIN_EMAIL` و `INIT_ADMIN_PASSWORD`.
-سيتم إنشاء المدير في جدول `jms_users` تلقائيًا بأمان.
+المتغيرات المطلوبة:
 
-## 4) مهم
-لن تظهر كلمة المرور في الشاشة. تغيير كلمة المرور يتم عبر Backend وينطبق على كل الأجهزة.
+```
+SUPABASE_URL=رابط مشروع Supabase
+SUPABASE_SERVICE_ROLE_KEY=Service Role Key من Supabase وليس anon key
+AUTH_SECRET=اكتب نص طويل عشوائي
+INIT_ADMIN_EMAIL=admin@jms.local
+INIT_ADMIN_PASSWORD=كلمة مرور قوية مؤقتة للمدير أول مرة
+INIT_ADMIN_PHONE=9665xxxxxxxx
+```
+
+متغيرات WhatsApp الاختيارية:
+
+```
+WHATSAPP_ACCESS_TOKEN=token من Meta WhatsApp Cloud API
+WHATSAPP_PHONE_NUMBER_ID=Phone Number ID
+```
+
+أو SMS عبر Twilio:
+
+```
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM=...
+```
+
+## 3) أول دخول للمدير
+بعد ضبط المتغيرات وإعادة النشر، ادخل بالبريد الموجود في:
+
+`INIT_ADMIN_EMAIL`
+
+وكلمة المرور الموجودة في:
+
+`INIT_ADMIN_PASSWORD`
+
+سيتم إنشاء المدير تلقائيًا في جدول `jms_users` أول مرة فقط، وبعدها يمكنك تغيير كلمة المرور من النظام.
+
+## 4) مهم جدًا
+- لا تضع كلمة مرور داخل `app.js`.
+- لا تعرض بيانات الدخول على صفحة الدخول.
+- لا تستخدم `SUPABASE_SERVICE_ROLE_KEY` داخل المتصفح؛ فقط في Vercel Environment Variables.
+- بعد تعديل أي Environment Variable اضغط Redeploy.
