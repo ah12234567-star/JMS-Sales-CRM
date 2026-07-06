@@ -5477,3 +5477,277 @@ askJmsAI = async function(q){
   ready(()=>{ ensureCampaignDb(); injectCampaignStyle(); addCampaignPage(); setTimeout(()=>{ if(typeof jmsRenderWhatsappCampaigns==='function') jmsRenderWhatsappCampaigns(); },600); });
   window.JMS_AI_WHATSAPP_CAMPAIGNS_VERSION=CAMPAIGN_VERSION;
 })();
+
+/* JMS UPDATE 11A - PRODUCTION ORDERS & WORKFLOW */
+(function(){
+  const VERSION='11A-PRODUCTION-ORDERS-WORKFLOW';
+  const STAGES=[
+    {key:'pending_manager',label:'بانتظار موافقة المدير',short:'موافقة المدير',icon:'🕘'},
+    {key:'manager_approved',label:'تم اعتماد المدير',short:'اعتماد',icon:'✅'},
+    {key:'payment_confirmed',label:'تم تسجيل التحويل',short:'التحويل',icon:'💳'},
+    {key:'sent_to_production',label:'أرسل للإنتاج',short:'إرسال للإنتاج',icon:'📤'},
+    {key:'production_received',label:'استلام مدير الإنتاج',short:'استلام الإنتاج',icon:'🏭'},
+    {key:'technical_plan',label:'تجهيز الخطة الفنية',short:'الخطة الفنية',icon:'📋'},
+    {key:'film_production',label:'إنتاج الفيلم',short:'الفيلم',icon:'🎞️'},
+    {key:'sent_to_cutting',label:'إرسال للمقص',short:'إلى المقص',icon:'➡️'},
+    {key:'cutting',label:'التقطيع / المقص',short:'المقص',icon:'✂️'},
+    {key:'packing',label:'التغليف',short:'التغليف',icon:'📦'},
+    {key:'ready_delivery',label:'جاهز للتسليم',short:'جاهز',icon:'🚚'},
+    {key:'delivered',label:'تم التسليم',short:'مكتمل',icon:'✅'}
+  ];
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s])); }
+  function uid(){ try{return crypto.randomUUID()}catch(e){return 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2)} }
+  function todaySafe(){ return (typeof today==='function') ? today() : new Date().toISOString().slice(0,10); }
+  function nowIso(){ return new Date().toISOString(); }
+  function canManageProduction(){ const r=currentUser?.role; return ['admin','sales','production','production_manager','manager'].includes(r); }
+  function customerLabel(id){ try{return customerName(id)}catch(e){ return (db.customers||[]).find(c=>c.id===id)?.name || '-'; } }
+  function repLabel(id){ try{return repName(id)}catch(e){ return (db.reps||[]).find(r=>r.id===id)?.name || '-'; } }
+  function moneySafe(n){ try{return money(n)}catch(e){ return Number(n||0).toLocaleString('ar-SA'); } }
+  function stageIndex(key){ return Math.max(0, STAGES.findIndex(s=>s.key===key)); }
+  function stageObj(key){ return STAGES[stageIndex(key)] || STAGES[0]; }
+  function stageLabel(key){ return stageObj(key).label; }
+  function nextStage(key){ const i=stageIndex(key); return STAGES[Math.min(i+1,STAGES.length-1)]?.key || key; }
+  function productionNo(){ const n=(db.productionOrders||[]).length+1; return 'MO-'+todaySafe().slice(0,4)+'-'+String(n).padStart(5,'0'); }
+  function ensureDb(){
+    if(!window.db) return;
+    db.productionOrders ||= [];
+    db.productionLogs ||= [];
+    db.productionSettings ||= { defaultStages: STAGES.map(s=>s.key) };
+    (db.productionOrders||[]).forEach(p=>{
+      p.stage ||= p.status_key || 'pending_manager';
+      p.production_no ||= productionNo();
+      p.created_at ||= nowIso();
+      p.technical ||= {};
+      p.notes ||= [];
+    });
+  }
+  function baseOrder(o){ return (db.orders||[]).find(x=>x.id===o.order_id) || {}; }
+  function productionByOrder(orderId){ return (db.productionOrders||[]).find(p=>p.order_id===orderId); }
+  function logProduction(pid, action, note){
+    db.productionLogs ||= [];
+    const p=(db.productionOrders||[]).find(x=>x.id===pid);
+    db.productionLogs.unshift({id:uid(),production_id:pid,order_id:p?.order_id||'',stage:p?.stage||'',action, note:note||'',by:currentUser?.name||'',by_id:currentUser?.id||'',at:nowIso()});
+  }
+  function saveDb(){ if(typeof save==='function') save(); }
+  function createProductionFromOrder(orderId){
+    ensureDb();
+    if(!canManageProduction()) return alert('هذه الصلاحية للمدير أو مدير الإنتاج فقط');
+    const o=(db.orders||[]).find(x=>x.id===orderId);
+    if(!o) return alert('لم يتم العثور على الطلب');
+    let existing=productionByOrder(orderId);
+    if(existing){ window.openProductionOrder(existing.id); return; }
+    const p={
+      id:uid(), production_no:productionNo(), order_id:o.id,
+      customer_id:o.customer_id, rep_id:o.rep_id, date:o.date||todaySafe(),
+      product:o.product||'', material:o.material||'', color:o.color||'',
+      width:o.width||'', length:o.length||'', thickness:o.thickness||'', total_kg:o.total_kg||'', pieces:o.pieces||'', piece_weight:o.piece_weight||'',
+      amount_value:o.amount_value||0, stage:'pending_manager', priority:'normal', due_date:'',
+      created_by:currentUser?.name||'', created_at:nowIso(), updated_at:nowIso(),
+      technical:{
+        production_type:o.product||'', machine:'', operator:'', film_width:o.width||'', film_thickness:o.thickness||'', film_unit:'micron',
+        film_micron:o.thickness||'', roll_count:'', roll_weight:'', expected_kg:o.total_kg||'', actual_kg:'', waste_kg:'',
+        cut_width:o.width||'', cut_length:o.length||'', bag_size:'', seal_type:'', opening_side:'', print_status:'',
+        film_notes:'', cutting_notes:'', packing_notes:'', floor_notes:''
+      },
+      notes:[]
+    };
+    db.productionOrders.unshift(p);
+    o.production_id=p.id;
+    o.status='بانتظار موافقة المدير';
+    logProduction(p.id,'إنشاء أمر تصنيع','تم إنشاء أمر التصنيع من طلب المبيعات');
+    saveDb(); window.renderProductionWorkflow?.(); alert('تم إنشاء أمر التصنيع');
+  }
+  function addStyle(){
+    if(document.getElementById('jmsProduction11AStyle')) return;
+    const st=document.createElement('style'); st.id='jmsProduction11AStyle';
+    st.textContent=`
+      .jms-prod-wrap{display:grid;gap:16px}.jms-prod-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.jms-prod-kpi{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:15px;box-shadow:0 10px 26px rgba(15,23,42,.05)}.jms-prod-kpi span{display:block;color:#64748b;font-size:12px}.jms-prod-kpi b{font-size:24px;color:#0f172a}.jms-prod-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.jms-prod-col{background:#f8fafc;border:1px solid #e5e7eb;border-radius:18px;padding:12px;min-height:150px}.jms-prod-col h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;justify-content:space-between}.jms-prod-count{background:#e2e8f0;border-radius:999px;padding:3px 9px;font-size:12px}.jms-prod-card{background:#fff;border:1px solid #e5e7eb;border-radius:15px;padding:12px;margin-bottom:10px;box-shadow:0 8px 22px rgba(15,23,42,.06)}.jms-prod-card h4{margin:0 0 6px}.jms-prod-card p{margin:3px 0;color:#475569;font-size:13px}.jms-prod-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.jms-prod-actions button,.jms-prod-btn{border:0;border-radius:10px;padding:8px 11px;cursor:pointer;background:#e2e8f0}.jms-prod-actions .primary,.jms-prod-btn.primary{background:#2563eb;color:#fff}.jms-prod-btn.green{background:#16a34a;color:#fff}.jms-prod-btn.orange{background:#ea580c;color:#fff}.jms-stage-line{display:flex;gap:4px;margin-top:10px;overflow:auto}.jms-stage-dot{height:8px;min-width:22px;border-radius:999px;background:#e2e8f0}.jms-stage-dot.done{background:#16a34a}.jms-production-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.jms-production-form label{font-size:12px;color:#475569}.jms-production-form input,.jms-production-form select,.jms-production-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:9px;margin-top:4px}.jms-prod-timeline{border-right:3px solid #e2e8f0;padding-right:12px;margin-top:12px}.jms-prod-log{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:8px}.jms-prod-log b{color:#0f172a}.jms-prod-log span{color:#64748b;font-size:12px}.jms-prod-note{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px;margin:8px 0}.jms-prod-muted{color:#64748b;font-size:12px}.jms-prod-badge{display:inline-block;border-radius:999px;padding:4px 9px;background:#dbeafe;color:#1d4ed8;font-size:12px}.jms-prod-badge.done{background:#dcfce7;color:#166534}.jms-prod-badge.warn{background:#fef3c7;color:#92400e}.jms-prod-table{width:100%;border-collapse:collapse}.jms-prod-table th,.jms-prod-table td{border-bottom:1px solid #e5e7eb;padding:10px;text-align:right;font-size:13px}.jms-prod-table th{color:#475569;background:#f8fafc}.jms-prod-public{background:#f0f9ff;border:1px solid #bae6fd;border-radius:14px;padding:12px}
+    `;
+    document.head.appendChild(st);
+  }
+  function addPage(){
+    const main=document.querySelector('main.main') || document.querySelector('.main');
+    const nav=document.querySelector('aside nav') || document.querySelector('nav');
+    if(!main || !nav) return;
+    if(!document.querySelector('.nav[data-page="productionWorkflow"]')){
+      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='productionWorkflow'; btn.textContent='خط الإنتاج 11A';
+      const ordersBtn=nav.querySelector('[data-page="orders"]');
+      if(ordersBtn && ordersBtn.nextSibling) nav.insertBefore(btn, ordersBtn.nextSibling); else nav.appendChild(btn);
+    }
+    if(!document.getElementById('productionWorkflow')){
+      const sec=document.createElement('section'); sec.id='productionWorkflow'; sec.className='page';
+      sec.innerHTML=`
+        <div class="page-head with-action"><div><h1>خط الإنتاج وأوامر التصنيع</h1><p>تحويل طلب المبيعات إلى أمر تصنيع ومتابعته: اعتماد → تحويل → إنتاج → فيلم → مقص → تغليف.</p></div><div class="head-actions"><button class="primary" onclick="renderProductionWorkflow()">تحديث</button></div></div>
+        <div class="jms-prod-wrap">
+          <div class="jms-prod-kpis"><div class="jms-prod-kpi"><span>أوامر مفتوحة</span><b id="prodOpenCount">0</b></div><div class="jms-prod-kpi"><span>تحت الإنتاج</span><b id="prodActiveCount">0</b></div><div class="jms-prod-kpi"><span>جاهز للتسليم</span><b id="prodReadyCount">0</b></div><div class="jms-prod-kpi"><span>مكتمل</span><b id="prodDoneCount">0</b></div></div>
+          <div class="panel"><div class="panel-head"><b>إنشاء أمر تصنيع من طلب موجود</b><span>المندوب يدخل الطلب مختصرًا، ومدير الإنتاج يفصله فنيًا من هنا.</span></div><div class="jms-production-form"><label>طلب المبيعات<select id="prodOrderSelect"></select></label><label>ملاحظة أولية<input id="prodCreateNote" placeholder="مثلاً: تحويل بعد اعتماد المدير"></label><div style="display:flex;align-items:end"><button class="jms-prod-btn primary" onclick="createProductionFromSelectedOrder()">إنشاء أمر تصنيع</button></div></div></div>
+          <div class="panel"><div class="panel-head"><b>لوحة مراحل الإنتاج</b><span>كل مرحلة تسجل وقت واسم المستخدم والملاحظات.</span></div><div id="productionBoard" class="jms-prod-board"></div></div>
+          <div class="panel"><div class="panel-head"><b>آخر حركة في الإنتاج</b><span>سجل زمني مختصر</span></div><div id="productionTimelineShort"></div></div>
+        </div>`;
+      main.appendChild(sec);
+    }
+    document.querySelectorAll('.nav').forEach(btn=>{
+      if(btn.dataset.prod11aBound==='1') return;
+      btn.dataset.prod11aBound='1';
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active'); const p=document.getElementById(btn.dataset.page); if(p) p.classList.add('active');
+        if(btn.dataset.page==='productionWorkflow') window.renderProductionWorkflow?.();
+      });
+    });
+  }
+  function availableOrders(){
+    ensureDb();
+    const existing=new Set((db.productionOrders||[]).map(p=>p.order_id));
+    return (db.orders||[]).filter(o=>!existing.has(o.id));
+  }
+  function renderOrderSelect(){
+    const sel=document.getElementById('prodOrderSelect'); if(!sel) return;
+    const rows=availableOrders();
+    sel.innerHTML=rows.map(o=>`<option value="${esc(o.id)}">${esc(customerLabel(o.customer_id))} — ${esc(o.product||'-')} — ${esc(o.date||'-')} — ${moneySafe(o.amount_value||0)} ريال</option>`).join('') || '<option value="">لا توجد طلبات جديدة للتحويل</option>';
+  }
+  function renderKpis(){
+    const ps=db.productionOrders||[];
+    const open=ps.filter(p=>p.stage!=='delivered').length;
+    const active=ps.filter(p=>['sent_to_production','production_received','technical_plan','film_production','sent_to_cutting','cutting','packing'].includes(p.stage)).length;
+    const ready=ps.filter(p=>p.stage==='ready_delivery').length;
+    const done=ps.filter(p=>p.stage==='delivered').length;
+    const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+    set('prodOpenCount',open); set('prodActiveCount',active); set('prodReadyCount',ready); set('prodDoneCount',done);
+  }
+  function renderStageLine(stage){
+    const idx=stageIndex(stage);
+    return `<div class="jms-stage-line">${STAGES.map((s,i)=>`<span title="${esc(s.label)}" class="jms-stage-dot ${i<=idx?'done':''}"></span>`).join('')}</div>`;
+  }
+  function card(p){
+    const o=baseOrder(p); const s=stageObj(p.stage);
+    const tech=p.technical||{};
+    return `<div class="jms-prod-card"><h4>${s.icon} ${esc(p.production_no)}</h4><p><b>${esc(customerLabel(p.customer_id||o.customer_id))}</b> · ${esc(p.product||o.product||'-')}</p><p>المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</p><p>المندوب: ${esc(repLabel(p.rep_id||o.rep_id))} · التسليم: ${esc(p.due_date||'-')}</p><p class="jms-prod-muted">الفيلم: ${esc(tech.film_width||'-')} عرض · ${esc(tech.film_micron||tech.film_thickness||'-')} ميكرون · الرولات: ${esc(tech.roll_count||'-')}</p>${renderStageLine(p.stage)}<div class="jms-prod-actions"><button class="primary" onclick="openProductionOrder('${p.id}')">فتح</button>${canManageProduction()&&p.stage!=='delivered'?`<button onclick="advanceProductionStage('${p.id}')">المرحلة التالية</button>`:''}<button onclick="addProductionQuickNote('${p.id}')">ملاحظة</button></div></div>`;
+  }
+  function renderBoard(){
+    const board=document.getElementById('productionBoard'); if(!board) return;
+    const ps=db.productionOrders||[];
+    board.innerHTML=STAGES.map(s=>{
+      const rows=ps.filter(p=>(p.stage||'pending_manager')===s.key);
+      return `<div class="jms-prod-col"><h3><span>${s.icon} ${s.short}</span><span class="jms-prod-count">${rows.length}</span></h3>${rows.map(card).join('') || '<div class="jms-prod-muted">لا يوجد أوامر في هذه المرحلة</div>'}</div>`;
+    }).join('');
+  }
+  function renderTimelineShort(){
+    const box=document.getElementById('productionTimelineShort'); if(!box) return;
+    const rows=(db.productionLogs||[]).slice(0,12);
+    box.innerHTML=rows.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b> — ${esc(stageLabel(l.stage))}<br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc((db.productionOrders||[]).find(p=>p.id===l.production_id)?.production_no||'')}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || '<div class="jms-prod-muted">لا يوجد سجل حركة حتى الآن.</div>';
+  }
+  window.renderProductionWorkflow=function(){ ensureDb(); addStyle(); addPage(); renderOrderSelect(); renderKpis(); renderBoard(); renderTimelineShort(); };
+  window.createProductionFromSelectedOrder=function(){
+    const sel=document.getElementById('prodOrderSelect');
+    const oid=sel?.value;
+    if(!oid) return alert('اختر طلبًا أولًا');
+    createProductionFromOrder(oid);
+    const p=productionByOrder(oid); const note=document.getElementById('prodCreateNote')?.value||''; if(p && note){ logProduction(p.id,'ملاحظة إنشاء',note); saveDb(); }
+    window.renderProductionWorkflow();
+  };
+  window.openProductionOrder=function(pid){
+    ensureDb();
+    const p=(db.productionOrders||[]).find(x=>x.id===pid); if(!p) return alert('لم يتم العثور على أمر التصنيع');
+    const o=baseOrder(p); const tech=p.technical ||= {}; const s=stageObj(p.stage);
+    const logs=(db.productionLogs||[]).filter(l=>l.production_id===pid).slice(0,30);
+    const notes=p.notes||[];
+    const statusOptions=STAGES.map(x=>`<option value="${x.key}" ${x.key===p.stage?'selected':''}>${x.label}</option>`).join('');
+    const html=`<h2>أمر تصنيع ${esc(p.production_no)}</h2><p><span class="jms-prod-badge ${p.stage==='delivered'?'done':''}">${s.icon} ${esc(s.label)}</span></p>
+      <div class="jms-prod-public"><b>طلب العميل المختصر:</b><br>العميل: ${esc(customerLabel(p.customer_id||o.customer_id))} · المنتج: ${esc(p.product||o.product||'-')} · المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</div>
+      <h3>تفاصيل مدير الإنتاج / كرت التصنيع</h3>
+      <div class="jms-production-form">
+        <label>الحالة<select id="poStage">${statusOptions}</select></label><label>الأولوية<select id="poPriority"><option value="normal" ${p.priority==='normal'?'selected':''}>عادي</option><option value="high" ${p.priority==='high'?'selected':''}>عاجل</option><option value="hold" ${p.priority==='hold'?'selected':''}>إيقاف مؤقت</option></select></label><label>تاريخ التسليم المتوقع<input id="poDue" type="date" value="${esc(p.due_date||'')}"></label>
+        <label>نوع الإنتاج<input id="poType" value="${esc(tech.production_type||p.product||'')}"></label><label>الماكينة<input id="poMachine" value="${esc(tech.machine||'')}"></label><label>المشغل<input id="poOperator" value="${esc(tech.operator||'')}"></label>
+      </div>
+      <h3>بيانات أمر التشغيل الورقي</h3>
+      <div class="jms-production-form">
+        <label>رقم أمر التشغيل / OR No<input id="poOrNo" value="${esc(tech.or_no||p.production_no||'')}"></label><label>تاريخ الأمر<input id="poFormDate" value="${esc(tech.form_date||'')}" placeholder="مثال: 04/01/2026"></label><label>مدة التسليم<input id="poDeliveryTime" value="${esc(tech.delivery_time||'')}" placeholder="مثال: 3 يوم"></label>
+        <label>التعبئة / Packing<input id="poPackingSpec" value="${esc(tech.packing_spec||'')}" placeholder="مثال: SABIC BAG 20KG"></label><label>المقاس / Size<input id="poPaperSize" value="${esc(tech.paper_size||'')}" placeholder="مثال: 1/1"></label><label>المنطقة / Region<input id="poRegion" value="${esc(tech.region||'')}"></label>
+        <label>المندوب / Salesman<input id="poSalesman" value="${esc(tech.salesman||repLabel(p.rep_id||o.rep_id)||'')}"></label><label>مكان التسليم<input id="poDeliveryTo" value="${esc(tech.delivery_to||'')}"></label><label>رقم العقد<input id="poContractNo" value="${esc(tech.contract_no||'')}"></label>
+        <label>العميل<input id="poCustomerName" value="${esc(tech.customer_name||customerLabel(p.customer_id||o.customer_id)||'')}"></label><label>الكمية المطلوبة كجم<input id="poRequiredKg" value="${esc(tech.required_kg||p.total_kg||'')}"></label><label>ملاحظات البيان<input id="poStatementNote" value="${esc(tech.statement_note||'')}" placeholder="مثل: PACKING COVER"></label>
+      </div>
+      <h3>مواصفات الفيلم والكيس</h3>
+      <div class="jms-production-form">
+        <label>نوع البلاستيك<select id="poPlasticType"><option value="">اختر</option>${['LD','HD','LLD','PP','Mix'].map(x=>`<option value="${x}" ${tech.plastic_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label>نوع الكيس<input id="poBagType" value="${esc(tech.bag_type||'')}" placeholder="مثال: HANDLE"></label><label>لون اليد<input id="poHandleColor" value="${esc(tech.handle_color||'')}" placeholder="مثال: GOLD"></label>
+        <label>موديل اليد<input id="poHandleModel" value="${esc(tech.handle_model||'')}"></label><label>نوع اليد<input id="poHandleType" value="${esc(tech.handle_type||'')}"></label><label>نوع السوليد<input id="poSolidType" value="${esc(tech.solid_type||'')}"></label>
+        <label>الطول سم<input id="poLengthCm" value="${esc(tech.length_cm||p.length||'')}"></label><label>العرض سم<input id="poWidthCm" value="${esc(tech.width_cm||p.width||'')}"></label><label>الكاست / Gusset<input id="poGusset" value="${esc(tech.gusset||'')}" placeholder="مثال: 7 + 7"></label>
+        <label>السماكة ميكرون<input id="poMicron" value="${esc(tech.micron||tech.film_micron||p.thickness||'')}"></label><label>لون البلاستيك<input id="poPlasticColor" value="${esc(tech.plastic_color||'')}" placeholder="WHITE"></label><label>الماستر باتش<input id="poMasterBatch" value="${esc(tech.master_batch||'')}"></label>
+        <label>اسم ألوان الطباعة<input id="poPrintColorName" value="${esc(tech.print_color_name||'')}"></label><label>لون الحبر<input id="poInkColor" value="${esc(tech.ink_color||'')}"></label><label>شكل الإنتاج<select id="poOutputShape"><option value="">اختر</option>${['ONE SIDE OPEN','SINGLE SHEET','TUBE','JUMBO'].map(x=>`<option value="${x}" ${tech.output_shape===x?'selected':''}>${x}</option>`).join('')}</select></label>
+        <label>عرض التيوب / الجنب<input id="poTubeWidth" value="${esc(tech.tube_width||'')}" placeholder="مثال: 54 cm"></label><label>مقاس الكيس النهائي<input id="poBagSize" value="${esc(tech.bag_size||'')}"></label><label>مكان الفتح<input id="poOpenSide" value="${esc(tech.opening_side||'')}"></label>
+      </div>
+      <h3>اللحام والطباعة والكليشة</h3>
+      <div class="jms-production-form">
+        <label>طريقة اللحام<select id="poSeal"><option value="">اختر</option>${['No Sealing','T-Shirt','Side Sealing','Bottom Sealing'].map(x=>`<option value="${x}" ${tech.seal_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label>طباعة وجه واحد<select id="poOneSidePrinting"><option value="">اختر</option><option value="yes" ${tech.one_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.one_side_printing==='no'?'selected':''}>لا</option></select></label><label>طباعة وجهين<select id="poTwoSidePrinting"><option value="">اختر</option><option value="yes" ${tech.two_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.two_side_printing==='no'?'selected':''}>لا</option></select></label>
+        <label>الطباعة خارج الكاست<select id="poPrintingOutGusset"><option value="">اختر</option><option value="yes" ${tech.printing_out_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_out_gusset==='no'?'selected':''}>لا</option></select></label><label>الطباعة داخل الكاست<select id="poPrintingInsideGusset"><option value="">اختر</option><option value="yes" ${tech.printing_inside_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_inside_gusset==='no'?'selected':''}>لا</option></select></label><label>حالة الطباعة<input id="poPrintStatus" value="${esc(tech.print_status||'')}"></label>
+        <label>الكليشة<select id="poClicheStatus"><option value="">اختر</option>${['Cancel','Additional','Correction','Exist in Factory','Old Attach','New Attach'].map(x=>`<option value="${x}" ${tech.cliche_status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Size Block<input id="poSizeBlock" value="${esc(tech.size_block||'')}" placeholder="S / M / L / XL"></label><label>ملاحظات الكليشة<input id="poClicheNotes" value="${esc(tech.cliche_notes||'')}"></label>
+      </div>
+      <h3>الإنتاج الفعلي والملاحظات الفنية</h3>
+      <div class="jms-production-form">
+        <label>عرض الفيلم<input id="poFilmWidth" value="${esc(tech.film_width||p.width||'')}"></label><label>سماكة الفيلم / ميكرون<input id="poFilmMicron" value="${esc(tech.film_micron||tech.film_thickness||p.thickness||'')}"></label><label>عدد الرولات<input id="poRollCount" value="${esc(tech.roll_count||'')}"></label>
+        <label>وزن الرول<input id="poRollWeight" value="${esc(tech.roll_weight||'')}"></label><label>الوزن المتوقع كجم<input id="poExpectedKg" value="${esc(tech.expected_kg||p.total_kg||'')}"></label><label>الوزن الفعلي كجم<input id="poActualKg" value="${esc(tech.actual_kg||'')}"></label>
+        <label>هالك كجم<input id="poWasteKg" value="${esc(tech.waste_kg||'')}"></label><label>عرض القص<input id="poCutWidth" value="${esc(tech.cut_width||p.width||'')}"></label><label>طول القص<input id="poCutLength" value="${esc(tech.cut_length||p.length||'')}"></label>
+        <label>ملاحظات الفيلم<textarea id="poFilmNotes">${esc(tech.film_notes||'')}</textarea></label><label>ملاحظات المقص<textarea id="poCuttingNotes">${esc(tech.cutting_notes||'')}</textarea></label><label>ملاحظات التغليف<textarea id="poPackingNotes">${esc(tech.packing_notes||'')}</textarea></label>
+        <label>ترتيشات / تعديلات أرض المصنع<textarea id="poFloorNotes" placeholder="أي تعديل في المقاس، السماكة، الحرارة، الخلطة، القص، أو ملاحظة للمشغل">${esc(tech.floor_notes||'')}</textarea></label>
+      </div>
+      <div class="jms-prod-actions"><button class="jms-prod-btn primary" onclick="saveProductionTechnical('${p.id}')">حفظ كرت التصنيع</button><button class="jms-prod-btn green" onclick="advanceProductionStage('${p.id}')">إرسال للمرحلة التالية</button><button class="jms-prod-btn orange" onclick="addProductionQuickNote('${p.id}')">إضافة ملاحظة / مشكلة</button></div>
+      <h3>الملاحظات الفنية</h3>${notes.map(n=>`<div class="jms-prod-note"><b>${esc(n.type||'ملاحظة')}</b> — ${esc(n.by||'')}<br><span class="jms-prod-muted">${esc(new Date(n.at).toLocaleString('ar-SA'))}</span><div>${esc(n.text||'')}</div></div>`).join('') || '<div class="jms-prod-muted">لا توجد ملاحظات فنية.</div>'}
+      <h3>سجل الحركة</h3><div class="jms-prod-timeline">${logs.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b><br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc(stageLabel(l.stage))}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || '<div class="jms-prod-muted">لا يوجد سجل.</div>'}</div>`;
+    if(window.modalBody && window.modal){ modalBody.innerHTML=html; modal.classList.remove('hidden'); } else { alert('تعذر فتح نافذة التفاصيل'); }
+  };
+  window.saveProductionTechnical=function(pid){
+    const p=(db.productionOrders||[]).find(x=>x.id===pid); if(!p) return;
+    p.stage=document.getElementById('poStage')?.value || p.stage; p.priority=document.getElementById('poPriority')?.value || p.priority; p.due_date=document.getElementById('poDue')?.value || '';
+    const v=id=>document.getElementById(id)?.value||'';
+    p.technical={...(p.technical||{}),
+      production_type:v('poType'), machine:v('poMachine'), operator:v('poOperator'),
+      or_no:v('poOrNo'), form_date:v('poFormDate'), delivery_time:v('poDeliveryTime'), packing_spec:v('poPackingSpec'), paper_size:v('poPaperSize'), region:v('poRegion'), salesman:v('poSalesman'), delivery_to:v('poDeliveryTo'), contract_no:v('poContractNo'), customer_name:v('poCustomerName'), required_kg:v('poRequiredKg'), statement_note:v('poStatementNote'),
+      plastic_type:v('poPlasticType'), bag_type:v('poBagType'), handle_color:v('poHandleColor'), handle_model:v('poHandleModel'), handle_type:v('poHandleType'), solid_type:v('poSolidType'), length_cm:v('poLengthCm'), width_cm:v('poWidthCm'), gusset:v('poGusset'), micron:v('poMicron'), plastic_color:v('poPlasticColor'), master_batch:v('poMasterBatch'), print_color_name:v('poPrintColorName'), ink_color:v('poInkColor'), output_shape:v('poOutputShape'), tube_width:v('poTubeWidth'),
+      film_width:v('poFilmWidth'), film_micron:v('poFilmMicron'), film_thickness:v('poFilmMicron'), roll_count:v('poRollCount'), roll_weight:v('poRollWeight'), expected_kg:v('poExpectedKg'), actual_kg:v('poActualKg'), waste_kg:v('poWasteKg'), cut_width:v('poCutWidth'), cut_length:v('poCutLength'), bag_size:v('poBagSize'), seal_type:v('poSeal'), opening_side:v('poOpenSide'),
+      one_side_printing:v('poOneSidePrinting'), two_side_printing:v('poTwoSidePrinting'), printing_out_gusset:v('poPrintingOutGusset'), printing_inside_gusset:v('poPrintingInsideGusset'), print_status:v('poPrintStatus'), cliche_status:v('poClicheStatus'), size_block:v('poSizeBlock'), cliche_notes:v('poClicheNotes'),
+      film_notes:v('poFilmNotes'), cutting_notes:v('poCuttingNotes'), packing_notes:v('poPackingNotes'), floor_notes:v('poFloorNotes')};
+    p.updated_at=nowIso();
+    const o=baseOrder(p); if(o){ o.status=stageLabel(p.stage); o.production_stage=p.stage; o.production_id=p.id; }
+    logProduction(pid,'تحديث كرت التصنيع','تم حفظ التفاصيل الفنية وحالة الإنتاج'); saveDb(); window.renderProductionWorkflow(); window.openProductionOrder(pid); alert('تم حفظ كرت التصنيع');
+  };
+  window.advanceProductionStage=function(pid){
+    const p=(db.productionOrders||[]).find(x=>x.id===pid); if(!p) return;
+    if(!canManageProduction()) return alert('هذه الصلاحية للمدير أو مدير الإنتاج فقط');
+    const old=p.stage; const next=nextStage(old);
+    if(next===old) return alert('الأمر مكتمل بالفعل');
+    const note=prompt(`نقل من: ${stageLabel(old)}\nإلى: ${stageLabel(next)}\nاكتب ملاحظة اختيارية:`) || '';
+    p.stage=next; p.updated_at=nowIso();
+    const o=baseOrder(p); if(o){ o.status=stageLabel(next); o.production_stage=next; o.production_id=p.id; }
+    logProduction(pid,'تغيير مرحلة الإنتاج',note || `تم النقل من ${stageLabel(old)} إلى ${stageLabel(next)}`); saveDb(); window.renderProductionWorkflow();
+    if(window.modal && !modal.classList.contains('hidden')) window.openProductionOrder(pid);
+  };
+  window.addProductionQuickNote=function(pid){
+    const p=(db.productionOrders||[]).find(x=>x.id===pid); if(!p) return;
+    const type=prompt('نوع الملاحظة: مشكلة / تعديل / توجيه / هالك / ملاحظة') || 'ملاحظة';
+    const text=prompt('اكتب الملاحظة الفنية أو مشكلة أرض المصنع:');
+    if(!text) return;
+    p.notes ||= []; p.notes.unshift({id:uid(),type,text,by:currentUser?.name||'',at:nowIso(),stage:p.stage});
+    logProduction(pid,'ملاحظة إنتاج',`${type}: ${text}`); saveDb(); window.renderProductionWorkflow(); if(window.modal && !modal.classList.contains('hidden')) window.openProductionOrder(pid);
+  };
+  window.createProductionFromOrder=createProductionFromOrder;
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){ if(typeof oldRenderAll==='function') oldRenderAll(); ensureDb(); addStyle(); addPage(); if(document.getElementById('productionWorkflow')?.classList.contains('active')) window.renderProductionWorkflow(); };
+  const oldApiData=window.jmsAiApiDataFinal;
+  window.jmsAiApiDataFinal=function(){ const data=oldApiData?oldApiData():{customers:db.customers||[],reps:db.reps||[],orders:db.orders||[]}; data.productionOrders=db.productionOrders||[]; data.productionLogs=db.productionLogs||[]; return data; };
+  const oldLocal=window.jmsAiLocalAnswerFinal;
+  window.jmsAiLocalAnswerFinal=function(q){
+    q=String(q||'');
+    if(/خط الإنتاج|التصنيع|أمر تصنيع|اوامر التصنيع|أوامر التصنيع|الفيلم|المقص|التغليف|وين وصل الطلب/.test(q)){
+      ensureDb();
+      const ps=db.productionOrders||[];
+      if(!ps.length) return 'لا توجد أوامر تصنيع حتى الآن. افتح صفحة "خط الإنتاج 11A" وأنشئ أمر تصنيع من طلب مبيعات موجود.';
+      const open=ps.filter(p=>p.stage!=='delivered');
+      const lines=open.slice(0,12).map((p,i)=>`${i+1}. ${p.production_no} - ${customerLabel(p.customer_id)} - ${p.product||'-'} - الحالة: ${stageLabel(p.stage)} - التسليم: ${p.due_date||'-'}`);
+      return `تقرير خط الإنتاج:\n- إجمالي أوامر التصنيع: ${ps.length}\n- أوامر مفتوحة: ${open.length}\n- جاهز للتسليم: ${ps.filter(p=>p.stage==='ready_delivery').length}\n- مكتمل: ${ps.filter(p=>p.stage==='delivered').length}\n\nالأوامر المفتوحة:\n${lines.join('\n') || 'لا توجد أوامر مفتوحة.'}`;
+    }
+    return oldLocal?oldLocal(q):null;
+  };
+  ready(()=>{ ensureDb(); addStyle(); addPage(); setTimeout(()=>{ if(document.getElementById('productionWorkflow')) window.renderProductionWorkflow(); },500); });
+  window.JMS_PRODUCTION_WORKFLOW_VERSION=VERSION;
+})();
