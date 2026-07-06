@@ -4677,411 +4677,287 @@ askJmsAI = async function(q){
   });
 })();
 
-/* JMS UPDATE 01 - Customer GPS + Smart Visit Routing */
+/* JMS UPDATE 03-07: AI Growth Suite - New Customer Radar, Scoring, Tasks, WhatsApp, Quote Intelligence */
 (function(){
-  const UPDATE_ID = 'jmsGpsRoutesUpdate01';
-
-  function safeDb(){
-    window.db = window.db || (typeof db !== 'undefined' ? db : {});
-    db.customers ||= [];
-    db.reps ||= [];
-    db.visits ||= [];
-    db.routes ||= [];
-    db.customer_geo_events ||= [];
-    return db;
+  const SUITE_VERSION='2026-07-ai-growth-suite-v1';
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+  function localId(){return (typeof id==='function')?id():(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()));}
+  function tdy(){return (typeof today==='function')?today():new Date().toISOString().slice(0,10);}
+  function sar(n){return (typeof money==='function')?money(n):Number(n||0).toLocaleString('ar-SA');}
+  function repLabel(rid){return (db.reps||[]).find(r=>r.id===rid)?.name||'-';}
+  function customerLabel(cid){return (db.customers||[]).find(c=>c.id===cid)?.name||'-';}
+  function isManager(){return currentUser && ((currentUser.role==='admin') || (currentUser.role==='sales'));}
+  function canSeeGrowth(){return currentUser && (currentUser.role==='admin'||currentUser.role==='sales');}
+  function ensureGrowthDb(){
+    db.leads ||= [];
+    db.aiTasks ||= [];
+    db.aiReports ||= [];
+    db.aiRadarSettings ||= {cities:['جدة','مكة','الطائف','الرياض'],industries:['مطاعم وكوفيهات','مصانع غذائية','متاجر إلكترونية','مصانع مياه وتمور','شركات شحن وتغليف']};
   }
-  function esc(v){
-    return String(v ?? '').replace(/[&<>'"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s]));
+  function lastVisitDate(customerId){
+    return (db.visits||[]).filter(v=>v.customer_id===customerId).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0]?.date || '';
   }
-  function nowIso(){ return new Date().toISOString(); }
-  function todaySafe(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
-  function idSafe(){ return (typeof id === 'function') ? id() : String(Date.now()+Math.random()); }
-  function saveSafe(){ try{ if(typeof save === 'function') save(); else localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(db)); }catch(e){ console.error('GPS save error', e); } }
-  function renderSafe(){ try{ if(typeof renderAll === 'function') renderAll(); else if(typeof renderCustomers === 'function') renderCustomers(); }catch(e){ console.warn('GPS render skipped', e); } }
-  function allowed(){ try{ return (typeof allowedCustomers === 'function') ? allowedCustomers() : (safeDb().customers || []); }catch(e){ return safeDb().customers || []; } }
-  function repText(repId){ try{ return (typeof repName === 'function') ? repName(repId) : ((db.reps||[]).find(r=>r.id===repId)?.name || '-'); }catch(e){ return '-'; } }
-  function customerText(id){ try{ return (typeof customerName === 'function') ? customerName(id) : ((db.customers||[]).find(c=>c.id===id)?.name || '-'); }catch(e){ return '-'; } }
-  function currentUserSafe(){
-    try{
-      if(window.currentUser && window.currentUser.role) return window.currentUser;
-      const u = JSON.parse(sessionStorage.getItem('jms_current_user') || 'null');
-      return u && u.role ? u : null;
-    }catch(e){ return null; }
-  }
-  function getCustomer(id){ return (safeDb().customers || []).find(c => String(c.id) === String(id)); }
-  function customerGeo(c){
-    if(!c) return null;
-    const lat = Number(c.gps?.lat ?? c.lat ?? c.latitude ?? c.geo_lat);
-    const lng = Number(c.gps?.lng ?? c.lng ?? c.longitude ?? c.geo_lng);
-    if(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180){ return {lat,lng}; }
-    return null;
-  }
-  function hasGps(c){ return !!customerGeo(c); }
-  function distanceKm(a,b){
-    if(!a || !b) return Infinity;
-    const R=6371;
-    const dLat=(b.lat-a.lat)*Math.PI/180;
-    const dLng=(b.lng-a.lng)*Math.PI/180;
-    const la1=a.lat*Math.PI/180;
-    const la2=b.lat*Math.PI/180;
-    const x=Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
-    return 2*R*Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
-  }
-  function parseCoords(text){
-    text=String(text||'');
-    let m=text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
-    if(!m) m=text.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
-    if(!m) m=text.match(/[?&]query=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
-    if(!m) m=text.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
-    if(!m) return null;
-    const lat=Number(m[1]), lng=Number(m[2]);
-    if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180) return null;
-    return {lat,lng};
-  }
-  function mapsSearchLink(c){
-    const g=customerGeo(c);
-    if(g) return `https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lng}`;
-    const q=encodeURIComponent([c?.name,c?.district,c?.city,c?.location].filter(Boolean).join(' '));
-    return `https://www.google.com/maps/search/?api=1&query=${q}`;
-  }
-  function saveCustomerGps(c, pos, source='gps'){
-    if(!c || !pos) return false;
-    const u=currentUserSafe();
-    const lat=Number(pos.lat), lng=Number(pos.lng);
-    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
-    c.gps = {
-      lat,
-      lng,
-      accuracy: pos.accuracy || '',
-      source,
-      updated_at: nowIso(),
-      updated_by: u?.id || '',
-      updated_by_name: u?.name || ''
-    };
-    c.lat = lat;
-    c.lng = lng;
-    c.location_map = mapsSearchLink(c);
-    if(!c.location) c.location = 'موقع محدد GPS';
-    safeDb().customer_geo_events.unshift({
-      id:idSafe(), customer_id:c.id, rep_id:c.rep_id || u?.id || '', lat, lng,
-      accuracy: pos.accuracy || '', source, created_at: nowIso(), created_by:u?.id || '', created_by_name:u?.name || ''
-    });
-    saveSafe();
-    return true;
-  }
-
-  window.jmsGpsCaptureCustomer = function(cid){
-    const c=getCustomer(cid);
-    if(!c) return alert('لم يتم العثور على العميل');
-    if(!navigator.geolocation) return window.jmsGpsManualCustomer(cid);
-    if(!confirm(`تحديد موقع العميل الآن؟\n\nالعميل: ${c.name}\n\nمهم: لازم تكون واقف عند العميل أو قريب من موقعه.`)) return;
-    const oldTitle=document.title;
-    document.title='جاري تحديد الموقع...';
-    navigator.geolocation.getCurrentPosition(function(p){
-      document.title=oldTitle;
-      saveCustomerGps(c, {lat:p.coords.latitude, lng:p.coords.longitude, accuracy:Math.round(p.coords.accuracy||0)}, 'device_gps');
-      alert(`تم حفظ موقع العميل: ${c.name}\nالدقة التقريبية: ${Math.round(p.coords.accuracy||0)} متر`);
-      renderSafe();
-      setTimeout(enhanceGpsCards,200);
-      renderGpsRoutesPage();
-    }, function(err){
-      document.title=oldTitle;
-      alert('تعذر تحديد الموقع من الجهاز. سنفتح الإدخال اليدوي.');
-      window.jmsGpsManualCustomer(cid);
-    }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
-  };
-
-  window.jmsGpsManualCustomer = function(cid){
-    const c=getCustomer(cid);
-    if(!c) return alert('لم يتم العثور على العميل');
-    const input=prompt('الصق رابط Google Maps أو اكتب الإحداثيات بهذا الشكل:\n21.4858,39.1925', c.location_map || c.location || '');
-    if(!input) return;
-    const coords=parseCoords(input);
-    if(!coords) return alert('لم أستطع قراءة الإحداثيات. افتح Google Maps ثم انسخ الرابط أو اكتب latitude,longitude');
-    saveCustomerGps(c, coords, 'manual');
-    alert('تم حفظ الموقع يدويًا');
-    renderSafe();
-    setTimeout(enhanceGpsCards,200);
-    renderGpsRoutesPage();
-  };
-
-  window.jmsGpsOpenCustomer = function(cid){
-    const c=getCustomer(cid);
-    if(!c) return alert('لم يتم العثور على العميل');
-    window.open(mapsSearchLink(c), '_blank');
-  };
-
-  window.jmsGpsClearCustomer = function(cid){
-    const c=getCustomer(cid);
-    if(!c) return;
-    if(!confirm('حذف موقع هذا العميل؟')) return;
-    delete c.gps; delete c.lat; delete c.lng; delete c.latitude; delete c.longitude; delete c.geo_lat; delete c.geo_lng; delete c.location_map;
-    saveSafe(); renderSafe(); renderGpsRoutesPage();
-  };
-
-  function priorityScore(c){
-    let score=0;
-    const debt=Number(c.debt_balance||0);
-    if(debt>0) score += Math.min(30, Math.round(debt/1000));
-    try{
-      const lv = (typeof lastVisit === 'function') ? lastVisit(c.id) : '';
-      const d = (typeof daysFrom === 'function') ? daysFrom(lv) : 0;
-      if(d>=30) score += 25;
-      else if(d>=20) score += 12;
-    }catch(e){}
-    if(c.next_date && String(c.next_date).slice(0,10) <= todaySafe()) score += 20;
-    return score;
-  }
-  function customersWithGps(repId, mode){
-    let rows=allowed().filter(c=>hasGps(c));
-    if(repId && repId !== 'all') rows=rows.filter(c=>String(c.rep_id)===String(repId));
-    if(mode==='debt') rows=rows.filter(c=>Number(c.debt_balance||0)>0);
-    if(mode==='late') rows=rows.filter(c=>priorityScore(c)>=20);
-    return rows;
-  }
-  function planNearest(customers, start){
-    let remaining=customers.map(c=>({...c, __geo:customerGeo(c), __priority:priorityScore(c)}));
-    const route=[];
-    let cursor=start || (remaining.sort((a,b)=>b.__priority-a.__priority)[0]?.__geo || null);
-    if(!cursor && remaining[0]) cursor=remaining[0].__geo;
-    while(remaining.length){
-      remaining.sort((a,b)=>{
-        const da=distanceKm(cursor,a.__geo) - (a.__priority*0.06);
-        const dbb=distanceKm(cursor,b.__geo) - (b.__priority*0.06);
-        return da-dbb;
-      });
-      const next=remaining.shift();
-      next.__distance = route.length ? distanceKm(route[route.length-1].__geo, next.__geo) : (start ? distanceKm(start, next.__geo) : 0);
-      route.push(next);
-      cursor=next.__geo;
-    }
-    return route;
-  }
-  function googleRouteUrl(route, origin){
-    const points=route.map(c=>c.__geo).filter(Boolean);
-    if(!points.length) return '';
-    const start=origin || points[0];
-    const dest=points[points.length-1];
-    const waypoints=points.slice(origin?0:1, -1).slice(0,8).map(p=>`${p.lat},${p.lng}`).join('|');
-    const url = new URL('https://www.google.com/maps/dir/');
-    url.searchParams.set('api','1');
-    url.searchParams.set('travelmode','driving');
-    url.searchParams.set('origin', `${start.lat},${start.lng}`);
-    url.searchParams.set('destination', `${dest.lat},${dest.lng}`);
-    if(waypoints) url.searchParams.set('waypoints', waypoints);
-    return url.toString();
-  }
-  window.jmsGpsBuildPlan = function(opts={}){
-    const repId=opts.repId ?? document.getElementById('gpsRouteRep')?.value ?? 'all';
-    const mode=opts.mode ?? document.getElementById('gpsRouteMode')?.value ?? 'all';
-    const limit=Number(opts.limit ?? document.getElementById('gpsRouteLimit')?.value ?? 12) || 12;
-    const start=opts.start || window.jmsGpsLastOrigin || null;
-    const rows=customersWithGps(repId, mode).sort((a,b)=>priorityScore(b)-priorityScore(a)).slice(0, Math.max(1,limit));
-    return planNearest(rows, start);
-  };
-  window.jmsGpsOpenRoute = function(){
-    const route=window.jmsGpsBuildPlan();
-    if(route.length<1) return alert('لا يوجد عملاء لديهم مواقع محفوظة');
-    const url=googleRouteUrl(route, window.jmsGpsLastOrigin || null);
-    if(!url) return alert('لا يمكن إنشاء رابط الخريطة');
-    window.open(url, '_blank');
-  };
-  window.jmsGpsUseMyLocationForRoute = function(){
-    if(!navigator.geolocation) return alert('المتصفح لا يدعم تحديد الموقع');
-    navigator.geolocation.getCurrentPosition(function(p){
-      window.jmsGpsLastOrigin={lat:p.coords.latitude,lng:p.coords.longitude};
-      renderGpsRoutesPage();
-      alert('تم اعتماد موقعك الحالي كنقطة بداية للمسار');
-    }, function(){ alert('تعذر أخذ موقعك الحالي'); }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
-  };
-  window.jmsGpsSaveTodayRoute = function(){
-    const route=window.jmsGpsBuildPlan();
-    if(!route.length) return alert('لا يوجد مسار لحفظه');
-    const repId=document.getElementById('gpsRouteRep')?.value || route[0]?.rep_id || '';
-    safeDb().routes.unshift({
-      id:idSafe(), date:todaySafe(), rep_id:repId==='all'?(route[0]?.rep_id||''):repId,
-      title:'مسار GPS ذكي', gps:true,
-      items:route.map((c,i)=>({customer_id:c.id, order:i+1, status:'pending', distance_km:Number(c.__distance||0).toFixed(2)})),
-      created_at:nowIso(), created_by:currentUserSafe()?.id || ''
-    });
-    saveSafe();
-    alert('تم حفظ المسار في صفحة المسارات');
-    try{ if(typeof renderRoutes==='function') renderRoutes(); }catch(e){}
-  };
-
-  function routeRowsHtml(route){
-    if(!route.length) return '<div class="jms-gps-empty">لا يوجد عملاء بمواقع محفوظة حسب الفلتر الحالي.</div>';
-    return `<div class="jms-gps-route-list">${route.map((c,i)=>{
-      const g=customerGeo(c);
-      return `<div class="jms-gps-route-row">
-        <div class="jms-gps-route-no">${i+1}</div>
-        <div class="jms-gps-route-main">
-          <b>${esc(c.name)}</b>
-          <small>${esc(repText(c.rep_id))} · ${esc(c.city||'-')} · ${Number(c.__distance||0).toFixed(2)} كم من النقطة السابقة</small>
-          <div class="jms-gps-tags">
-            ${Number(c.debt_balance||0)>0?`<span class="debt">مديونية ${Number(c.debt_balance||0).toLocaleString('ar-SA')} ريال</span>`:''}
-            ${priorityScore(c)>=20?`<span class="late">أولوية عالية</span>`:''}
-            <span>GPS ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}</span>
-          </div>
-        </div>
-        <div class="jms-gps-route-actions">
-          <button onclick="jmsGpsOpenCustomer('${esc(c.id)}')">خريطة</button>
-          <button onclick="visit && visit('${esc(c.id)}')">تمت الزيارة</button>
-        </div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-  window.renderGpsRoutesPage = function(){
-    const box=document.getElementById('gpsRoutesBody');
-    if(!box) return;
-    safeDb();
-    const all=allowed();
-    const gpsCount=all.filter(hasGps).length;
-    const missing=all.length-gpsCount;
-    const repId=document.getElementById('gpsRouteRep')?.value || 'all';
-    const route=window.jmsGpsBuildPlan({repId});
-    const routeUrl=googleRouteUrl(route, window.jmsGpsLastOrigin || null);
-    const repOptions=['<option value="all">كل المناديب</option>'].concat((db.reps||[]).map(r=>`<option value="${esc(r.id)}" ${String(r.id)===String(repId)?'selected':''}>${esc(r.name)}</option>`)).join('');
-    box.innerHTML=`
-      <div class="jms-gps-stats">
-        <div><b>${gpsCount}</b><span>عميل محدد الموقع</span></div>
-        <div><b>${missing}</b><span>عميل بدون موقع</span></div>
-        <div><b>${route.length}</b><span>عميل في المسار المقترح</span></div>
-        <div><b>${window.jmsGpsLastOrigin?'موقعك':'أول عميل'}</b><span>نقطة البداية</span></div>
-      </div>
-      <div class="jms-gps-panel">
-        <div class="form-grid four">
-          <label>المندوب<select id="gpsRouteRep" onchange="renderGpsRoutesPage()">${repOptions}</select></label>
-          <label>نوع المسار<select id="gpsRouteMode" onchange="renderGpsRoutesPage()">
-            <option value="all">كل العملاء المحددين</option>
-            <option value="late">الأولوية والمتأخرين</option>
-            <option value="debt">عملاء التحصيل</option>
-          </select></label>
-          <label>عدد العملاء<input id="gpsRouteLimit" type="number" min="1" max="25" value="${esc(document.getElementById('gpsRouteLimit')?.value || 12)}" oninput="renderGpsRoutesPage()"></label>
-          <label>أوامر<button type="button" class="primary small" onclick="jmsGpsUseMyLocationForRoute()">ابدأ من موقعي</button></label>
-        </div>
-        <div class="jms-gps-actions">
-          <button class="primary" onclick="jmsGpsOpenRoute()">فتح المسار في Google Maps</button>
-          <button onclick="jmsGpsSaveTodayRoute()">حفظ المسار</button>
-          <button onclick="renderGpsRoutesPage()">تحديث</button>
-        </div>
-        ${routeUrl?`<a class="jms-gps-maplink" href="${routeUrl}" target="_blank">رابط المسار الجاهز</a>`:''}
-      </div>
-      ${routeRowsHtml(route)}
-      <div class="jms-gps-panel">
-        <b>عملاء بدون موقع</b>
-        <p>افتح صفحة العملاء واضغط زر «تحديد الموقع» لكل عميل. كلما زادت المواقع المحفوظة صار ترتيب الزيارات أدق.</p>
-        <div class="jms-gps-missing-list">${all.filter(c=>!hasGps(c)).slice(0,20).map(c=>`<button onclick="document.querySelector('[data-page=customers]')?.click(); setTimeout(()=>{ const s=document.getElementById('customerSearch'); if(s){s.value='${esc(c.name).replace(/'/g,'\\\'')}'; renderCustomers&&renderCustomers();}},200);">${esc(c.name)}</button>`).join('') || 'كل العملاء لديهم موقع محفوظ.'}</div>
-      </div>`;
-    const modeEl=document.getElementById('gpsRouteMode'); if(modeEl && window.__jmsGpsMode) modeEl.value=window.__jmsGpsMode;
-  };
-
-  function injectPage(){
-    if(document.getElementById('gpsRoutes')) return;
-    const nav=document.querySelector('.sidebar nav');
-    if(nav && !document.querySelector('.nav[data-page="gpsRoutes"]')){
-      const btn=document.createElement('button');
-      btn.className='nav';
-      btn.dataset.page='gpsRoutes';
-      btn.textContent='مواقع العملاء والمسارات';
-      const ref=document.querySelector('.nav[data-page="smartVisits"]') || document.querySelector('.nav[data-page="customers"]');
-      nav.insertBefore(btn, ref ? ref.nextSibling : null);
-      btn.addEventListener('click', function(){
-        document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('gpsRoutes')?.classList.add('active');
-        renderGpsRoutesPage();
-      });
-    }
-    const main=document.querySelector('.main');
-    if(main){
-      const sec=document.createElement('section');
-      sec.id='gpsRoutes';
-      sec.className='page';
-      sec.innerHTML=`<div class="page-head with-action"><div><h1>مواقع العملاء والمسارات</h1><p>تحديد مواقع العملاء وترتيب زيارات المندوبين حسب القرب والأولوية.</p></div><div class="head-actions"><button class="primary" onclick="jmsGpsOpenRoute()">فتح المسار</button><button class="primary secondary" onclick="renderGpsRoutesPage()">تحديث</button></div></div><div id="gpsRoutesBody"></div>`;
-      main.appendChild(sec);
-    }
-  }
+  function daysSince(d){ if(!d) return 9999; const x=new Date(d); if(isNaN(x)) return 9999; return Math.max(0,Math.floor((new Date(tdy())-x)/86400000)); }
+  function customerOrders(customerId){return (db.orders||[]).filter(o=>o.customer_id===customerId);}
+  function customerQuotes(customerId){return (db.quotes||[]).filter(q=>q.customer_id===customerId);}
+  function normPhone(p){p=String(p||'').replace(/\D/g,''); if(!p) return ''; return p.startsWith('966')?p:'966'+p.replace(/^0/,'');}
 
   function injectStyle(){
-    if(document.getElementById(UPDATE_ID)) return;
+    if(document.getElementById('jmsAiGrowthSuiteStyle')) return;
     const st=document.createElement('style');
-    st.id=UPDATE_ID;
+    st.id='jmsAiGrowthSuiteStyle';
     st.textContent=`
-      .jms-gps-chip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;padding:10px 12px;border:1px solid #dbeafe;background:#eff6ff;border-radius:14px;color:#1e3a8a;font-size:12px}.jms-gps-chip.no{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.jms-gps-chip b{font-size:13px}.jms-gps-customer-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.jms-gps-customer-actions button{border:0;border-radius:999px;padding:8px 10px;font-weight:900;cursor:pointer;background:#0f172a;color:#fff}.jms-gps-customer-actions .gps{background:#2563eb}.jms-gps-customer-actions .map{background:#16a34a}.jms-gps-customer-actions .manual{background:#7c3aed}.jms-gps-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}.jms-gps-stats div{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:16px;box-shadow:0 10px 28px rgba(15,23,42,.04)}.jms-gps-stats b{display:block;font-size:28px;color:#111827}.jms-gps-stats span{color:#64748b;font-size:13px}.jms-gps-panel{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:16px;margin-bottom:14px;box-shadow:0 10px 28px rgba(15,23,42,.04)}.jms-gps-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.jms-gps-actions button,.jms-gps-route-actions button,.jms-gps-missing-list button{border:0;border-radius:12px;padding:9px 12px;background:#111827;color:#fff;font-weight:900;cursor:pointer}.jms-gps-route-list{display:grid;gap:10px}.jms-gps-route-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:14px;box-shadow:0 10px 28px rgba(15,23,42,.04)}.jms-gps-route-no{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#111827;color:#fff;font-weight:900}.jms-gps-route-main b{display:block;color:#0f172a}.jms-gps-route-main small{color:#64748b}.jms-gps-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.jms-gps-tags span{border-radius:999px;background:#f1f5f9;color:#475569;padding:5px 8px;font-size:12px}.jms-gps-tags .debt{background:#fee2e2;color:#991b1b}.jms-gps-tags .late{background:#fef3c7;color:#92400e}.jms-gps-maplink{display:inline-block;margin-top:10px;color:#2563eb;font-weight:900}.jms-gps-missing-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.jms-gps-missing-list button{background:#f1f5f9;color:#334155}.jms-gps-empty{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:18px}.jms-ai-msg .jms-gps-ai-route{white-space:pre-wrap}.jms-ai-route-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.jms-ai-route-actions button{border:0;border-radius:999px;background:#2563eb;color:#fff;padding:8px 12px;font-weight:900;cursor:pointer}@media(max-width:850px){.jms-gps-route-row{grid-template-columns:1fr}.jms-gps-route-actions{display:flex;gap:8px;flex-wrap:wrap}.jms-gps-route-no{width:34px;height:34px}}
+      .jms-growth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:14px 0}.jms-growth-card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:16px;box-shadow:0 8px 26px rgba(15,23,42,.06)}.jms-growth-card b{font-size:24px;color:#0f172a}.jms-growth-card span{display:block;color:#64748b;margin-top:6px}.jms-radar-toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:end}.jms-radar-toolbar input,.jms-radar-toolbar select,.jms-radar-toolbar textarea{width:100%;border:1px solid #dbe3ef;border-radius:14px;padding:11px;background:#fff}.jms-radar-toolbar button,.jms-growth-btn{border:0;border-radius:14px;padding:11px 14px;background:#0f172a;color:#fff;cursor:pointer}.jms-growth-btn.blue{background:#2563eb}.jms-growth-btn.green{background:#16a34a}.jms-growth-btn.orange{background:#ea580c}.jms-growth-btn.purple{background:#7c3aed}.jms-growth-btn.gray{background:#475569}.jms-lead-list{display:grid;gap:12px;margin-top:14px}.jms-lead-card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:15px;box-shadow:0 8px 28px rgba(15,23,42,.06)}.jms-lead-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jms-lead-head h3{margin:0;color:#0f172a}.jms-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;background:#eef2ff;color:#3730a3;font-weight:700;font-size:12px}.jms-badge.hot{background:#fee2e2;color:#991b1b}.jms-badge.ok{background:#dcfce7;color:#166534}.jms-lead-meta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;color:#64748b}.jms-lead-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.jms-lead-actions button{border:0;border-radius:999px;padding:9px 12px;background:#f1f5f9;color:#0f172a;cursor:pointer}.jms-lead-actions button.primary{background:#0f172a;color:white}.jms-lead-actions button.green{background:#16a34a;color:white}.jms-lead-actions button.blue{background:#2563eb;color:white}.jms-ai-table{width:100%;border-collapse:separate;border-spacing:0 8px}.jms-ai-table th{font-size:12px;color:#64748b;text-align:right}.jms-ai-table td{background:#fff;padding:10px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}.jms-ai-table td:first-child{border-radius:0 14px 14px 0;border-right:1px solid #e5e7eb}.jms-ai-table td:last-child{border-radius:14px 0 0 14px;border-left:1px solid #e5e7eb}.jms-score-pill{display:inline-grid;place-items:center;min-width:44px;height:30px;border-radius:999px;background:#0f172a;color:white;font-weight:900}.jms-score-high{background:#16a34a}.jms-score-mid{background:#ea580c}.jms-score-low{background:#dc2626}.jms-ai-command-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.jms-ai-insight{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:15px}.jms-ai-insight h3{margin:0 0 8px}.jms-ai-insight ul{margin:8px 0 0;padding-inline-start:22px;line-height:1.9}.jms-thinking{padding:12px;border-radius:14px;background:#f8fafc;border:1px dashed #cbd5e1;color:#475569}.jms-customer-score{margin-top:8px;padding:9px 10px;border-radius:14px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:white;font-size:12px;display:flex;justify-content:space-between;gap:8px;align-items:center}.jms-customer-score .circle{min-width:38px;height:38px;border-radius:50%;background:#fff;color:#0f172a;display:grid;place-items:center;font-weight:900}.jms-radar-note{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:16px;padding:12px;margin-top:10px}.jms-mini-muted{color:#64748b;font-size:12px}.jms-ai-msg bot pre,.jms-ai-msg pre{white-space:pre-wrap}.jms-page-hint{color:#64748b;margin-top:-8px}
     `;
     document.head.appendChild(st);
   }
 
-  function enhanceGpsCards(){
-    safeDb();
+  function addNavAndPages(){
+    const nav=document.querySelector('.sidebar nav');
+    const main=document.querySelector('main.main') || document.querySelector('.main');
+    if(!nav || !main) return;
+    if(!document.querySelector('[data-page="newCustomerRadar"]')){
+      const btn=document.createElement('button');
+      btn.className='nav manager-only'; btn.dataset.page='newCustomerRadar'; btn.textContent='رادار العملاء الجدد';
+      nav.insertBefore(btn, nav.querySelector('[data-page="customers"]') || null);
+    }
+    if(!document.querySelector('[data-page="aiCommandCenter"]')){
+      const btn=document.createElement('button');
+      btn.className='nav manager-only'; btn.dataset.page='aiCommandCenter'; btn.textContent='أوامر الذكاء';
+      nav.insertBefore(btn, nav.querySelector('[data-page="jmsAI"]')?.nextSibling || null);
+    }
+    if(!document.getElementById('newCustomerRadar')){
+      const sec=document.createElement('section'); sec.id='newCustomerRadar'; sec.className='page';
+      sec.innerHTML=`
+        <div class="page-head with-action"><div><h1>رادار العملاء الجدد</h1><p>بحث ذكي عن أنشطة جديدة ظهرت في الويب أو الخرائط: افتتاحات، مواقع جديدة، كوفيهات، مطاعم، مصانع، متاجر.</p></div><div class="head-actions"><button class="primary" onclick="jmsRunRadarSearch()">بحث الآن</button><button onclick="jmsOpenManualLead()">إضافة فرصة يدوية</button></div></div>
+        <div class="panel"><div class="jms-radar-toolbar">
+          <label>المدينة / المنطقة<input id="radarCity" value="جدة" placeholder="جدة، مكة، الصناعية الثانية"></label>
+          <label>النشاط<select id="radarIndustry"><option>مطاعم وكوفيهات جديدة</option><option>مصانع غذائية جديدة</option><option>متاجر إلكترونية جديدة</option><option>مصانع مياه وتمور</option><option>شركات شحن وتغليف</option><option>محلات حلويات ومخابز</option><option>مغاسل وفنادق</option><option>مخصص</option></select></label>
+          <label>كلمات إضافية<input id="radarKeywords" placeholder="افتتاح، opening soon، new"></label>
+          <label>عدد النتائج<select id="radarLimit"><option>8</option><option selected>12</option><option>20</option></select></label>
+          <button class="jms-growth-btn blue" onclick="jmsRunRadarSearch()">🔎 بحث ذكي بالويب</button>
+          <button class="jms-growth-btn green" onclick="jmsRadarSaveSearch()">حفظ إعداد البحث</button>
+        </div><div class="jms-radar-note">التنبيه: النتائج من مصادر عامة وتحتاج تحقق قبل الزيارة. النظام لا يسحب أرقام خاصة؛ يستخدم بيانات منشورة فقط.</div></div>
+        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="radarTotal">0</b><span>فرص محفوظة</span></div><div class="jms-growth-card"><b id="radarHot">0</b><span>فرص قوية</span></div><div class="jms-growth-card"><b id="radarContacted">0</b><span>تم التواصل</span></div><div class="jms-growth-card"><b id="radarConverted">0</b><span>تحولت لعميل</span></div></div>
+        <div id="radarStatus"></div><div id="radarLeadList" class="jms-lead-list"></div>`;
+      main.appendChild(sec);
+    }
+    if(!document.getElementById('aiCommandCenter')){
+      const sec=document.createElement('section'); sec.id='aiCommandCenter'; sec.className='page';
+      sec.innerHTML=`
+        <div class="page-head with-action"><div><h1>أوامر الذكاء الاصطناعي</h1><p>مهام اليوم، تقييم العملاء، مخاطر التحصيل، فرص البيع، ذكاء عروض الأسعار.</p></div><div class="head-actions"><button class="primary" onclick="jmsRenderAiCommandCenter()">تحديث التحليل</button><button onclick="jmsPrintAiCommandReport()">طباعة التقرير</button></div></div>
+        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="aiTodayTasksCount">0</b><span>مهام ذكية اليوم</span></div><div class="jms-growth-card"><b id="aiRiskCount">0</b><span>مخاطر تحصيل</span></div><div class="jms-growth-card"><b id="aiOpportunityCount">0</b><span>فرص بيع</span></div><div class="jms-growth-card"><b id="aiQuoteRiskCount">0</b><span>عروض تحتاج مراجعة</span></div></div>
+        <div class="jms-ai-command-row"><div class="jms-ai-insight"><h3>مهام اليوم المقترحة</h3><div id="aiTodayTasks"></div></div><div class="jms-ai-insight"><h3>خطر التحصيل</h3><div id="aiCollectionRisks"></div></div><div class="jms-ai-insight"><h3>فرص البيع والمتابعة</h3><div id="aiSalesOpportunities"></div></div><div class="jms-ai-insight"><h3>ذكاء عروض الأسعار</h3><div id="aiQuoteIntelligence"></div></div></div>
+        <div class="panel" style="margin-top:14px"><div class="panel-head"><b>تقييم العملاء الذكي</b><span>حسب الزيارات، الطلبات، المديونية، اكتمال البيانات</span></div><div id="aiCustomerScoreTable"></div></div>`;
+      main.appendChild(sec);
+    }
+    document.querySelectorAll('.nav').forEach(btn=>{
+      if(btn.dataset.jmsGrowthBound==='1') return; btn.dataset.jmsGrowthBound='1';
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active');
+        const page=document.getElementById(btn.dataset.page); if(page) page.classList.add('active');
+        if(btn.dataset.page==='newCustomerRadar') renderNewCustomerRadar();
+        if(btn.dataset.page==='aiCommandCenter') jmsRenderAiCommandCenter();
+      });
+    });
+    if(currentUser && currentUser.role==='rep') document.querySelectorAll('.manager-only,.admin-only').forEach(x=>x.style.display='none');
+  }
+
+  function leadScore(lead){
+    const txt=[lead.name,lead.business_type,lead.category,lead.evidence,lead.fit_reason,lead.city,lead.area,lead.source_url].join(' ').toLowerCase();
+    let s=45;
+    if(/new|جديد|افتتاح|opening|افتتح|قريباً|قريبا|coming soon/.test(txt)) s+=25;
+    if(/مطعم|كوفي|قهوة|كافيه|حلويات|مخبز|تمور|مياه|غذائي|مصنع|تغليف|متجر|شحن|ecommerce|restaurant|cafe|factory|bakery/.test(txt)) s+=18;
+    if(lead.phone) s+=6; if(lead.website||lead.source_url) s+=5; if(lead.maps_url) s+=6;
+    if((db.customers||[]).some(c=>String(c.name||'').trim() && String(lead.name||'').includes(String(c.name||'').trim()))) s-=30;
+    return Math.max(5,Math.min(99,Number(lead.score||s)));
+  }
+  function scoreClass(s){return s>=75?'jms-score-high':s>=50?'jms-score-mid':'jms-score-low';}
+  function makeLeadMessage(lead){
+    const productHint = /مطعم|كوفي|كافيه|حلويات|مخبز/.test(String(lead.business_type||lead.category||'')) ? 'أكياس سفري وتغليف ومناديل' : /مصنع|غذائي|مياه|تمور/.test(String(lead.business_type||lead.category||'')) ? 'رولات وأكياس تغليف صناعية' : 'أكياس وتغليف حسب احتياجكم';
+    return `السلام عليكم، معكم شركة جدة النموذجية للصناعة. لاحظنا نشاطكم ${lead.name||''} ونتمنى لكم التوفيق. نقدر نخدمكم في ${productHint} بجودة وأسعار مناسبة. هل مناسب نرتب زيارة أو نرسل عرض تعريفي؟`;
+  }
+  function normalizeLead(raw){
+    const lead={...raw};
+    lead.id = lead.id || localId();
+    lead.name = lead.name || lead.title || 'فرصة بدون اسم';
+    lead.business_type = lead.business_type || lead.category || lead.industry || 'نشاط تجاري';
+    lead.city = lead.city || document.getElementById('radarCity')?.value || 'جدة';
+    lead.area = lead.area || lead.district || '';
+    lead.phone = lead.phone || lead.mobile || '';
+    lead.website = lead.website || '';
+    lead.maps_url = lead.maps_url || lead.map_url || '';
+    lead.source_url = lead.source_url || lead.url || '';
+    lead.fit_reason = lead.fit_reason || lead.reason || 'نشاط محتمل يحتاج منتجات تغليف أو أكياس.';
+    lead.evidence = lead.evidence || lead.snippet || '';
+    lead.status = lead.status || 'new';
+    lead.created_at = lead.created_at || new Date().toISOString();
+    lead.score = leadScore(lead);
+    lead.suggested_message = lead.suggested_message || makeLeadMessage(lead);
+    return lead;
+  }
+  function mergeLeads(list){
+    ensureGrowthDb();
+    let added=0;
+    list.map(normalizeLead).forEach(l=>{
+      const key=String(l.name||'').trim().toLowerCase();
+      const exists=db.leads.find(x=>String(x.name||'').trim().toLowerCase()===key && String(x.city||'')===String(l.city||''));
+      if(exists){Object.assign(exists,{...l,id:exists.id,created_at:exists.created_at,updated_at:new Date().toISOString()});}
+      else{db.leads.unshift(l);added++;}
+    });
+    if(typeof save==='function') save();
+    return added;
+  }
+  window.jmsRunRadarSearch = async function(){
+    ensureGrowthDb();
+    if(!canSeeGrowth()) return alert('رادار العملاء للمدير ومدير المبيعات فقط');
+    const city=document.getElementById('radarCity')?.value||'جدة';
+    const industry=document.getElementById('radarIndustry')?.value||'مطاعم وكوفيهات جديدة';
+    const keywords=document.getElementById('radarKeywords')?.value||'افتتاح جديد opening soon new';
+    const limit=Number(document.getElementById('radarLimit')?.value||12);
+    const status=document.getElementById('radarStatus');
+    if(status) status.innerHTML='<div class="jms-thinking">جارٍ البحث في الويب عن فرص جديدة... قد يستغرق 20 إلى 40 ثانية.</div>';
+    try{
+      const res=await fetch('/api/new-customer-radar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city,industry,keywords,limit,existingCustomers:(db.customers||[]).map(c=>c.name).slice(0,300)})});
+      const data=await res.json().catch(()=>({ok:false,error:'bad_response'}));
+      if(data.ok && Array.isArray(data.leads)){
+        const added=mergeLeads(data.leads);
+        if(status) status.innerHTML=`<div class="jms-radar-note">تم جلب ${data.leads.length} فرصة. الجديد: ${added}. راجع النتائج قبل التواصل.</div>`;
+      }else{
+        if(status) status.innerHTML=`<div class="jms-radar-note">تعذر البحث الخارجي: ${esc(data.error||data.answer||'تأكد من OPENAI_API_KEY')}. يمكنك إضافة الفرص يدويًا أو البحث من JMS AI.</div>`;
+      }
+    }catch(e){ if(status) status.innerHTML=`<div class="jms-radar-note">تعذر الاتصال بواجهة البحث. تأكد أنك رفعت ملف api/new-customer-radar.js.</div>`; }
+    renderNewCustomerRadar();
+  };
+  window.jmsRadarSaveSearch=function(){
+    ensureGrowthDb(); db.aiRadarSettings.last={city:radarCity?.value,industry:radarIndustry?.value,keywords:radarKeywords?.value,limit:radarLimit?.value,updated_at:new Date().toISOString()};
+    if(typeof save==='function') save(); alert('تم حفظ إعداد البحث');
+  };
+  window.jmsOpenManualLead=function(){
+    const reps=(db.reps||[]);
+    modalBody.innerHTML=`<h2>إضافة فرصة عميل جديد</h2><div class="form-grid two">
+      <label>اسم النشاط<input id="mlName" placeholder="اسم العميل أو النشاط"></label><label>النشاط<input id="mlType" placeholder="مطعم، كوفي، مصنع..."></label>
+      <label>المدينة<input id="mlCity" value="جدة"></label><label>الحي<input id="mlArea"></label>
+      <label>الجوال<input id="mlPhone" placeholder="9665..."></label><label>رابط الموقع<input id="mlWebsite"></label>
+      <label>رابط خرائط Google<input id="mlMaps"></label><label>المندوب<select id="mlRep"><option value="">بدون تعيين</option>${reps.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+    </div><label>سبب الفرصة<textarea id="mlReason" rows="3">نشاط جديد يحتاج أكياس أو تغليف.</textarea></label><br><button class="primary" onclick="jmsSaveManualLead()">حفظ الفرصة</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.jmsSaveManualLead=function(){
+    const lead=normalizeLead({name:mlName.value,business_type:mlType.value,city:mlCity.value,area:mlArea.value,phone:mlPhone.value,website:mlWebsite.value,maps_url:mlMaps.value,fit_reason:mlReason.value,assigned_rep_id:mlRep.value,status:'new'});
+    if(!lead.name || lead.name==='فرصة بدون اسم') return alert('اكتب اسم النشاط');
+    mergeLeads([lead]); closeModal(); renderNewCustomerRadar();
+  };
+  window.jmsLeadSetStatus=function(id,status){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; l.status=status; l.updated_at=new Date().toISOString(); if(typeof save==='function')save(); renderNewCustomerRadar();};
+  window.jmsLeadAssign=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const repId=prompt('اكتب ID المندوب أو اتركه فارغًا',l.assigned_rep_id||'rep-yaser'); if(repId===null)return; l.assigned_rep_id=repId; if(typeof save==='function')save(); renderNewCustomerRadar();};
+  window.jmsLeadWhatsApp=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const p=normPhone(l.phone); if(!p) return prompt('رسالة جاهزة للنسخ',l.suggested_message||makeLeadMessage(l)); window.open(`https://wa.me/${p}?text=${encodeURIComponent(l.suggested_message||makeLeadMessage(l))}`,'_blank');};
+  window.jmsLeadCopyMessage=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const msg=l.suggested_message||makeLeadMessage(l); navigator.clipboard?.writeText(msg); alert('تم نسخ رسالة التواصل');};
+  window.jmsLeadConvertToCustomer=function(id){
+    const l=(db.leads||[]).find(x=>x.id===id); if(!l)return;
+    const repId=l.assigned_rep_id || (db.reps||[])[0]?.id || 'rep-yaser';
+    db.customers ||= [];
+    db.customers.unshift({id:localId(),name:l.name,phone:l.phone||'',city:l.city||'جدة',district:l.area||'',location:l.maps_url||l.website||'',category:l.business_type||'عميل محتمل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:`تحول من رادار العملاء الجدد. السبب: ${l.fit_reason||''}`,created_at:new Date().toISOString()});
+    l.status='converted'; l.converted_at=new Date().toISOString();
+    if(typeof save==='function')save(); renderNewCustomerRadar(); if(typeof renderCustomers==='function')renderCustomers(); alert('تم تحويل الفرصة إلى عميل');
+  };
+  window.renderNewCustomerRadar=function(){
+    ensureGrowthDb();
+    const list=(db.leads||[]).slice().sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+    const total=document.getElementById('radarTotal'); if(total) total.textContent=list.length;
+    const hot=document.getElementById('radarHot'); if(hot) hot.textContent=list.filter(l=>Number(l.score||0)>=75).length;
+    const contacted=document.getElementById('radarContacted'); if(contacted) contacted.textContent=list.filter(l=>l.status==='contacted'||l.status==='interested').length;
+    const converted=document.getElementById('radarConverted'); if(converted) converted.textContent=list.filter(l=>l.status==='converted').length;
+    const box=document.getElementById('radarLeadList'); if(!box)return;
+    box.innerHTML=list.map(l=>{
+      const score=Number(l.score||leadScore(l));
+      const statusText={new:'جديد',contacted:'تم التواصل',interested:'مهتم',not_interested:'غير مهتم',converted:'تحول إلى عميل'}[l.status]||l.status||'جديد';
+      return `<div class="jms-lead-card"><div class="jms-lead-head"><div><h3>${esc(l.name)}</h3><div class="jms-lead-meta"><span>${esc(l.business_type)}</span><span>${esc(l.city||'')}</span><span>${esc(l.area||'')}</span><span>المندوب: ${esc(repLabel(l.assigned_rep_id))}</span></div></div><span class="jms-score-pill ${scoreClass(score)}">${score}%</span></div><div><span class="jms-badge ${score>=75?'hot':'ok'}">${statusText}</span> <span class="jms-mini-muted">${esc(l.evidence||'فرصة تجارية من مصدر عام أو إدخال يدوي')}</span></div><p>${esc(l.fit_reason||'نشاط مناسب لمنتجات التغليف والأكياس.')}</p><div class="jms-lead-actions"><button class="primary" onclick="jmsLeadConvertToCustomer('${l.id}')">تحويل لعميل</button><button class="green" onclick="jmsLeadWhatsApp('${l.id}')">واتساب</button><button onclick="jmsLeadCopyMessage('${l.id}')">نسخ الرسالة</button><button onclick="jmsLeadSetStatus('${l.id}','contacted')">تم التواصل</button><button onclick="jmsLeadSetStatus('${l.id}','interested')">مهتم</button><button onclick="jmsLeadAssign('${l.id}')">تعيين مندوب</button>${l.maps_url?`<button class="blue" onclick="window.open('${esc(l.maps_url)}','_blank')">الخريطة</button>`:''}${l.website?`<button onclick="window.open('${esc(l.website)}','_blank')">الموقع</button>`:''}${l.source_url?`<button onclick="window.open('${esc(l.source_url)}','_blank')">المصدر</button>`:''}</div></div>`;
+    }).join('') || '<div class="panel">لا توجد فرص محفوظة. اضغط بحث الآن أو أضف فرصة يدوية.</div>';
+  };
+
+  function customerAiScore(c){
+    const last=lastVisitDate(c.id); const days=daysSince(last); const debt=Number(c.debt_balance||0); const orders=customerOrders(c.id).length; const quotes=customerQuotes(c.id).length;
+    let s=55 + Math.min(20,orders*4) + Math.min(12,quotes*3);
+    if(days>45) s-=25; else if(days>30) s-=15; else if(days<15) s+=8;
+    if(debt>0) s-=Math.min(25,Math.round(debt/800));
+    if(!normPhone(c.phone)) s-=8;
+    if(c.lat||c.lng||String(c.location||'').includes('maps')) s+=5;
+    return Math.max(5,Math.min(99,s));
+  }
+  function customerAiLabel(c){const s=customerAiScore(c); if(s>=80)return 'عميل ممتاز'; if(Number(c.debt_balance||0)>0 && daysSince(lastVisitDate(c.id))>25)return 'خطر تحصيل'; if(daysSince(lastVisitDate(c.id))>45)return 'متوقف يحتاج زيارة'; if(customerOrders(c.id).length===0)return 'فرصة بيع أول طلب'; return 'يحتاج متابعة';}
+  function buildDailyTasks(){
+    const customers=(typeof allowedCustomers==='function'?allowedCustomers():db.customers||[]);
+    const tasks=[];
+    customers.filter(c=>daysSince(lastVisitDate(c.id))>=30).slice(0,8).forEach(c=>tasks.push({type:'visit',priority:90,txt:`زيارة ${c.name} لأنه لم تتم زيارته منذ ${daysSince(lastVisitDate(c.id))} يوم`,customer_id:c.id,rep_id:c.rep_id}));
+    customers.filter(c=>Number(c.debt_balance||0)>0).sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0)).slice(0,8).forEach(c=>tasks.push({type:'collection',priority:85,txt:`متابعة تحصيل ${c.name}: ${sar(c.debt_balance)} ريال`,customer_id:c.id,rep_id:c.rep_id}));
+    customers.filter(c=>!normPhone(c.phone) || !(c.lat||c.lng||c.location)).slice(0,8).forEach(c=>tasks.push({type:'data',priority:60,txt:`استكمال بيانات ${c.name}: ${!normPhone(c.phone)?'رقم جوال ':''}${!(c.lat||c.lng||c.location)?'موقع العميل':''}`,customer_id:c.id,rep_id:c.rep_id}));
+    (db.quotes||[]).filter(q=>['pending','draft',''].includes(String(q.status||'').toLowerCase()) || String(q.status||'').includes('انتظار')).slice(0,6).forEach(q=>tasks.push({type:'quote',priority:70,txt:`متابعة عرض السعر ${q.quote_no||q.id} للعميل ${customerLabel(q.customer_id)}`,customer_id:q.customer_id,rep_id:q.rep_id}));
+    return tasks.sort((a,b)=>b.priority-a.priority).slice(0,18);
+  }
+  function quoteRisk(q){
+    const price=Number(q.price_kg||q.price||0); const amount=Number(q.total_amount||0); const kg=Number(q.total_kg||q.kg||0);
+    let risks=[]; if(price && price<7) risks.push('سعر الكيلو منخفض ويحتاج مراجعة'); if(amount && kg && amount/kg<7) risks.push('متوسط السعر أقل من الآمن'); if(!q.customer_id) risks.push('لا يوجد عميل مربوط'); if(String(q.status||'').includes('pending')||String(q.status||'').includes('انتظار')) risks.push('بانتظار اعتماد أو متابعة');
+    return risks;
+  }
+  window.jmsRenderAiCommandCenter=function(){
+    ensureGrowthDb();
+    const tasks=buildDailyTasks(); const riskCustomers=(db.customers||[]).filter(c=>Number(c.debt_balance||0)>0 && daysSince(lastVisitDate(c.id))>20); const opp=(db.customers||[]).filter(c=>customerOrders(c.id).length===0 || daysSince(lastVisitDate(c.id))>30); const quoteRiskRows=(db.quotes||[]).map(q=>({q,risks:quoteRisk(q)})).filter(x=>x.risks.length);
+    const set=(id,val)=>{const e=document.getElementById(id); if(e)e.textContent=val;};
+    set('aiTodayTasksCount',tasks.length); set('aiRiskCount',riskCustomers.length); set('aiOpportunityCount',opp.length); set('aiQuoteRiskCount',quoteRiskRows.length);
+    const tasksBox=document.getElementById('aiTodayTasks'); if(tasksBox) tasksBox.innerHTML=`<ul>${tasks.slice(0,10).map(t=>`<li>${esc(t.txt)} <span class="jms-mini-muted">— ${esc(repLabel(t.rep_id))}</span></li>`).join('')}</ul>` || 'لا توجد مهام.';
+    const risksBox=document.getElementById('aiCollectionRisks'); if(risksBox) risksBox.innerHTML=`<ul>${riskCustomers.slice(0,10).map(c=>`<li>${esc(c.name)} — ${sar(c.debt_balance)} — آخر زيارة ${lastVisitDate(c.id)||'لا توجد'}</li>`).join('')}</ul>` || 'لا توجد مخاطر.';
+    const oppBox=document.getElementById('aiSalesOpportunities'); if(oppBox) oppBox.innerHTML=`<ul>${opp.slice(0,10).map(c=>`<li>${esc(c.name)} — ${customerAiLabel(c)} — المندوب ${esc(repLabel(c.rep_id))}</li>`).join('')}</ul>` || 'لا توجد فرص.';
+    const quoteBox=document.getElementById('aiQuoteIntelligence'); if(quoteBox) quoteBox.innerHTML=`<ul>${quoteRiskRows.slice(0,10).map(x=>`<li>${esc(x.q.quote_no||x.q.id)} — ${esc(customerLabel(x.q.customer_id))}: ${esc(x.risks.join('، '))}</li>`).join('')}</ul>` || 'لا توجد عروض تحتاج مراجعة.';
+    const table=document.getElementById('aiCustomerScoreTable');
+    if(table){
+      const rows=(db.customers||[]).map(c=>({c,score:customerAiScore(c),label:customerAiLabel(c)})).sort((a,b)=>b.score-a.score).slice(0,25);
+      table.innerHTML=`<table class="jms-ai-table"><tr><th>العميل</th><th>التقييم</th><th>الحالة</th><th>آخر زيارة</th><th>مديونية</th><th>إجراء</th></tr>${rows.map(r=>`<tr><td>${esc(r.c.name)}</td><td><span class="jms-score-pill ${scoreClass(r.score)}">${r.score}%</span></td><td>${esc(r.label)}</td><td>${lastVisitDate(r.c.id)||'-'}</td><td>${sar(r.c.debt_balance||0)}</td><td><button class="jms-growth-btn gray" onclick="jmsOpenCustomer360Growth('${r.c.id}')">ملف 360</button></td></tr>`).join('')}</table>`;
+    }
+  };
+  window.jmsPrintAiCommandReport=function(){ const txt=document.getElementById('aiCommandCenter')?.innerText||''; const w=window.open('','_blank'); w.document.write(`<html dir="rtl"><head><title>JMS AI Report</title><style>body{font-family:Tahoma,Arial;line-height:1.9;padding:30px;white-space:pre-line}</style></head><body>${esc(txt)}</body></html>`); w.document.close(); w.print(); };
+  window.jmsOpenCustomer360Growth=function(cid){
+    const c=(db.customers||[]).find(x=>x.id===cid); if(!c)return; const score=customerAiScore(c); const tasks=buildDailyTasks().filter(t=>t.customer_id===cid); const msg=makeLeadMessage({name:c.name,business_type:c.category,phone:c.phone});
+    modalBody.innerHTML=`<h2>ملف العميل الذكي 360°</h2><div class="jms-growth-grid"><div class="jms-growth-card"><b>${esc(c.name)}</b><span>${esc(c.category||'عميل')}</span></div><div class="jms-growth-card"><b>${score}%</b><span>${esc(customerAiLabel(c))}</span></div><div class="jms-growth-card"><b>${lastVisitDate(cid)||'-'}</b><span>آخر زيارة</span></div><div class="jms-growth-card"><b>${sar(c.debt_balance||0)}</b><span>المديونية</span></div></div><div class="jms-ai-insight"><h3>الإجراء المقترح</h3><ul>${(tasks.length?tasks:[{txt:'متابعة ودية للحفاظ على العلاقة'}]).map(t=>`<li>${esc(t.txt)}</li>`).join('')}</ul></div><label>رسالة واتساب مقترحة<textarea rows="5" id="c360Msg">${esc(msg)}</textarea></label><br><button class="primary" onclick="navigator.clipboard?.writeText(c360Msg.value);alert('تم نسخ الرسالة')">نسخ الرسالة</button><button onclick="closeModal()">إغلاق</button>`; modal.classList.remove('hidden');
+  };
+  function enrichCustomerCards(){
     document.querySelectorAll('.customer-card').forEach(card=>{
-      let name=card.querySelector('h3')?.textContent?.trim();
-      if(!name) return;
-      const c=allowed().find(x=>String(x.name||'').trim()===name);
-      if(!c || card.dataset.jmsGps==='1') return;
-      card.dataset.jmsGps='1';
-      const g=customerGeo(c);
-      const chip=`<div class="jms-gps-chip ${g?'':'no'}"><b>${g?'📍 الموقع محفوظ':'📍 الموقع غير محدد'}</b><span>${g?`${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}`:'اضغط تحديد الموقع عند العميل'}</span>${c.gps?.updated_at?`<span>آخر تحديث ${String(c.gps.updated_at).slice(0,10)}</span>`:''}</div>`;
-      const actions=`<div class="jms-gps-customer-actions"><button class="gps" onclick="jmsGpsCaptureCustomer('${esc(c.id)}')">تحديد الموقع</button><button class="manual" onclick="jmsGpsManualCustomer('${esc(c.id)}')">إدخال يدوي</button>${g?`<button class="map" onclick="jmsGpsOpenCustomer('${esc(c.id)}')">فتح الخريطة</button>`:''}</div>`;
-      const target=card.querySelector('.customer-actions') || card;
-      target.insertAdjacentHTML('beforebegin', chip);
-      target.insertAdjacentHTML('afterend', actions);
+      if(card.dataset.aiGrowth==='1') return; const name=card.querySelector('h3')?.textContent?.trim(); const c=(db.customers||[]).find(x=>String(x.name||'').trim()===name); if(!c)return; card.dataset.aiGrowth='1'; const score=customerAiScore(c);
+      const div=document.createElement('div'); div.className='jms-customer-score'; div.innerHTML=`<span>${esc(customerAiLabel(c))}</span><span class="circle">${score}</span>`; const actions=card.querySelector('.customer-actions,.actions,.row-actions')||card; actions.parentNode.insertBefore(div,actions);
+      const btn=document.createElement('button'); btn.className='jms-growth-btn purple'; btn.textContent='ملف 360'; btn.onclick=()=>jmsOpenCustomer360Growth(c.id); (card.querySelector('.customer-actions,.actions,.row-actions')||card).appendChild(btn);
     });
   }
 
-  function aiRouteAnswer(q){
-    const route=window.jmsGpsBuildPlan({limit:12});
-    const all=allowed();
-    const gpsCount=all.filter(hasGps).length;
-    if(!gpsCount){
-      return 'لا يوجد عملاء لديهم مواقع محفوظة. افتح صفحة العملاء واضغط «تحديد الموقع» لكل عميل، وبعدها أقدر أرتب الزيارات حسب القرب.';
+  const oldLocalFinal = window.jmsAiLocalAnswerFinal;
+  function aiGrowthLocalAnswer(q){
+    q=String(q||'');
+    if(/عملاء جدد|زبائن جدد|رادار|افتتاح|فتح موقع|موقع جديد|صيد العملاء/.test(q)){
+      const city=(q.match(/جدة|مكة|الرياض|الطائف|المدينة|الخمرة|بحرة|الصناعية الثانية/)||['جدة'])[0];
+      return `لتشغيل رادار العملاء الجدد افتح صفحة "رادار العملاء الجدد" واضغط بحث الآن.\nاقتراح بحث سريع:\n- المدينة: ${city}\n- النشاط: مطاعم وكوفيهات جديدة أو مصانع غذائية جديدة\n- كلمات: افتتاح جديد opening soon new business\n\nبعد ظهور النتائج اضغط: تحويل لعميل، تعيين مندوب، أو نسخ رسالة التواصل.`;
     }
-    if(!route.length) return 'لا يوجد مسار مناسب حسب الفلاتر الحالية.';
-    const total=route.reduce((s,c)=>s+Number(c.__distance||0),0);
-    return `مسار الزيارات المقترح حسب القرب والأولوية:\n\n${route.map((c,i)=>`${i+1}. ${c.name} — ${repText(c.rep_id)} — ${Number(c.__distance||0).toFixed(2)} كم من النقطة السابقة${Number(c.debt_balance||0)>0?` — تحصيل ${Number(c.debt_balance||0).toLocaleString('ar-SA')} ريال`:''}`).join('\n')}\n\nإجمالي المسافة التقريبية بين العملاء: ${total.toFixed(2)} كم\nالعملاء بدون موقع محفوظ: ${all.length-gpsCount}\n\nافتح صفحة «مواقع العملاء والمسارات» للفلترة حسب المندوب أو فتح المسار في Google Maps.`;
+    if(/مهام اليوم|وش اسوي اليوم|تقرير المدير|أوامر الذكاء/.test(q)){
+      const tasks=buildDailyTasks().slice(0,12); return tasks.length?'مهام اليوم الذكية:\n'+tasks.map((t,i)=>`${i+1}. ${t.txt} — ${repLabel(t.rep_id)}`).join('\n'):'لا توجد مهام عاجلة اليوم.';
+    }
+    if(/تقييم العملاء|سكور|score|تصنيف العملاء/.test(q)){
+      return (db.customers||[]).map(c=>({c,score:customerAiScore(c),label:customerAiLabel(c)})).sort((a,b)=>b.score-a.score).slice(0,15).map((r,i)=>`${i+1}. ${r.c.name}: ${r.score}% — ${r.label}`).join('\n') || 'لا يوجد عملاء.';
+    }
+    return null;
   }
-  function installAiHook(){
-    const old = window.askJmsAI || (typeof askJmsAI === 'function' ? askJmsAI : null);
-    if(!old || old.__jmsGpsHook) return;
-    const hooked = async function(q){
-      const input=document.getElementById('jmsAiInput');
-      q=String(q || input?.value || '').trim();
-      const isRoute = (q.includes('رتب') || q.includes('خطة') || q.includes('مسار')) && (q.includes('زيارة') || q.includes('زيارات') || q.includes('العملاء'));
-      if(!isRoute) return old.apply(this, arguments);
-      const body=document.getElementById('jmsAiBody');
-      if(!body) return old.apply(this, arguments);
-      const ans=aiRouteAnswer(q);
-      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${esc(q)}</div>`);
-      body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot"><div class="jms-gps-ai-route">${esc(ans)}</div><div class="jms-ai-route-actions"><button onclick="document.querySelector('[data-page=gpsRoutes]')?.click()">فتح صفحة المسارات</button><button onclick="jmsGpsOpenRoute()">فتح Google Maps</button></div></div>`);
-      body.scrollTop=body.scrollHeight;
-      if(input) input.value='';
-    };
-    hooked.__jmsGpsHook=true;
-    window.askJmsAI=hooked;
-    try{ askJmsAI=hooked; }catch(e){}
+  const oldJmsAiAnswerGrowth = (typeof jmsAiAnswer==='function') ? jmsAiAnswer : null;
+  window.jmsAiLocalAnswerFinal=function(q){return aiGrowthLocalAnswer(q) || (oldLocalFinal?oldLocalFinal(q):(oldJmsAiAnswerGrowth?oldJmsAiAnswerGrowth(q):'لم أجد إجابة مناسبة.'));};
+  if(typeof jmsAiAnswer==='function'){
+    const previous=jmsAiAnswer;
+    jmsAiAnswer=function(q){return aiGrowthLocalAnswer(q) || previous(q);};
   }
+  const oldNeedsWeb=window.jmsAiQuestionNeedsWebFinal;
+  window.jmsAiQuestionNeedsWebFinal=function(q){ q=String(q||''); if(/عملاء جدد|زبائن جدد|افتتاح|opening|موقع جديد|new business|رادار/.test(q)) return true; return oldNeedsWeb?oldNeedsWeb(q):false; };
 
-  function initGpsUpdate(){
-    injectStyle();
-    injectPage();
-    installAiHook();
-    setTimeout(enhanceGpsCards,300);
-    setTimeout(renderGpsRoutesPage,500);
-  }
-  const oldRenderCustomers = window.renderCustomers || (typeof renderCustomers === 'function' ? renderCustomers : null);
-  if(oldRenderCustomers && !oldRenderCustomers.__jmsGpsWrapped){
-    const wrapped=function(){ const r=oldRenderCustomers.apply(this, arguments); setTimeout(enhanceGpsCards,200); return r; };
-    wrapped.__jmsGpsWrapped=true;
-    window.renderCustomers=wrapped;
-    try{ renderCustomers=wrapped; }catch(e){}
-  }
-  const oldRenderAll = window.renderAll || (typeof renderAll === 'function' ? renderAll : null);
-  if(oldRenderAll && !oldRenderAll.__jmsGpsWrapped){
-    const wrappedAll=function(){ const r=oldRenderAll.apply(this, arguments); setTimeout(()=>{injectPage(); enhanceGpsCards(); renderGpsRoutesPage(); installAiHook();},250); return r; };
-    wrappedAll.__jmsGpsWrapped=true;
-    window.renderAll=wrappedAll;
-    try{ renderAll=wrappedAll; }catch(e){}
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initGpsUpdate); else initGpsUpdate();
+  const oldRenderCustomersGrowth=(typeof renderCustomers==='function')?renderCustomers:null;
+  if(oldRenderCustomersGrowth){ renderCustomers=function(){ oldRenderCustomersGrowth.apply(this,arguments); setTimeout(enrichCustomerCards,100); }; }
+  const oldRenderAllGrowth=(typeof renderAll==='function')?renderAll:null;
+  renderAll=function(){ if(oldRenderAllGrowth) oldRenderAllGrowth(); ensureGrowthDb(); addNavAndPages(); renderNewCustomerRadar(); jmsRenderAiCommandCenter(); setTimeout(enrichCustomerCards,120); };
+
+  ready(function(){ ensureGrowthDb(); injectStyle(); addNavAndPages(); setTimeout(()=>{renderNewCustomerRadar(); jmsRenderAiCommandCenter(); enrichCustomerCards();},400); });
+  window.JMS_AI_GROWTH_SUITE_VERSION=SUITE_VERSION;
 })();
