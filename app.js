@@ -4961,3 +4961,519 @@ askJmsAI = async function(q){
   ready(function(){ ensureGrowthDb(); injectStyle(); addNavAndPages(); setTimeout(()=>{renderNewCustomerRadar(); jmsRenderAiCommandCenter(); enrichCustomerCards();},400); });
   window.JMS_AI_GROWTH_SUITE_VERSION=SUITE_VERSION;
 })();
+/* JMS UPDATE 08: Admin users, permissions, and customer assignment */
+(function(){
+  function ensure(){
+    db.users ||= [];
+    db.reps ||= [];
+    db.customers ||= [];
+    db.assignmentLogs ||= [];
+  }
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function esc(v){ return String(v ?? '').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+  function roleLabel(role){ return role==='admin'?'مدير النظام':role==='sales'?'مدير مبيعات':'مندوب'; }
+  function isManager(){ return currentUser && (currentUser.role==='admin' || currentUser.role==='sales'); }
+  function roleDefaults(role){
+    if(role==='admin') return {manage_users:true,manage_permissions:true,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:true,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true};
+    if(role==='sales') return {manage_users:false,manage_permissions:false,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:false,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true};
+    return {manage_users:false,manage_permissions:false,view_all_customers:false,create_customers:true,edit_customers:false,reassign_customers:false,delete_customers:false,view_reports:false,use_ai:true,manage_quotes:false,manage_orders:false};
+  }
+  function normalizeUser(u){
+    if(!u) return u;
+    u.status ||= 'active';
+    u.permissions = {...roleDefaults(u.role), ...(u.permissions||{})};
+    return u;
+  }
+  function normalizeAll(){
+    ensure();
+    db.users.forEach(normalizeUser);
+    db.reps.forEach(r=>{
+      const u=db.users.find(x=>x.id===r.id || (x.email && r.email && x.email===r.email));
+      if(u){ Object.assign(r,{name:u.name,email:u.email,phone:u.phone,status:u.status,role:'rep'}); }
+    });
+    if(currentUser){
+      const u=db.users.find(x=>x.id===currentUser.id || (x.email&&x.email===currentUser.email));
+      currentUser.permissions = {...roleDefaults(currentUser.role), ...(currentUser.permissions||{}), ...(u?.permissions||{})};
+      currentUser.status = u?.status || currentUser.status || 'active';
+      window.currentUser=currentUser;
+      sessionStorage.setItem('jms_current_user', JSON.stringify(currentUser));
+    }
+  }
+  function can(permission){
+    normalizeAll();
+    if(!currentUser) return false;
+    if(currentUser.role==='admin') return true;
+    return !!currentUser.permissions?.[permission];
+  }
+  function repOptions(selected=''){
+    ensure();
+    const reps = db.reps.filter(r=>r.status!=='disabled');
+    return reps.map(r=>`<option value="${esc(r.id)}" ${r.id===selected?'selected':''}>${esc(r.name)}</option>`).join('');
+  }
+  function repLabel(id){ return db.reps.find(r=>r.id===id)?.name || db.users.find(u=>u.id===id)?.name || '-'; }
+  function upsertLocalUser(u){
+    ensure();
+    normalizeUser(u);
+    const i=db.users.findIndex(x=>x.id===u.id || (x.email && u.email && x.email===u.email));
+    if(i>=0) db.users[i]={...db.users[i],...u,permissions:{...roleDefaults(u.role),...(db.users[i].permissions||{}),...(u.permissions||{})}};
+    else db.users.push(u);
+    if(u.role==='rep'){
+      const rep={id:u.id,name:u.name,email:u.email,phone:u.phone||'',role:'rep',status:u.status||'active'};
+      const ri=db.reps.findIndex(r=>r.id===u.id || (r.email&&u.email&&r.email===u.email));
+      if(ri>=0) db.reps[ri]={...db.reps[ri],...rep}; else db.reps.push(rep);
+    }else{
+      db.reps = db.reps.filter(r=>r.id!==u.id && (!u.email || r.email!==u.email));
+    }
+  }
+  async function serverCreateUser(u,password){
+    if(typeof jmsPostJson !== 'function') throw new Error('missing_api_client');
+    return await jmsPostJson('/api/auth-create-user',{id:u.id,name:u.name,email:u.email,phone:u.phone,password,role:u.role,status:u.status,permissions:u.permissions});
+  }
+  async function serverUpdateUser(u){
+    if(typeof jmsPostJson !== 'function') throw new Error('missing_api_client');
+    return await jmsPostJson('/api/auth-update-user',{id:u.id,name:u.name,email:u.email,phone:u.phone,role:u.role,status:u.status,permissions:u.permissions});
+  }
+
+  // Keep customer visibility aligned with permissions.
+  window.allowedCustomers = function(){
+    normalizeAll();
+    if(!currentUser) return [];
+    if(currentUser.role==='admin' || can('view_all_customers')) return db.customers || [];
+    return (db.customers||[]).filter(c=>c.rep_id===currentUser.id);
+  };
+
+  // Login override to preserve server permissions locally.
+  if(window.loginForm){
+    loginForm.onsubmit = async function(e){
+      e.preventDefault();
+      const email=loginEmail.value.trim();
+      const password=loginPassword.value;
+      const role=document.querySelector('input[name=loginRole]:checked')?.value||'';
+      if(!email || !password) return alert('اكتب البريد وكلمة المرور');
+      try{
+        const data=await jmsPostJson('/api/auth-login',{email,password,role});
+        const u=data.user;
+        if(!u) return alert('بيانات الدخول غير صحيحة');
+        currentUser={id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active',permissions:{...roleDefaults(u.role),...(u.permissions||{})}};
+        window.currentUser=currentUser;
+        sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
+        if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
+        upsertLocalUser(currentUser);
+        save();
+        showApp();
+      }catch(err){
+        console.error('JMS login error', err);
+        alert('بيانات الدخول غير صحيحة أو تعذر الاتصال بخدمة الدخول');
+      }
+    };
+  }
+
+  window.openUserForm = function(){
+    if(!can('manage_users')) return alert('إضافة المستخدمين مخصصة لمدير النظام فقط');
+    const perms = roleDefaults('rep');
+    modalBody.innerHTML = `<h2>إضافة مستخدم وصلاحيات</h2>
+      <p class="muted">المستخدم يُحفظ في السيرفر، وبعدها يقدر يدخل من أي جهاز.</p>
+      <div class="form-grid two">
+        <label>الاسم<input id="muName" placeholder="اسم المستخدم"></label>
+        <label>البريد<input id="muEmail" type="email" placeholder="name@jms.local" autocomplete="username"></label>
+        <label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
+        <label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="كلمة مرور مؤقتة"></label>
+        <label>الدور<select id="muRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label>
+        <label>الحالة<select id="muStatus"><option value="active">نشط</option><option value="disabled">موقوف</option></select></label>
+      </div>
+      <h3>الصلاحيات</h3>
+      <div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">
+        ${permissionCheckboxes(perms)}
+      </div>
+      <button class="primary" onclick="saveUser()">حفظ المستخدم في السيرفر</button>
+      <button onclick="closeModal()">إلغاء</button>`;
+    modal.classList.remove('hidden');
+  };
+
+  function permissionCheckboxes(perms){
+    const list=[
+      ['manage_users','إضافة المستخدمين'],['manage_permissions','تعديل الصلاحيات'],['view_all_customers','عرض كل العملاء'],['create_customers','إضافة عملاء'],['edit_customers','تعديل العملاء'],['reassign_customers','نقل العميل لمندوب'],['delete_customers','حذف العملاء'],['view_reports','عرض التقارير'],['use_ai','استخدام الذكاء'],['manage_quotes','إدارة عروض الأسعار'],['manage_orders','إدارة الطلبات']
+    ];
+    return list.map(([k,t])=>`<label style="display:flex;gap:6px;align-items:center;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px"><input type="checkbox" class="jmsPerm" data-perm="${k}" ${perms[k]?'checked':''}> ${t}</label>`).join('');
+  }
+  window.jmsFillPermissionPreset=function(role){
+    const p=roleDefaults(role);
+    document.querySelectorAll('.jmsPerm').forEach(x=>{ x.checked=!!p[x.dataset.perm]; });
+  };
+  function collectPermissions(){
+    const out={};
+    document.querySelectorAll('.jmsPerm').forEach(x=>out[x.dataset.perm]=!!x.checked);
+    return out;
+  }
+  window.saveUser = async function(){
+    if(!can('manage_users')) return alert('لا تملك صلاحية إضافة المستخدمين');
+    const name=muName.value.trim(), email=muEmail.value.trim().toLowerCase(), phone=muPhone.value.trim(), password=muPass.value, role=muRole.value, status=muStatus.value;
+    if(!name || !email || !password) return alert('اكتب الاسم والبريد وكلمة المرور المؤقتة');
+    const u={id:(role==='rep'?'rep-':'u-')+Date.now(),name,email,phone,role,status,permissions:collectPermissions()};
+    try{
+      await serverCreateUser(u,password);
+      upsertLocalUser(u);
+      save(); closeModal(); renderAll();
+      alert('تم إنشاء المستخدم وحفظ صلاحياته في السيرفر');
+    }catch(e){
+      console.error(e);
+      alert('تعذر إنشاء المستخدم في السيرفر. تأكد من ملفات API ومتغيرات Supabase في Vercel.');
+    }
+  };
+
+  window.openUserPermissions=function(userId){
+    if(!can('manage_permissions')) return alert('تعديل الصلاحيات لمدير النظام فقط');
+    normalizeAll();
+    const u=db.users.find(x=>x.id===userId);
+    if(!u) return alert('لم يتم العثور على المستخدم');
+    normalizeUser(u);
+    modalBody.innerHTML=`<h2>تعديل صلاحيات المستخدم</h2>
+      <div class="form-grid two">
+        <label>الاسم<input id="epName" value="${esc(u.name)}"></label>
+        <label>البريد<input id="epEmail" value="${esc(u.email)}"></label>
+        <label>الجوال<input id="epPhone" value="${esc(u.phone||'')}"></label>
+        <label>الدور<select id="epRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" ${u.role==='rep'?'selected':''}>مندوب</option><option value="sales" ${u.role==='sales'?'selected':''}>مدير مبيعات</option><option value="admin" ${u.role==='admin'?'selected':''}>مدير نظام</option></select></label>
+        <label>الحالة<select id="epStatus"><option value="active" ${u.status==='active'?'selected':''}>نشط</option><option value="disabled" ${u.status!=='active'?'selected':''}>موقوف</option></select></label>
+      </div>
+      <h3>الصلاحيات</h3><div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">${permissionCheckboxes(u.permissions)}</div>
+      <button class="primary" onclick="saveUserPermissions('${u.id}')">حفظ الصلاحيات</button>
+      <button onclick="resetPass('${u.id}')">تغيير كلمة المرور</button>
+      <button onclick="closeModal()">إغلاق</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveUserPermissions=async function(userId){
+    const u=db.users.find(x=>x.id===userId);
+    if(!u) return;
+    Object.assign(u,{name:epName.value.trim(),email:epEmail.value.trim().toLowerCase(),phone:epPhone.value.trim(),role:epRole.value,status:epStatus.value,permissions:collectPermissions()});
+    try{ await serverUpdateUser(u); }catch(e){ console.warn('server update failed',e); alert('تم الحفظ محليًا، لكن تعذر تحديث السيرفر. جرّب بعد ضبط API.'); }
+    upsertLocalUser(u); save(); closeModal(); renderAll();
+  };
+  window.toggleUser=async function(userId){
+    const u=db.users.find(x=>x.id===userId); if(!u) return;
+    u.status = u.status==='active'?'disabled':'active';
+    normalizeUser(u);
+    try{ await serverUpdateUser(u); }catch(e){ console.warn(e); }
+    upsertLocalUser(u); save(); renderAll();
+  };
+  window.resetPass=async function(userId){
+    const u=db.users.find(x=>x.id===userId); if(!u) return alert('لم يتم العثور على المستخدم');
+    const p=prompt('اكتب كلمة المرور الجديدة للمستخدم: '+u.name);
+    if(!p) return;
+    try{
+      await jmsPostJson('/api/auth-admin-reset-password',{userId:u.id,email:u.email,newPassword:p});
+      alert('تم تغيير كلمة المرور في السيرفر');
+    }catch(e){
+      try{
+        await serverCreateUser(normalizeUser(u),p);
+        alert('تم إنشاء/تحديث المستخدم في السيرفر بكلمة المرور الجديدة');
+      }catch(err){
+        console.error(err); alert('تعذر تغيير كلمة المرور في السيرفر');
+      }
+    }
+  };
+  window.renderUsers=function(){
+    if(!window.usersList) return;
+    normalizeAll();
+    const canEdit=can('manage_permissions') || can('manage_users');
+    usersList.innerHTML = `<div class="panel"><div class="row-actions"><button class="primary" onclick="openUserForm()">إضافة مستخدم</button></div></div>`+
+    `<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>{normalizeUser(u); const p=[]; if(u.permissions.view_all_customers)p.push('كل العملاء'); if(u.permissions.reassign_customers)p.push('نقل العملاء'); if(u.permissions.view_reports)p.push('تقارير'); if(u.permissions.use_ai)p.push('AI'); return `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${roleLabel(u.role)}</td><td>${p.join('، ')||'-'}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions">${canEdit?`<button onclick="openUserPermissions('${u.id}')">الصلاحيات</button><button onclick="resetPass('${u.id}')">كلمة المرور</button><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button>`:''}</div></td></tr>`}).join('')}</table>`;
+  };
+
+  // Customer creation/edit/assignment.
+  window.openCustomerForm=function(){
+    if(!can('create_customers')) return alert('لا تملك صلاحية إضافة عملاء');
+    const defaultRep=currentUser?.role==='rep'?currentUser.id:(db.reps[0]?.id||'');
+    modalBody.innerHTML=`<h2>إضافة عميل</h2><div class="form-grid two">
+      <label>اسم العميل<input id="mcName"></label><label>الجوال<input id="mcPhone"></label>
+      <label>المدينة<input id="mcCity" value="جدة"></label>
+      <label>المندوب<select id="mcRep" ${can('reassign_customers')?'':'disabled'}>${repOptions(defaultRep)}</select></label>
+      <label>الموقع<input id="mcLocation"></label><label>تصنيف العميل<input id="mcCategory" value="عميل"></label>
+      <label>المديونية<input id="mcDebt" type="number" value="0"></label>
+    </div><br><button class="primary" onclick="saveCustomer()">حفظ</button><button onclick="closeModal()">إلغاء</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCustomer=function(){
+    if(!can('create_customers')) return alert('لا تملك صلاحية إضافة عملاء');
+    const repId = can('reassign_customers') ? mcRep.value : (currentUser?.id || mcRep.value);
+    db.customers.unshift({id:uid(),name:mcName.value.trim(),phone:mcPhone.value.trim(),city:mcCity.value.trim()||'جدة',location:mcLocation.value.trim(),category:mcCategory.value.trim()||'عميل',status:'active',rep_id:repId,debt_balance:Number(mcDebt.value||0),notes:'',created_at:new Date().toISOString()});
+    save(); closeModal(); renderAll();
+  };
+  window.openAssignCustomer=function(customerId){
+    if(!can('reassign_customers')) return alert('لا تملك صلاحية نقل العملاء بين المناديب');
+    const c=db.customers.find(x=>x.id===customerId); if(!c) return alert('لم يتم العثور على العميل');
+    modalBody.innerHTML=`<h2>نقل العميل لمندوب</h2>
+      <p><b>${esc(c.name)}</b><br>المندوب الحالي: ${esc(repLabel(c.rep_id))}</p>
+      <label>المندوب الجديد<select id="assignRep">${repOptions(c.rep_id)}</select></label>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="assignOpenRecords" checked> تحديث العروض والطلبات المفتوحة لهذا العميل إلى المندوب الجديد</label>
+      <label>سبب النقل<input id="assignReason" placeholder="مثال: تغيير منطقة / تحويل متابعة"></label>
+      <br><button class="primary" onclick="saveCustomerAssignment('${customerId}')">حفظ النقل</button><button onclick="closeModal()">إلغاء</button>`;
+    modal.classList.remove('hidden');
+  };
+  window.saveCustomerAssignment=function(customerId){
+    const c=db.customers.find(x=>x.id===customerId); if(!c) return;
+    const oldRep=c.rep_id, newRep=assignRep.value;
+    if(!newRep || oldRep===newRep) return alert('اختر مندوب جديد');
+    c.rep_id=newRep;
+    c.assignment_history ||= [];
+    const log={id:uid(),customer_id:c.id,customer_name:c.name,from_rep_id:oldRep,to_rep_id:newRep,reason:assignReason.value||'',by:currentUser?.name||'',at:new Date().toISOString()};
+    c.assignment_history.unshift(log); db.assignmentLogs.unshift(log);
+    if(assignOpenRecords.checked){
+      (db.quotes||[]).forEach(q=>{ if(q.customer_id===customerId && !['cancelled','rejected','closed'].includes(q.status)) q.rep_id=newRep; });
+      (db.orders||[]).forEach(o=>{ if(o.customer_id===customerId && !['مكتمل','ملغي','closed','cancelled'].includes(o.status)) o.rep_id=newRep; });
+    }
+    save(); closeModal(); renderAll(); alert('تم نقل العميل إلى '+repLabel(newRep));
+  };
+  window.openBulkAssignCustomers=function(){
+    if(!can('reassign_customers')) return alert('لا تملك صلاحية نقل العملاء');
+    modalBody.innerHTML=`<h2>نقل عدة عملاء</h2>
+      <div class="form-grid two"><label>من مندوب<select id="bulkFrom"><option value="all">كل العملاء</option>${repOptions('')}</select></label><label>إلى مندوب<select id="bulkTo">${repOptions('')}</select></label></div>
+      <button onclick="renderBulkCustomerList()">عرض العملاء</button><div id="bulkCustomerList" style="max-height:320px;overflow:auto;margin-top:10px"></div>
+      <br><button class="primary" onclick="saveBulkAssignment()">نقل المحددين</button><button onclick="closeModal()">إلغاء</button>`;
+    modal.classList.remove('hidden'); renderBulkCustomerList();
+  };
+  window.renderBulkCustomerList=function(){
+    const from=document.getElementById('bulkFrom')?.value||'all';
+    const list=(db.customers||[]).filter(c=>from==='all'||c.rep_id===from);
+    const box=document.getElementById('bulkCustomerList'); if(!box) return;
+    box.innerHTML=list.map(c=>`<label style="display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px"><input type="checkbox" class="bulkCust" value="${esc(c.id)}"> <span><b>${esc(c.name)}</b><br><small>${esc(c.phone||'-')} · ${esc(repLabel(c.rep_id))}</small></span></label>`).join('') || '<div class="panel">لا يوجد عملاء</div>';
+  };
+  window.saveBulkAssignment=function(){
+    const ids=[...document.querySelectorAll('.bulkCust:checked')].map(x=>x.value);
+    const to=document.getElementById('bulkTo')?.value;
+    if(!ids.length) return alert('حدد العملاء أولًا');
+    if(!to) return alert('اختر المندوب الجديد');
+    ids.forEach(cid=>{ const c=db.customers.find(x=>x.id===cid); if(c){ const old=c.rep_id; c.rep_id=to; const log={id:uid(),customer_id:c.id,customer_name:c.name,from_rep_id:old,to_rep_id:to,reason:'نقل جماعي',by:currentUser?.name||'',at:new Date().toISOString()}; c.assignment_history ||= []; c.assignment_history.unshift(log); db.assignmentLogs.unshift(log); } });
+    save(); closeModal(); renderAll(); alert('تم نقل '+ids.length+' عميل إلى '+repLabel(to));
+  };
+
+  window.renderCustomers=function(){
+    if(!window.customersGrid) return;
+    normalizeAll();
+    const q=(window.customerSearch?.value||'').trim();
+    const list=allowedCustomers().filter(c=>!q||`${c.name||''} ${c.phone||''} ${c.city||''} ${c.district||''} ${c.location||''}`.includes(q));
+    customersGrid.innerHTML=list.map(c=>{
+      const st=(typeof customerState==='function')?customerState(c):['عميل','ok'];
+      const last=(typeof lastVisit==='function')?lastVisit(c.id):'';
+      return `<div class="customer-card"><div class="customer-head"><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||'-')} · ${esc(c.city||'-')} · ${esc(repLabel(c.rep_id))}</p></div><span class="badge ${st[1]}">${esc(st[0])}</span></div>
+      <div class="metrics"><div><b>${typeof money==='function'?money(c.debt_balance):Number(c.debt_balance||0)}</b><span>مديونية</span></div><div><b>${esc(last||'-')}</b><span>آخر زيارة</span></div><div><b>${esc(c.next_date||'-')}</b><span>موعد</span></div></div>
+      <div class="customer-actions">
+        <button onclick="visit('${c.id}')">تمت الزيارة</button><button onclick="newOrder('${c.id}')">طلب جديد</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="collect('${c.id}')">تحصيل</button><button onclick="note('${c.id}')">ملاحظة</button>
+        ${can('edit_customers')?`<button onclick="editCustomerPro('${c.id}')">تعديل العميل</button>`:''}
+        ${can('reassign_customers')?`<button class="primary" onclick="openAssignCustomer('${c.id}')">نقل لمندوب</button>`:''}
+        ${typeof openCustomerMap==='function'?`<button onclick="openCustomerMap('${c.id}')">موقع العميل</button>`:''}
+        ${typeof jmsOpenCustomer360Growth==='function'?`<button onclick="jmsOpenCustomer360Growth('${c.id}')">ملف ذكي</button>`:''}
+      </div></div>`;
+    }).join('') || '<div class="panel">لا يوجد عملاء</div>';
+  };
+
+  function addManagementButtons(){
+    try{
+      const usersPage=document.getElementById('users')||document.getElementById('usersPage');
+      if(usersPage && !document.getElementById('jmsAddUserBtn')){
+        const head=usersPage.querySelector('.page-head,.head-actions')||usersPage;
+        const b=document.createElement('button'); b.id='jmsAddUserBtn'; b.className='primary'; b.textContent='إضافة مستخدم وصلاحيات'; b.onclick=openUserForm; head.prepend(b);
+      }
+      const customersPage=document.getElementById('customers')||document.getElementById('customersPage');
+      if(customersPage && !document.getElementById('jmsBulkAssignBtn') && can('reassign_customers')){
+        const head=customersPage.querySelector('.page-head,.head-actions')||customersPage;
+        const b=document.createElement('button'); b.id='jmsBulkAssignBtn'; b.className='primary'; b.textContent='نقل عدة عملاء'; b.onclick=openBulkAssignCustomers; head.prepend(b);
+      }
+    }catch(e){}
+  }
+  const oldRenderAll = window.renderAll;
+  window.renderAll=function(){ if(typeof oldRenderAll==='function') oldRenderAll(); normalizeAll(); addManagementButtons(); };
+  setTimeout(()=>{normalizeAll(); addManagementButtons(); if(typeof renderUsers==='function')renderUsers(); if(typeof renderCustomers==='function')renderCustomers();},500);
+})();
+
+
+/* JMS UPDATE 10: AI WhatsApp Campaigns - supervised customer messaging */
+(function(){
+  const CAMPAIGN_VERSION='2026-07-ai-whatsapp-campaigns-v1';
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+  function uid(){ return (typeof id==='function') ? id() : (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
+  function nowIso(){ return new Date().toISOString(); }
+  function todaySafe(){ return (typeof today==='function') ? today() : new Date().toISOString().slice(0,10); }
+  function isManager(){ return currentUser && (currentUser.role==='admin' || currentUser.role==='sales'); }
+  function repLabel(id){ return (db.reps||[]).find(r=>r.id===id)?.name || '-'; }
+  function normalizePhone(p){ let d=String(p||'').replace(/\D/g,''); if(!d) return ''; if(d.startsWith('966')) return d; return '966'+d.replace(/^0/,''); }
+  function lastVisitDate(cid){ try{ return (db.visits||[]).filter(v=>v.customer_id===cid).sort((a,b)=>String(b.date||b.checkin_at||'').localeCompare(String(a.date||a.checkin_at||'')))[0]?.date || ''; }catch(e){ return ''; } }
+  function daysSince(d){ if(!d) return 9999; const dt=new Date(d); if(isNaN(dt)) return 9999; return Math.max(0,Math.floor((new Date(todaySafe())-dt)/86400000)); }
+  function ensureCampaignDb(){ db.whatsappCampaigns ||= []; db.whatsappMessageLog ||= []; db.whatsappSettings ||= {maxBatch:50,cooldownDays:7,requireApproval:true}; db.customers ||= []; db.reps ||= []; }
+  function canUseCampaigns(){ return isManager(); }
+  function customerOrders(cid){ return (db.orders||[]).filter(o=>o.customer_id===cid); }
+  function lastMessageLog(cid){ return (db.whatsappMessageLog||[]).filter(x=>x.customer_id===cid).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')))[0]; }
+  function messageCooldownBlocked(c){ const last=lastMessageLog(c.id); if(!last) return false; const days=daysSince(String(last.at||'').slice(0,10)); return days < Number(db.whatsappSettings?.cooldownDays||7); }
+  function customerAllowedBySegment(c,seg){
+    const debt=Number(c.debt_balance||0);
+    const lastDays=daysSince(lastVisitDate(c.id));
+    const orders=customerOrders(c.id);
+    if(seg==='all') return true;
+    if(seg==='debt') return debt>0;
+    if(seg==='late_visit') return lastDays>=30;
+    if(seg==='inactive') return orders.length===0 || lastDays>=45;
+    if(seg==='no_location') return !(c.lat&&c.lng) && !String(c.location||'').includes('google');
+    if(seg==='hot_leads') return String(c.category||'').includes('محتمل') || String(c.notes||'').includes('رادار');
+    if(seg==='no_order_30') return orders.length===0 || daysSince((orders.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0]||{}).date)>=30;
+    return true;
+  }
+  function getCampaignTargets(){
+    ensureCampaignDb();
+    const seg=document.getElementById('wcSegment')?.value||'all';
+    const rep=document.getElementById('wcRep')?.value||'all';
+    const city=(document.getElementById('wcCity')?.value||'').trim();
+    const limit=Number(document.getElementById('wcLimit')?.value||50);
+    const optOnly=!!document.getElementById('wcOptInOnly')?.checked;
+    let list=(db.customers||[]).filter(c=>customerAllowedBySegment(c,seg));
+    if(rep!=='all') list=list.filter(c=>c.rep_id===rep);
+    if(city) list=list.filter(c=>String(c.city||'').includes(city)||String(c.district||'').includes(city)||String(c.location||'').includes(city));
+    if(optOnly) list=list.filter(c=>c.whatsapp_opt_in===true || c.whatsapp_opt_in==='yes' || c.whatsapp_opt_in==='نعم');
+    return list.slice(0, Math.min(limit, 200));
+  }
+  function campaignTypeLabel(type){
+    return {followup:'متابعة عامة',debt:'تحصيل',inactive:'إعادة تنشيط',offer:'عرض خاص',visit:'ترتيب زيارة',lead:'عميل محتمل'}[type] || 'متابعة عامة';
+  }
+  function defaultMessageFor(c,type,tone){
+    const name=(c.name||'عميلنا الكريم').trim();
+    const company='شركة جدة النموذجية للصناعة';
+    if(type==='debt') return `السلام عليكم أستاذ/ ${name}\nنذكركم بوجود مبلغ مستحق في الحساب، ونأمل ترتيب السداد أو تزويدنا بموعد مناسب.\nشاكرين تعاونكم، ${company}`;
+    if(type==='inactive') return `السلام عليكم أستاذ/ ${name}\nلاحظنا أن الطلبات توقفت من فترة، وحابين نخدمكم من جديد في احتياجات الأكياس والتغليف. إذا عندكم طلب قريب نجهز لكم عرض مناسب.\n${company}`;
+    if(type==='offer') return `السلام عليكم أستاذ/ ${name}\nعندنا إمكانية تجهيز أكياس وتغليف حسب المقاس والكمية المطلوبة بسعر مناسب. نرسل لكم عرض سعر؟\n${company}`;
+    if(type==='visit') return `السلام عليكم أستاذ/ ${name}\nنرغب بترتيب زيارة قصيرة للتعرف على احتياجكم من الأكياس والتغليف وخدمتكم بشكل أفضل. ما الوقت المناسب لكم؟\n${company}`;
+    if(type==='lead') return `السلام عليكم، معكم ${company}.\nنخدمكم في الأكياس والتغليف حسب المقاس والكمية، ويسعدنا إرسال عرض مناسب لاحتياجكم.`;
+    return `السلام عليكم أستاذ/ ${name}\nحبيت أتابع معكم احتياجكم من الأكياس والتغليف، وإذا عندكم طلب أو مقاس معين نجهزه لكم بعرض مناسب.\n${company}`;
+  }
+  function buildMessage(c){
+    const type=document.getElementById('wcType')?.value||'followup';
+    const tone=document.getElementById('wcTone')?.value||'professional';
+    const custom=(document.getElementById('wcPrompt')?.value||'').trim();
+    let msg = custom || defaultMessageFor(c,type,tone);
+    msg=msg.replaceAll('{{name}}', c.name||'عميلنا الكريم')
+           .replaceAll('{{phone}}', c.phone||'')
+           .replaceAll('{{city}}', c.city||'')
+           .replaceAll('{{rep}}', repLabel(c.rep_id))
+           .replaceAll('{{debt}}', String(c.debt_balance||0))
+           .replaceAll('{{category}}', c.category||'');
+    return msg;
+  }
+  function targetStatus(c){
+    const phone=normalizePhone(c.phone);
+    if(!phone) return {ready:false,reason:'لا يوجد رقم جوال'};
+    if(c.whatsapp_opt_out===true || c.whatsapp_opt_out==='yes') return {ready:false,reason:'موقوف واتساب'};
+    if(messageCooldownBlocked(c)) return {ready:false,reason:'تم إرسال رسالة خلال آخر '+(db.whatsappSettings?.cooldownDays||7)+' أيام'};
+    return {ready:true,reason:'جاهز'};
+  }
+  function campaignPreviewRows(){
+    return getCampaignTargets().map(c=>({customer:c,phone:normalizePhone(c.phone),message:buildMessage(c),status:targetStatus(c)}));
+  }
+  function injectCampaignStyle(){
+    if(document.getElementById('jmsWhatsappCampaignStyle')) return;
+    const st=document.createElement('style'); st.id='jmsWhatsappCampaignStyle'; st.textContent=`
+      .jms-campaign-toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end}.jms-campaign-toolbar input,.jms-campaign-toolbar select,.jms-campaign-toolbar textarea{width:100%;border:1px solid #dbe3ef;border-radius:14px;padding:10px;background:#fff}.jms-campaign-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.jms-campaign-actions button{border:0;border-radius:14px;padding:10px 14px;background:#0f172a;color:#fff;cursor:pointer}.jms-campaign-actions button.green{background:#16a34a}.jms-campaign-actions button.blue{background:#2563eb}.jms-campaign-actions button.orange{background:#ea580c}.jms-campaign-actions button.gray{background:#475569}.jms-campaign-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}.jms-campaign-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:14px;box-shadow:0 8px 26px rgba(15,23,42,.06)}.jms-campaign-card b{font-size:24px;color:#0f172a}.jms-campaign-card span{display:block;color:#64748b}.jms-campaign-table{width:100%;border-collapse:separate;border-spacing:0 8px}.jms-campaign-table th{font-size:12px;color:#64748b;text-align:right}.jms-campaign-table td{background:#fff;padding:10px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;vertical-align:top}.jms-campaign-table td:first-child{border-radius:0 14px 14px 0;border-right:1px solid #e5e7eb}.jms-campaign-table td:last-child{border-radius:14px 0 0 14px;border-left:1px solid #e5e7eb}.jms-campaign-badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#eef2ff;color:#3730a3}.jms-campaign-badge.ok{background:#dcfce7;color:#166534}.jms-campaign-badge.warn{background:#fef3c7;color:#92400e}.jms-campaign-badge.bad{background:#fee2e2;color:#991b1b}.jms-campaign-note{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:16px;padding:12px;margin:10px 0}.jms-message-preview{white-space:pre-wrap;max-width:390px;color:#334155;font-size:13px}.jms-campaign-log{display:grid;gap:8px}.jms-campaign-log-row{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px}.jms-muted{color:#64748b;font-size:12px}.jms-link-btn{border:0;border-radius:999px;background:#16a34a;color:#fff;padding:7px 10px;cursor:pointer}
+    `; document.head.appendChild(st);
+  }
+  function repOptions(){ return '<option value="all">كل المناديب</option>'+(db.reps||[]).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join(''); }
+  function addCampaignPage(){
+    const nav=document.querySelector('.sidebar nav'); const main=document.querySelector('main.main') || document.querySelector('.main');
+    if(!nav || !main) return;
+    if(!document.querySelector('[data-page="whatsappCampaigns"]')){
+      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='whatsappCampaigns'; btn.textContent='حملات واتساب الذكية';
+      nav.insertBefore(btn, nav.querySelector('[data-page="jmsAI"]') || null);
+    }
+    if(!document.getElementById('whatsappCampaigns')){
+      const sec=document.createElement('section'); sec.id='whatsappCampaigns'; sec.className='page';
+      sec.innerHTML=`
+        <div class="page-head with-action"><div><h1>حملات واتساب الذكية</h1><p>الذكاء يختار العملاء، يكتب الرسائل، يعرضها عليك للموافقة، ثم يجهز الإرسال تحت تحكم المدير.</p></div><div class="head-actions"><button class="primary" onclick="jmsGenerateWhatsappCampaign()">توليد حملة</button><button onclick="jmsRenderWhatsappCampaigns()">تحديث</button></div></div>
+        <div class="panel"><div class="jms-campaign-toolbar">
+          <label>نوع الحملة<select id="wcType"><option value="followup">متابعة عامة</option><option value="debt">تحصيل</option><option value="inactive">إعادة تنشيط العملاء المتوقفين</option><option value="offer">عرض خاص</option><option value="visit">ترتيب زيارات</option><option value="lead">عملاء محتملين</option></select></label>
+          <label>اختيار العملاء<select id="wcSegment"><option value="all">كل العملاء</option><option value="debt">عليهم تحصيل</option><option value="late_visit">لم تتم زيارتهم 30 يوم</option><option value="inactive">متوقفين / لا يوجد طلب حديث</option><option value="hot_leads">عملاء محتملين من الرادار</option><option value="no_location">بدون موقع</option><option value="no_order_30">بدون طلب 30 يوم</option></select></label>
+          <label>المندوب<select id="wcRep">${repOptions()}</select></label>
+          <label>المدينة / الحي<input id="wcCity" placeholder="جدة، مكة، الصناعية"></label>
+          <label>عدد العملاء<select id="wcLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
+          <label>النبرة<select id="wcTone"><option value="professional">رسمية ومختصرة</option><option value="friendly">ودية</option><option value="firm">حازمة للتحصيل</option></select></label>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="wcOptInOnly"> إرسال/تجهيز فقط للعملاء الموافقين على رسائل واتساب</label>
+        <label style="margin-top:12px;display:block">تعليمات خاصة للذكاء / قالب الرسالة<textarea id="wcPrompt" rows="4" placeholder="اكتب رسالة مخصصة أو استخدم المتغيرات: {{name}} {{city}} {{rep}} {{debt}}. اتركها فارغة ليكتب الذكاء رسالة مناسبة حسب نوع الحملة."></textarea></label>
+        <div class="jms-campaign-note">نظام الأمان: لا يتم الإرسال مباشرة إلا بعد اعتماد المدير. يمنع التكرار لنفس العميل خلال 7 أيام، ويستبعد العملاء بدون رقم أو الموقوفين من واتساب.</div>
+        <div class="jms-campaign-actions"><button class="blue" onclick="jmsGenerateWhatsappCampaign()">توليد ومعاينة</button><button class="green" onclick="jmsSaveWhatsappCampaignDraft()">حفظ كمسودة</button><button class="orange" onclick="jmsApproveAndSendCampaign()">اعتماد وإرسال الدفعة الجاهزة</button><button class="gray" onclick="jmsExportCampaignPreview()">نسخ القائمة</button></div></div>
+        <div class="jms-campaign-grid"><div class="jms-campaign-card"><b id="wcTotal">0</b><span>مختار</span></div><div class="jms-campaign-card"><b id="wcReady">0</b><span>جاهز للإرسال</span></div><div class="jms-campaign-card"><b id="wcBlocked">0</b><span>مستبعد</span></div><div class="jms-campaign-card"><b id="wcSentMonth">0</b><span>رسائل هذا الشهر</span></div></div>
+        <div id="wcPreview" class="panel"></div>
+        <div class="panel" style="margin-top:14px"><div class="panel-head"><b>سجل الحملات والرسائل</b><span>كل عملية إرسال تحفظ للمراجعة</span></div><div id="wcLog" class="jms-campaign-log"></div></div>`;
+      main.appendChild(sec);
+    }
+    document.querySelectorAll('.nav').forEach(btn=>{
+      if(btn.dataset.jmsCampaignBound==='1') return; btn.dataset.jmsCampaignBound='1';
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active'); const page=document.getElementById(btn.dataset.page); if(page) page.classList.add('active');
+        if(btn.dataset.page==='whatsappCampaigns') jmsRenderWhatsappCampaigns();
+      });
+    });
+    if(currentUser && currentUser.role==='rep') document.querySelectorAll('.manager-only,.admin-only').forEach(x=>x.style.display='none');
+  }
+  function renderPreview(rows){
+    const box=document.getElementById('wcPreview'); if(!box) return;
+    const ready=rows.filter(r=>r.status.ready); const blocked=rows.length-ready.length;
+    const set=(id,val)=>{const e=document.getElementById(id); if(e)e.textContent=val;};
+    set('wcTotal',rows.length); set('wcReady',ready.length); set('wcBlocked',blocked);
+    const month=todaySafe().slice(0,7); set('wcSentMonth',(db.whatsappMessageLog||[]).filter(x=>String(x.at||'').startsWith(month)).length);
+    box.innerHTML=`<div class="panel-head"><b>معاينة قبل الإرسال</b><span>${ready.length} جاهز من ${rows.length}. راجع الرسائل قبل الاعتماد.</span></div>
+      <table class="jms-campaign-table"><tr><th>العميل</th><th>الجوال</th><th>المندوب</th><th>الحالة</th><th>الرسالة</th><th>إجراء</th></tr>
+      ${rows.map(r=>`<tr><td><b>${esc(r.customer.name)}</b><br><span class="jms-muted">${esc(r.customer.city||'')} · ${esc(r.customer.category||'')}</span></td><td>${esc(r.phone||'-')}</td><td>${esc(repLabel(r.customer.rep_id))}</td><td><span class="jms-campaign-badge ${r.status.ready?'ok':'bad'}">${esc(r.status.reason)}</span></td><td><div class="jms-message-preview">${esc(r.message)}</div></td><td>${r.phone?`<button class="jms-link-btn" onclick="jmsOpenWaLink('${r.phone}',\`${esc(r.message).replace(/`/g,'&#96;')}\`)">فتح واتساب</button>`:''}<br><button onclick="jmsCopyCampaignMessage('${r.customer.id}')">نسخ</button><br><button onclick="jmsCampaignSetOptOut('${r.customer.id}',true)">إيقاف رسائل</button></td></tr>`).join('') || '<tr><td colspan="6">لا يوجد عملاء مطابقين.</td></tr>'}
+      </table>`;
+  }
+  window.jmsGenerateWhatsappCampaign=function(){
+    if(!canUseCampaigns()) return alert('حملات واتساب للمدير ومدير المبيعات فقط');
+    ensureCampaignDb(); const rows=campaignPreviewRows(); window.JMS_LAST_CAMPAIGN_ROWS=rows; renderPreview(rows);
+  };
+  window.jmsSaveWhatsappCampaignDraft=function(){
+    if(!canUseCampaigns()) return alert('لا تملك صلاحية'); ensureCampaignDb();
+    const rows=window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows();
+    const campaign={id:uid(),type:document.getElementById('wcType')?.value||'followup',type_label:campaignTypeLabel(document.getElementById('wcType')?.value),segment:document.getElementById('wcSegment')?.value||'all',status:'draft',count:rows.length,ready_count:rows.filter(r=>r.status.ready).length,created_by:currentUser?.name||'',created_at:nowIso(),items:rows.map(r=>({customer_id:r.customer.id,customer_name:r.customer.name,phone:r.phone,message:r.message,ready:r.status.ready,reason:r.status.reason}))};
+    db.whatsappCampaigns.unshift(campaign); save(); jmsRenderWhatsappCampaigns(); alert('تم حفظ الحملة كمسودة');
+  };
+  window.jmsApproveAndSendCampaign=async function(){
+    if(!canUseCampaigns()) return alert('لا تملك صلاحية'); ensureCampaignDb();
+    const rows=(window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows()).filter(r=>r.status.ready).slice(0, Number(db.whatsappSettings?.maxBatch||50));
+    if(!rows.length) return alert('لا يوجد عملاء جاهزين للإرسال');
+    const ok=confirm(`سيتم اعتماد وإرسال ${rows.length} رسالة. هل توافق؟`); if(!ok) return;
+    const campaign={id:uid(),type:document.getElementById('wcType')?.value||'followup',type_label:campaignTypeLabel(document.getElementById('wcType')?.value),segment:document.getElementById('wcSegment')?.value||'all',status:'approved',count:rows.length,ready_count:rows.length,created_by:currentUser?.name||'',created_at:nowIso(),items:rows.map(r=>({customer_id:r.customer.id,customer_name:r.customer.name,phone:r.phone,message:r.message,ready:true}))};
+    db.whatsappCampaigns.unshift(campaign); save();
+    try{
+      const payload={campaign_id:campaign.id,previewOnly:false,messages:rows.map(r=>({customer_id:r.customer.id,name:r.customer.name,phone:r.phone,message:r.message}))};
+      const res=await fetch('/api/whatsapp-campaign-send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const data=await res.json().catch(()=>({ok:false,error:'bad_response'}));
+      const results=data.results||[];
+      results.forEach((x,i)=>{
+        const r=rows[i]; db.whatsappMessageLog.unshift({id:uid(),campaign_id:campaign.id,customer_id:r.customer.id,customer_name:r.customer.name,phone:r.phone,message:r.message,status:x.ok?'sent':(x.mode==='fallback_link'?'fallback_link':'failed'),error:x.error||'',url:x.url||'',at:nowIso(),by:currentUser?.name||''});
+      });
+      campaign.status=data.ok?'sent':'partial'; campaign.sent_at=nowIso(); campaign.api_mode=data.mode||''; save(); jmsRenderWhatsappCampaigns();
+      const fallback=results.find(x=>x.url)?.url; if(fallback && confirm('بعض الرسائل تحتاج فتح واتساب يدويًا. هل تفتح أول رابط؟')) window.open(fallback,'_blank');
+      alert(data.ok?'تم تنفيذ الإرسال/التجهيز وحفظ السجل':'تمت المحاولة. راجع السجل لمعرفة الرسائل التي تحتاج إرسال يدوي أو إعداد WhatsApp API.');
+    }catch(e){ console.error(e); campaign.status='failed'; save(); alert('تعذر الاتصال بخدمة الإرسال. تأكد من رفع api/whatsapp-campaign-send.js وإعداد متغيرات واتساب.'); }
+  };
+  window.jmsRenderWhatsappCampaigns=function(){
+    ensureCampaignDb(); addCampaignPage();
+    const rows=window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows(); renderPreview(rows);
+    const log=document.getElementById('wcLog'); if(log){
+      const campaigns=(db.whatsappCampaigns||[]).slice(0,10); const messages=(db.whatsappMessageLog||[]).slice(0,20);
+      log.innerHTML=`<h3>آخر الحملات</h3>${campaigns.map(c=>`<div class="jms-campaign-log-row"><b>${esc(c.type_label||c.type)}</b> — ${esc(c.status)} — ${c.ready_count||0}/${c.count||0}<br><span class="jms-muted">${esc(c.created_at||'')} · ${esc(c.created_by||'')}</span></div>`).join('')||'<div class="jms-muted">لا توجد حملات محفوظة.</div>'}<h3>آخر الرسائل</h3>${messages.map(m=>`<div class="jms-campaign-log-row"><b>${esc(m.customer_name)}</b> — <span class="jms-campaign-badge ${m.status==='sent'?'ok':m.status==='failed'?'bad':'warn'}">${esc(m.status)}</span><br><span class="jms-muted">${esc(m.at||'')} · ${esc(m.phone||'')}</span>${m.url?`<br><button class="jms-link-btn" onclick="window.open('${esc(m.url)}','_blank')">فتح رابط الإرسال</button>`:''}</div>`).join('')||'<div class="jms-muted">لا توجد رسائل.</div>'}`;
+    }
+  };
+  window.jmsOpenWaLink=function(phone,msg){ const to=normalizePhone(phone); if(!to) return alert('لا يوجد رقم'); window.open('https://wa.me/'+to+'?text='+encodeURIComponent(msg||''),'_blank'); };
+  window.jmsCopyCampaignMessage=function(cid){ const rows=window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows(); const r=rows.find(x=>x.customer.id===cid); if(!r) return; navigator.clipboard?.writeText(r.message); alert('تم نسخ الرسالة'); };
+  window.jmsCampaignSetOptOut=function(cid,val){ const c=(db.customers||[]).find(x=>x.id===cid); if(!c)return; c.whatsapp_opt_out=!!val; save(); jmsRenderWhatsappCampaigns(); alert('تم تحديث حالة واتساب للعميل'); };
+  window.jmsExportCampaignPreview=function(){ const rows=window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows(); const txt=rows.map((r,i)=>`${i+1}. ${r.customer.name} | ${r.phone||'-'} | ${r.status.reason}\n${r.message}`).join('\n\n'); navigator.clipboard?.writeText(txt); alert('تم نسخ قائمة الحملة'); };
+  const oldLocal=window.jmsAiLocalAnswerFinal;
+  window.jmsAiLocalAnswerFinal=function(q){
+    q=String(q||'');
+    if(/حملة|واتساب|رسائل العملاء|ارسل للعملاء|رسالة للعملاء|إرسال جماعي/.test(q)){
+      return 'افتح صفحة "حملات واتساب الذكية". اختر نوع الحملة والعملاء، ثم اضغط "توليد ومعاينة". النظام سيكتب الرسائل ويعرضها عليك، ولا يرسل إلا بعد اعتمادك.';
+    }
+    return oldLocal?oldLocal(q):null;
+  };
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){ if(typeof oldRenderAll==='function') oldRenderAll(); ensureCampaignDb(); injectCampaignStyle(); addCampaignPage(); if(document.getElementById('whatsappCampaigns')?.classList.contains('active')) jmsRenderWhatsappCampaigns(); };
+  ready(()=>{ ensureCampaignDb(); injectCampaignStyle(); addCampaignPage(); setTimeout(()=>{ if(typeof jmsRenderWhatsappCampaigns==='function') jmsRenderWhatsappCampaigns(); },600); });
+  window.JMS_AI_WHATSAPP_CAMPAIGNS_VERSION=CAMPAIGN_VERSION;
+})();
