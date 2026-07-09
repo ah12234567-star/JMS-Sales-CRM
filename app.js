@@ -5751,3 +5751,172 @@ askJmsAI = async function(q){
   ready(()=>{ ensureDb(); addStyle(); addPage(); setTimeout(()=>{ if(document.getElementById('productionWorkflow')) window.renderProductionWorkflow(); },500); });
   window.JMS_PRODUCTION_WORKFLOW_VERSION=VERSION;
 })();
+
+/* =========================================================
+   JMS UPDATE 11A-V3 — Sales approval to production execution
+   Fix: approved quotes/orders now become actionable production orders.
+   ========================================================= */
+(function(){
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s])); }
+  function uid(){ try{return crypto.randomUUID()}catch(e){return 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2)} }
+  function todaySafe(){ return (typeof today==='function') ? today() : new Date().toISOString().slice(0,10); }
+  function nowIso(){ return new Date().toISOString(); }
+  function saveDb(){ try{ if(typeof save==='function') save(); else localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(window.db||{})); }catch(e){} }
+  function canManager(){ const r=(window.currentUser||{}).role; return ['admin','sales','manager','production','production_manager'].includes(r); }
+  function customerLabel(id){ try{return customerName(id)}catch(e){ return (db.customers||[]).find(c=>c.id===id)?.name || '-'; } }
+  function repLabel(id){ try{return repName(id)}catch(e){ return (db.reps||[]).find(r=>r.id===id)?.name || '-'; } }
+  function fmt(n){ try{return money(n)}catch(e){ return Number(n||0).toLocaleString('ar-SA'); } }
+  function ensureProdDb(){
+    window.db ||= {};
+    db.orders ||= [];
+    db.quotes ||= [];
+    db.productionOrders ||= [];
+    db.productionLogs ||= [];
+  }
+  function productionNo(){ const n=(db.productionOrders||[]).length+1; return 'MO-'+todaySafe().slice(0,4)+'-'+String(n).padStart(5,'0'); }
+  function prodByOrder(orderId){ return (db.productionOrders||[]).find(p=>p.order_id===orderId); }
+  function logProd(pid, action, note){
+    const p=(db.productionOrders||[]).find(x=>x.id===pid);
+    db.productionLogs ||= [];
+    db.productionLogs.unshift({id:uid(),production_id:pid,order_id:p?.order_id||'',stage:p?.stage||'',action,note:note||'',by:(window.currentUser||{}).name||'',by_id:(window.currentUser||{}).id||'',at:nowIso()});
+  }
+  function publicStage(stage){
+    const map={pending_manager:'بانتظار موافقة المدير',approved_manager:'تم اعتماد المدير',payment_received:'تم تسجيل التحويل',sent_to_production:'أرسل للإنتاج',production_received:'استلام الإنتاج',technical_plan:'تجهيز الخطة الفنية',film_production:'إنتاج الفيلم',sent_to_cutting:'إرسال للمقص',cutting:'المقص',packing:'التغليف',ready_delivery:'جاهز للتسليم',delivered:'تم التسليم'};
+    return map[stage] || stage || '-';
+  }
+  function orderFromQuote(q){
+    ensureProdDb();
+    if(!q) return null;
+    let o=(db.orders||[]).find(x=>x.quote_id===q.id || x.source_quote_id===q.id || String(x.notes||'').includes(q.quote_no||'---'));
+    if(o) return o;
+    o={
+      id:uid(), quote_id:q.id, source_quote_id:q.id,
+      date:todaySafe(), customer_id:q.customer_id, rep_id:q.rep_id,
+      product:q.product||'', material:q.material||'', color:q.color||'', print:q.print||'',
+      width:q.width||'', length:q.length||'', size_unit:q.size_unit||'cm', thickness:q.thickness||'', thickness_unit:q.thickness_unit||'micron',
+      total_kg:q.total_kg||'', piece_weight:q.piece_weight||'', pieces:q.pieces||'',
+      amount:(q.total_amount||0)+' ريال', amount_value:Number(q.total_amount||0),
+      status:'بانتظار التحويل', notes:'تم الإنشاء من عرض السعر '+(q.quote_no||''),
+      created_by:(window.currentUser||{}).name||'', created_at:nowIso()
+    };
+    db.orders.unshift(o);
+    q.converted_to_order=true;
+    q.converted_order_id=o.id;
+    q.converted_at=nowIso();
+    return o;
+  }
+  function createOrUpdateProductionFromOrder(orderId, stage, note){
+    ensureProdDb();
+    const o=(db.orders||[]).find(x=>x.id===orderId);
+    if(!o) return null;
+    let p=prodByOrder(orderId);
+    if(!p){
+      p={
+        id:uid(), production_no:productionNo(), order_id:o.id,
+        customer_id:o.customer_id, rep_id:o.rep_id, date:o.date||todaySafe(),
+        product:o.product||'', material:o.material||'', color:o.color||'',
+        width:o.width||'', length:o.length||'', thickness:o.thickness||'', total_kg:o.total_kg||'', pieces:o.pieces||'', piece_weight:o.piece_weight||'',
+        amount_value:o.amount_value||0, stage:stage||'pending_manager', priority:'normal', due_date:o.delivery_date||'',
+        created_by:(window.currentUser||{}).name||'', created_at:nowIso(), updated_at:nowIso(),
+        technical:{
+          production_type:o.product||'', machine:'', operator:'', film_width:o.width||'', film_thickness:o.thickness||'', film_unit:'micron',
+          film_micron:o.thickness||'', roll_count:'', roll_weight:'', expected_kg:o.total_kg||'', actual_kg:'', waste_kg:'',
+          cut_width:o.width||'', cut_length:o.length||'', bag_size:'', seal_type:'', opening_side:'', print_status:o.print||'',
+          film_notes:'', cutting_notes:'', packing_notes:'', floor_notes:'',
+          or_no:'', form_date:'', delivery_time:o.delivery_terms||'', packing:'', region:'', delivery_to:'', contract_no:'',
+          plastic_type:o.material||'', bag_type:o.product||'', handle_color:'', gusset:'', plastic_color:o.color||'', master_batch:'', print_colors:'', ink_color:''
+        },
+        notes:[]
+      };
+      db.productionOrders.unshift(p);
+      logProd(p.id,'إنشاء أمر تصنيع', note || 'تم إنشاء أمر التصنيع من طلب المبيعات');
+    }else{
+      p.stage=stage||p.stage||'pending_manager';
+      p.updated_at=nowIso();
+      logProd(p.id,'تحديث حالة أمر التصنيع', note || ('تم تحديث الحالة إلى '+publicStage(p.stage)));
+    }
+    if(stage) p.stage=stage;
+    o.production_id=p.id;
+    o.production_stage=p.stage;
+    o.status=publicStage(p.stage);
+    return p;
+  }
+  function quoteReady(q){ return ['approved','sent','accepted'].includes(q.status) && !q.converted_to_order; }
+  function orderNeedsProduction(o){ return o && !o.production_id && !prodByOrder(o.id); }
+  window.jms11aQuoteToProduction=function(qid){
+    if(!canManager()) return alert('هذه الصلاحية للمدير أو مدير الإنتاج فقط');
+    const q=(db.quotes||[]).find(x=>x.id===qid); if(!q) return alert('لم يتم العثور على العرض');
+    if(!['approved','sent','accepted'].includes(q.status)) return alert('اعتمد عرض السعر أولًا');
+    const o=orderFromQuote(q);
+    const p=createOrUpdateProductionFromOrder(o.id,'sent_to_production','تم تحويل العرض المعتمد إلى أمر تصنيع وإرساله للإنتاج');
+    saveDb();
+    window.renderProductionWorkflow?.();
+    alert('تم تحويل العرض إلى طلب وإرساله للإنتاج');
+    if(p) setTimeout(()=>window.openProductionOrder?.(p.id),150);
+  };
+  window.jms11aApproveOrder=function(orderId){
+    if(!canManager()) return alert('هذه الصلاحية للمدير فقط');
+    const p=createOrUpdateProductionFromOrder(orderId,'approved_manager','تم اعتماد طلب المبيعات من المدير');
+    saveDb(); window.renderProductionWorkflow?.(); if(p) window.openProductionOrder?.(p.id);
+  };
+  window.jms11aMarkPaid=function(orderId){
+    if(!canManager()) return alert('هذه الصلاحية للمدير فقط');
+    const p=createOrUpdateProductionFromOrder(orderId,'payment_received','تم تسجيل تحويل / دفعة العميل');
+    saveDb(); window.renderProductionWorkflow?.(); if(p) window.openProductionOrder?.(p.id);
+  };
+  window.jms11aSendOrderToProduction=function(orderId){
+    if(!canManager()) return alert('هذه الصلاحية للمدير أو مدير الإنتاج فقط');
+    const p=createOrUpdateProductionFromOrder(orderId,'sent_to_production','تم إرسال الطلب إلى الإنتاج');
+    saveDb(); window.renderProductionWorkflow?.(); if(p) window.openProductionOrder?.(p.id);
+  };
+  function renderBridgePanel(){
+    ensureProdDb();
+    const page=document.getElementById('productionWorkflow');
+    if(!page) return;
+    let host=document.getElementById('prodSalesBridgePanel');
+    if(!host){
+      const wrap=page.querySelector('.jms-prod-wrap');
+      if(!wrap) return;
+      host=document.createElement('div');
+      host.id='prodSalesBridgePanel';
+      host.className='panel';
+      const kpis=wrap.querySelector('.jms-prod-kpis');
+      if(kpis && kpis.nextSibling) wrap.insertBefore(host,kpis.nextSibling); else wrap.prepend(host);
+    }
+    const quotes=(db.quotes||[]).filter(quoteReady).slice(0,10);
+    const orders=(db.orders||[]).filter(orderNeedsProduction).slice(0,15);
+    const qHtml=quotes.map(q=>`<div class="jms-prod-card"><h4>عرض معتمد ${esc(q.quote_no||'')}</h4><p><b>${esc(customerLabel(q.customer_id))}</b> · ${esc(q.product||'-')} · ${fmt(q.total_amount||0)} ريال</p><p>المقاس: ${esc(q.width||'-')} × ${esc(q.length||'-')} · الكمية: ${esc(q.total_kg||'-')} كجم · الحالة: ${esc(q.status)}</p><div class="jms-prod-actions"><button class="primary" onclick="jms11aQuoteToProduction('${q.id}')">تحويل وإرسال للإنتاج</button></div></div>`).join('');
+    const oHtml=orders.map(o=>`<div class="jms-prod-card"><h4>طلب مبيعات جاهز للتحويل</h4><p><b>${esc(customerLabel(o.customer_id))}</b> · ${esc(o.product||'-')} · ${fmt(o.amount_value||0)} ريال</p><p>المقاس: ${esc(o.width||'-')} × ${esc(o.length||'-')} · السماكة: ${esc(o.thickness||'-')} · الكمية: ${esc(o.total_kg||'-')} كجم</p><p>الحالة الحالية: ${esc(o.status||'جديد')} · المندوب: ${esc(repLabel(o.rep_id))}</p><div class="jms-prod-actions"><button onclick="jms11aApproveOrder('${o.id}')">اعتماد المدير</button><button onclick="jms11aMarkPaid('${o.id}')">تسجيل التحويل</button><button class="primary" onclick="jms11aSendOrderToProduction('${o.id}')">إرسال للإنتاج</button></div></div>`).join('');
+    host.innerHTML=`<div class="panel-head"><b>طلبات جاهزة للتحويل للإنتاج</b><span>هنا يبدأ التشغيل الفعلي: اعتماد السعر → تسجيل التحويل → إرسال للإنتاج.</span></div>
+      <div class="jms-prod-note">إذا اعتمدت السعر أو سجلت تحويل العميل، سيظهر الطلب هنا. اضغط <b>إرسال للإنتاج</b> ليظهر فورًا في لوحة المراحل ويفتح كرت أمر التشغيل.</div>
+      <div class="jms-prod-board">
+        <div class="jms-prod-col"><h3><span>عروض معتمدة لم تتحول</span><span class="jms-prod-count">${quotes.length}</span></h3>${qHtml || '<div class="jms-prod-muted">لا توجد عروض معتمدة تنتظر التحويل.</div>'}</div>
+        <div class="jms-prod-col"><h3><span>طلبات مبيعات بدون أمر تصنيع</span><span class="jms-prod-count">${orders.length}</span></h3>${oHtml || '<div class="jms-prod-muted">لا توجد طلبات تنتظر الإرسال للإنتاج.</div>'}</div>
+      </div>`;
+  }
+  const oldRenderProduction=window.renderProductionWorkflow;
+  window.renderProductionWorkflow=function(){
+    if(typeof oldRenderProduction==='function') oldRenderProduction.apply(this,arguments);
+    renderBridgePanel();
+  };
+  // Make newly converted orders visible in production queue immediately.
+  const oldConvert=window.convertQuoteToOrder;
+  if(typeof oldConvert==='function' && !oldConvert.jms11aV3Wrapped){
+    const wrapped=function(qid){
+      const q=(db.quotes||[]).find(x=>x.id===qid);
+      oldConvert.apply(this,arguments);
+      setTimeout(()=>{
+        ensureProdDb();
+        if(q){
+          const o=(db.orders||[]).find(x=>x.quote_id===q.id || x.source_quote_id===q.id || String(x.notes||'').includes(q.quote_no||'---'));
+          if(o && !o.production_id){ o.status='بانتظار التحويل'; saveDb(); }
+        }
+        window.renderProductionWorkflow?.();
+      },100);
+    };
+    wrapped.jms11aV3Wrapped=true;
+    window.convertQuoteToOrder=wrapped;
+  }
+  ready(()=>setTimeout(()=>{ if(document.getElementById('productionWorkflow')) window.renderProductionWorkflow?.(); },700));
+})();
