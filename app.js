@@ -150,10 +150,10 @@ function showApp(){
   currentUserName.textContent=((currentUser&&currentUser.name)||"");
   currentUserRole.textContent=roleText((currentUser&&currentUser.role));
 
-  const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
+  const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
   document.querySelectorAll('.nav').forEach(btn=>{
     const page = btn.dataset.page;
-    const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
+    const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
     if((currentUser&&currentUser.role) === 'rep' && !repAllowed.includes(page)){
       btn.style.display='none';
     } else if(btn.classList.contains('admin-only') && (currentUser&&currentUser.role) !== 'admin'){
@@ -1481,7 +1481,7 @@ function convertQuoteToOrder(qid){
     if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
     loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
     currentUserName.textContent=((currentUser&&currentUser.name)||""); currentUserRole.textContent=roleText((currentUser&&currentUser.role));
-    const repAllowed=['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
+    const repAllowed=['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
     document.querySelectorAll('.nav').forEach(btn=>{
       const page=btn.dataset.page;
       if((currentUser&&currentUser.role)==='rep'&&!repAllowed.includes(page)) btn.style.display='none';
@@ -6104,4 +6104,228 @@ askJmsAI = async function(q){
   const oldShowApp=window.showApp;
   if(typeof oldShowApp==='function') window.showApp=function(){ oldShowApp(); setTimeout(enhanceRadarForRep,250); };
   setTimeout(enhanceRadarForRep,1000);
+})();
+
+
+/* JMS UPDATE 13 - Rep AI Sales Assistant: permission-safe AI for reps */
+(function(){
+  if(window.__JMS_UPDATE_13_REP_AI__) return;
+  window.__JMS_UPDATE_13_REP_AI__ = true;
+
+  function h(v){return String(v??'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));}
+  function arMoney(n){return Number(n||0).toLocaleString('ar-SA');}
+  function safeDate(v){return String(v||'').slice(0,10) || '-';}
+  function norm(s){
+    return String(s||'').toLowerCase()
+      .replace(/[\u064B-\u0652]/g,'')
+      .replace(/[إأآا]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+      .replace(/[^\p{L}\p{N}\s]/gu,' ')
+      .replace(/\s+/g,' ').trim();
+  }
+  function repScope(){
+    const user=window.currentUser || currentUser || {};
+    if(user.role==='rep') return (db.customers||[]).filter(c=>c.rep_id===user.id);
+    return (db.customers||[]);
+  }
+  function repQuotes(){
+    const user=window.currentUser || currentUser || {};
+    if(user.role==='rep') return (db.quotes||[]).filter(q=>q.rep_id===user.id);
+    return (db.quotes||[]);
+  }
+  function repVisits(){
+    const user=window.currentUser || currentUser || {};
+    if(user.role==='rep') return (db.visits||[]).filter(v=>v.rep_id===user.id);
+    return (db.visits||[]);
+  }
+  function customerById(cid){return (db.customers||[]).find(c=>c.id===cid)||{};}
+  function repDisplayName(rid){return (db.reps||[]).find(r=>r.id===rid)?.name || rid || '-';}
+  function lastVisitFor(cid){
+    return (db.visits||[]).filter(v=>v.customer_id===cid)
+      .sort((a,b)=>String(b.date||b.checkin_at||b.created_at||'').localeCompare(String(a.date||a.checkin_at||a.created_at||'')))[0];
+  }
+  function lastQuoteFor(cid){
+    return (db.quotes||[]).filter(q=>q.customer_id===cid)
+      .sort((a,b)=>String(b.date||b.quote_date||b.created_at||'').localeCompare(String(a.date||a.quote_date||a.created_at||'')))[0];
+  }
+  function daysSince(d){
+    if(!d) return 9999;
+    const x=new Date(String(d).slice(0,10)); if(isNaN(x)) return 9999;
+    return Math.floor((new Date(new Date().toISOString().slice(0,10))-x)/86400000);
+  }
+  function findCustomer(q){
+    const nq=norm(q);
+    const words=nq.split(' ').filter(w=>w.length>=3 && !['كم','دين','الدين','رصيد','عليه','فلان','متى','عرض','سعر','زيارة','اخر','آخر','سويت','عملت','للعميل','للعميل'].includes(w));
+    const scored=repScope().map(c=>{
+      const name=norm(c.name);
+      let score=0;
+      if(name && nq.includes(name)) score+=100;
+      for(const w of words){ if(name.includes(w)) score+=20; }
+      const phone=String(c.phone||'').replace(/\D/g,'');
+      if(phone && nq.includes(phone.slice(-7))) score+=60;
+      return {c,score};
+    }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+    if(!scored.length) return {none:true};
+    const top=scored[0].score;
+    const matches=scored.filter(x=>x.score>=Math.max(20, top-10)).slice(0,6).map(x=>x.c);
+    if(matches.length>1 && top<100) return {ambiguous:true,matches};
+    return {customer:matches[0]};
+  }
+  function statusText(s){
+    const m={pending:'بانتظار اعتماد',approved:'معتمد',sent:'مرسل للعميل',accepted:'العميل وافق',rejected:'مرفوض',cancelled:'ملغي'};
+    return m[String(s||'').toLowerCase()] || s || 'بدون حالة';
+  }
+  function customerSummary(c){
+    const lv=lastVisitFor(c.id), lq=lastQuoteFor(c.id);
+    const quotes=(db.quotes||[]).filter(q=>q.customer_id===c.id);
+    const orders=(db.orders||[]).filter(o=>o.customer_id===c.id);
+    const collections=(db.collections||[]).filter(x=>x.customer_id===c.id);
+    const lastCol=collections.sort((a,b)=>String(b.date||b.created_at||'').localeCompare(String(a.date||a.created_at||'')))[0];
+    return `ملف العميل: ${c.name}\n- المندوب: ${repDisplayName(c.rep_id)}\n- الجوال: ${c.phone||'غير مسجل'}\n- الرصيد/الدين: ${arMoney(c.debt_balance||0)} ريال\n- آخر زيارة: ${lv ? safeDate(lv.date||lv.checkin_at) : 'لا توجد زيارة'}${lv?.notes?' - '+lv.notes:''}\n- آخر عرض سعر: ${lq ? (lq.quote_no||lq.id)+' بتاريخ '+safeDate(lq.date||lq.quote_date||lq.created_at)+' - الحالة: '+statusText(lq.status)+' - القيمة: '+arMoney(lq.total_amount||lq.amount_value||0)+' ريال' : 'لا يوجد'}\n- عدد العروض: ${quotes.length}\n- عدد الطلبات: ${orders.length}\n- آخر تحصيل: ${lastCol ? arMoney(lastCol.amount||0)+' ريال بتاريخ '+safeDate(lastCol.date||lastCol.created_at) : 'لا يوجد'}\n\nالإجراء المقترح: ${Number(c.debt_balance||0)>0?'متابعة تحصيل برسالة محترمة ثم اتصال.':(lq && !['accepted','rejected','cancelled'].includes(String(lq.status||''))?'متابعة عرض السعر المفتوح.':'تحديد زيارة متابعة أو عرض جديد حسب احتياج العميل.')}`;
+  }
+  function collectionList(){
+    const rows=repScope().filter(c=>Number(c.debt_balance||0)>0).sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0)).slice(0,25);
+    if(!rows.length) return 'لا توجد مديونيات مسجلة على عملائك.';
+    return 'ديون عملائك حسب الأعلى:\n'+rows.map((c,i)=>`${i+1}. ${c.name} - ${arMoney(c.debt_balance)} ريال - ${c.phone||'لا يوجد رقم'}`).join('\n');
+  }
+  function quoteList(){
+    const rows=repQuotes().filter(q=>!['accepted','rejected','cancelled'].includes(String(q.status||'').toLowerCase())).sort((a,b)=>String(b.date||b.created_at||'').localeCompare(String(a.date||a.created_at||''))).slice(0,25);
+    if(!rows.length) return 'لا توجد عروض مفتوحة تحتاج متابعة.';
+    return 'عروضك المفتوحة:\n'+rows.map((q,i)=>`${i+1}. ${q.quote_no||q.id} - ${customerById(q.customer_id).name||'-'} - ${safeDate(q.date||q.created_at)} - ${statusText(q.status)} - ${arMoney(q.total_amount||q.amount_value||0)} ريال`).join('\n');
+  }
+  function lateVisitsList(){
+    const rows=repScope().map(c=>({c,lv:lastVisitFor(c.id)})).map(x=>({...x,days:daysSince(x.lv?.date||x.lv?.checkin_at)})).filter(x=>x.days>=30).sort((a,b)=>b.days-a.days).slice(0,25);
+    if(!rows.length) return 'لا يوجد عملاء متأخرين عن الزيارة أكثر من 30 يوم.';
+    return 'عملاء يحتاجون زيارة:\n'+rows.map((x,i)=>`${i+1}. ${x.c.name} - ${x.days>=9000?'لم تتم زيارته سابقًا':x.days+' يوم'} - ${x.c.phone||'لا يوجد رقم'} - ${x.c.district||x.c.city||'-'}`).join('\n');
+  }
+  function visitPlan(){
+    const rows=repScope().map(c=>({c,lv:lastVisitFor(c.id)})).map(x=>({c:x.c, days:daysSince(x.lv?.date||x.lv?.checkin_at), debt:Number(x.c.debt_balance||0)}))
+      .sort((a,b)=>(b.days*2+b.debt/1000)-(a.days*2+a.debt/1000)).slice(0,12);
+    if(!rows.length) return 'لا توجد بيانات عملاء لترتيب الزيارات.';
+    return 'ترتيب زيارات مقترح للمندوب:\n'+rows.map((x,i)=>`${i+1}. ${x.c.name} - ${x.c.district||x.c.city||'-'} - الرصيد ${arMoney(x.debt)} ريال - آخر زيارة: ${x.days>=9000?'لا توجد':x.days+' يوم'}`).join('\n')+'\n\nملاحظة: إذا كان موقع العملاء محفوظًا، استخدم صفحة الزيارات الذكية لفتح مسار الخريطة.';
+  }
+  function makeMessage(q,c){
+    if(/تحصيل|دين|مديون|رصيد|سداد/.test(q)){
+      return `رسالة تحصيل مقترحة:\nالسلام عليكم ${c.name}\nنذكركم بوجود رصيد مستحق بقيمة ${arMoney(c.debt_balance||0)} ريال. نأمل التكرم بالسداد أو تزويدنا بموعد مناسب للتنسيق. شاكرين لكم تعاونكم.`;
+    }
+    if(/عرض|سعر|متابعة/.test(q)){
+      const lq=lastQuoteFor(c.id);
+      return `رسالة متابعة عرض سعر:\nالسلام عليكم ${c.name}\nحبيت أتابع معكم بخصوص عرض السعر ${lq?(lq.quote_no||''):'المرسل'}، هل يوجد أي تعديل مطلوب على المقاس أو الكمية؟ جاهزين لخدمتكم.`;
+    }
+    return `رسالة متابعة عامة:\nالسلام عليكم ${c.name}\nمعكم شركة جدة النموذجية للصناعة. نحب نتابع احتياجكم من الأكياس والتغليف، وهل مناسب نرتب زيارة أو نرسل عرض حسب طلبكم؟`;
+  }
+  function repAiAnswer(q){
+    q=String(q||'').trim();
+    if(!q) return '';
+    const role=(window.currentUser||currentUser||{}).role;
+    const scopedNote = role==='rep' ? 'حسب صلاحياتك: تم البحث داخل عملائك فقط.\n\n' : '';
+    if(/ديون عملائي|عملائي.*دين|عليهم تحصيل|تحصيل عملائي|المديونيات/.test(q)) return scopedNote+collectionList();
+    if(/عروضي المفتوحة|عروض مفتوحة|العروض المفتوحة|عروض.*متابعة/.test(q)) return scopedNote+quoteList();
+    if(/ما زرت|لم ازر|لم تتم زيارتهم|عملاء.*زيارة|زيارات متأخرة/.test(q)) return scopedNote+lateVisitsList();
+    if(/رتب.*زيارة|زيارات اليوم|مين ازور|مين أزور|خطة زيارة/.test(q)) return scopedNote+visitPlan();
+    if(/كم.*(دين|رصيد)|الدين|مديون|عليه|متى.*عرض|عرض سعر|اخر زيارة|آخر زيارة|رسالة|واتساب/.test(q)){
+      const f=findCustomer(q);
+      if(f.none) return scopedNote+'لم أجد العميل داخل نطاق صلاحياتك. اكتب جزءًا أوضح من اسم العميل أو رقم الجوال.';
+      if(f.ambiguous) return scopedNote+'وجدت أكثر من عميل، اختر الاسم المطلوب واكتب السؤال مرة ثانية:\n'+f.matches.map((c,i)=>`${i+1}. ${c.name} - ${c.phone||'لا يوجد رقم'} - ${c.district||c.city||'-'}`).join('\n');
+      const c=f.customer;
+      if(/رسالة|واتساب|اكتب/.test(q)) return scopedNote+makeMessage(q,c);
+      if(/عرض/.test(q)){
+        const lq=lastQuoteFor(c.id);
+        if(!lq) return scopedNote+`لا يوجد عرض سعر مسجل للعميل ${c.name}.`;
+        return scopedNote+`آخر عرض سعر للعميل ${c.name}:\n- رقم العرض: ${lq.quote_no||lq.id}\n- التاريخ: ${safeDate(lq.date||lq.quote_date||lq.created_at)}\n- الحالة: ${statusText(lq.status)}\n- المنتج: ${lq.product||'-'}\n- الكمية: ${lq.total_kg||'-'} كجم\n- القيمة: ${arMoney(lq.total_amount||lq.amount_value||0)} ريال`;
+      }
+      if(/زيارة/.test(q)){
+        const lv=lastVisitFor(c.id);
+        return scopedNote+`آخر زيارة للعميل ${c.name}:\n${lv ? '- التاريخ: '+safeDate(lv.date||lv.checkin_at)+'\n- الملاحظة: '+(lv.notes||'-') : 'لا توجد زيارة مسجلة.'}`;
+      }
+      return scopedNote+customerSummary(c);
+    }
+    return scopedNote+'أقدر أساعدك في: ديون عملائي، عروضي المفتوحة، آخر زيارة لعميل، آخر عرض سعر، ترتيب زيارات اليوم، أو كتابة رسالة واتساب. مثال: "مطاعم شاطئ النخيل كم الدين عليه؟"';
+  }
+  window.jmsRepAiAnswer = repAiAnswer;
+
+  function ensureRepAi(){
+    const nav=document.querySelector('.sidebar nav') || document.querySelector('aside nav') || document.querySelector('nav');
+    const main=document.querySelector('main.main') || document.querySelector('.main') || document.body;
+    if(!main) return;
+    if(nav && !document.querySelector('[data-page="repAiAssistant"]')){
+      const btn=document.createElement('button');
+      btn.className='nav rep-ai-only';
+      btn.dataset.page='repAiAssistant';
+      btn.textContent='مساعد المندوب AI';
+      const before=nav.querySelector('[data-page="visits"]') || nav.querySelector('[data-page="customers"]')?.nextSibling;
+      nav.insertBefore(btn, before || null);
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active');
+        const p=document.getElementById('repAiAssistant'); if(p) p.classList.add('active');
+        renderRepAiDashboard();
+        if(document.body.classList.contains('jms-mobile-menu-open')) document.body.classList.remove('jms-mobile-menu-open');
+      });
+    }
+    if(!document.getElementById('repAiAssistant')){
+      const sec=document.createElement('section');
+      sec.id='repAiAssistant';
+      sec.className='page';
+      sec.innerHTML=`
+        <div class="page-head with-action"><div><h1>مساعد المندوب الذكي</h1><p>اسأل عن عملائك فقط: الدين، آخر عرض سعر، آخر زيارة، التحصيل، وترتيب الزيارات.</p></div><div class="head-actions"><button class="primary" onclick="jmsRepAiAsk('ديون عملائي')">ديون عملائي</button><button onclick="jmsRepAiAsk('عروضي المفتوحة')">عروضي المفتوحة</button></div></div>
+        <div class="jms-rep-ai-grid"><div class="jms-rep-ai-card"><b id="repAiCustomersCount">0</b><span>عملاء في نطاقك</span></div><div class="jms-rep-ai-card"><b id="repAiDebtTotal">0</b><span>إجمالي الرصيد</span></div><div class="jms-rep-ai-card"><b id="repAiOpenQuotes">0</b><span>عروض مفتوحة</span></div><div class="jms-rep-ai-card"><b id="repAiLateVisits">0</b><span>زيارات متأخرة</span></div></div>
+        <div class="panel jms-rep-ai-panel"><div class="jms-rep-ai-actions"><button onclick="jmsRepAiAsk('رتب زيارات اليوم')">رتب زيارات اليوم</button><button onclick="jmsRepAiAsk('عملاء لم تتم زيارتهم من شهر')">عملاء لم أزرهم</button><button onclick="jmsRepAiAsk('عليهم تحصيل')">أولويات التحصيل</button><button onclick="jmsRepAiAsk('اكتب رسالة متابعة')">رسالة متابعة</button></div><div id="repAiBody" class="jms-rep-ai-body"><div class="jms-ai-msg bot">اكتب سؤالك مثل: <b>فلان كم الدين عليه؟</b> أو <b>متى سويت عرض سعر لفلان؟</b></div></div><div class="jms-rep-ai-input"><input id="repAiInput" placeholder="مثال: مطاعم شاطئ النخيل كم الدين عليه؟"><button class="primary" onclick="jmsRepAiAsk()">اسأل</button></div></div>`;
+      main.appendChild(sec);
+    }
+    injectRepAiStyle();
+    applyRepAiVisibility();
+  }
+  function applyRepAiVisibility(){
+    const user=window.currentUser || currentUser || {};
+    document.querySelectorAll('.rep-ai-only').forEach(x=>{x.style.display = user.role ? 'block' : 'none';});
+  }
+  function injectRepAiStyle(){
+    if(document.getElementById('jmsRepAiStyle')) return;
+    const st=document.createElement('style');
+    st.id='jmsRepAiStyle';
+    st.textContent=`
+      .jms-rep-ai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:12px 0}.jms-rep-ai-card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:16px;box-shadow:0 8px 26px rgba(15,23,42,.06)}.jms-rep-ai-card b{font-size:26px;color:#0f172a}.jms-rep-ai-card span{display:block;color:#64748b;margin-top:6px}.jms-rep-ai-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.jms-rep-ai-actions button{border:0;border-radius:999px;background:#eef2ff;color:#1e3a8a;padding:9px 12px;font-weight:700}.jms-rep-ai-body{min-height:260px;max-height:52vh;overflow:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:12px;display:grid;gap:10px}.jms-rep-ai-body .jms-ai-msg{padding:12px 14px;border-radius:16px;white-space:pre-wrap;line-height:1.8}.jms-rep-ai-body .user{background:#0f172a;color:#fff;margin-inline-start:20%}.jms-rep-ai-body .bot{background:#fff;border:1px solid #e2e8f0;color:#0f172a;margin-inline-end:8%}.jms-rep-ai-input{display:flex;gap:8px;margin-top:10px}.jms-rep-ai-input input{flex:1;border:1px solid #dbe3ef;border-radius:14px;padding:12px}.jms-rep-ai-input button{border:0;border-radius:14px;background:#0f172a;color:#fff;padding:12px 18px}@media(max-width:700px){.jms-rep-ai-input{flex-direction:column}.jms-rep-ai-body .user,.jms-rep-ai-body .bot{margin:0}.jms-rep-ai-grid{grid-template-columns:1fr 1fr}.jms-rep-ai-card b{font-size:20px}}`;
+    document.head.appendChild(st);
+  }
+  window.renderRepAiDashboard=function(){
+    const cs=repScope();
+    const debt=cs.reduce((s,c)=>s+Number(c.debt_balance||0),0);
+    const open=repQuotes().filter(q=>!['accepted','rejected','cancelled'].includes(String(q.status||'').toLowerCase())).length;
+    const late=cs.filter(c=>daysSince(lastVisitFor(c.id)?.date||lastVisitFor(c.id)?.checkin_at)>=30).length;
+    const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+    set('repAiCustomersCount', cs.length);
+    set('repAiDebtTotal', arMoney(debt));
+    set('repAiOpenQuotes', open);
+    set('repAiLateVisits', late);
+  };
+  window.jmsRepAiAsk=function(q){
+    const inp=document.getElementById('repAiInput');
+    q=String(q||inp?.value||'').trim(); if(!q) return;
+    const body=document.getElementById('repAiBody'); if(!body) return;
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg user">${h(q)}</div>`);
+    const ans=repAiAnswer(q);
+    body.insertAdjacentHTML('beforeend', `<div class="jms-ai-msg bot">${h(ans)}</div>`);
+    body.scrollTop=body.scrollHeight;
+    if(inp) inp.value='';
+  };
+
+  // Hook existing JMS AI safely: for reps, answer only within their scope.
+  const oldJmsAiAnswer = window.jmsAiAnswer || (typeof jmsAiAnswer==='function' ? jmsAiAnswer : null);
+  window.jmsAiAnswer = function(q){
+    const user=window.currentUser || currentUser || {};
+    if(user.role==='rep') return repAiAnswer(q);
+    if(typeof oldJmsAiAnswer==='function') return oldJmsAiAnswer(q);
+    return repAiAnswer(q);
+  };
+  try{ if(typeof jmsAiAnswer==='function') jmsAiAnswer = window.jmsAiAnswer; }catch(e){}
+
+  const oldRenderAll=window.renderAll || (typeof renderAll==='function' ? renderAll : null);
+  window.renderAll=function(){
+    const r=typeof oldRenderAll==='function'?oldRenderAll.apply(this,arguments):undefined;
+    setTimeout(()=>{ensureRepAi(); renderRepAiDashboard();},80);
+    return r;
+  };
+  try{ if(typeof renderAll==='function') renderAll=window.renderAll; }catch(e){}
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureRepAi(); renderRepAiDashboard();},800));
+  setTimeout(()=>{ensureRepAi(); renderRepAiDashboard();},1200);
 })();
