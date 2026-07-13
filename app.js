@@ -5920,3 +5920,92 @@ askJmsAI = async function(q){
   }
   ready(()=>setTimeout(()=>{ if(document.getElementById('productionWorkflow')) window.renderProductionWorkflow?.(); },700));
 })();
+
+
+/* JMS UPDATE 12 - MOBILE PWA UI FIX
+   Fixes installed iPhone/Android view: sidebar becomes a drawer and main pages take full width. */
+(function(){
+  const STYLE_ID='jmsUpdate12MobilePwaStyle';
+  function injectStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    const st=document.createElement('style');
+    st.id=STYLE_ID;
+    st.textContent=`
+      .jms-mobile-topbar{display:none}
+      @media (max-width: 920px){
+        html,body{width:100%;max-width:100%;overflow-x:hidden!important;background:#f8fafc!important;}
+        body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial!important;}
+        #appView.app:not(.hidden), .app:not(.hidden){display:block!important;min-height:100vh!important;background:#f8fafc!important;}
+        .main{display:block!important;width:100%!important;max-width:100%!important;margin:0!important;padding:74px 12px 110px!important;box-sizing:border-box!important;background:#f8fafc!important;color:#0f172a!important;overflow-x:hidden!important;}
+        .page{width:100%!important;max-width:100%!important;box-sizing:border-box!important;}
+        .page:not(.active){display:none!important;}
+        .page-head,.page-head.with-action{display:block!important;margin:0 0 14px!important;padding:12px!important;border-radius:18px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.06)!important;}
+        .page-head h1,.page-head h2{font-size:22px!important;margin:0 0 6px!important;line-height:1.25!important;color:#0f172a!important;}
+        .page-head p{font-size:13px!important;margin:0!important;color:#64748b!important;}
+        .head-actions{display:flex!important;gap:8px!important;flex-wrap:wrap!important;margin-top:10px!important;}
+        .stats,.grid2,.form-grid,.form-grid.two,.form-grid.three,.form-grid.four,.jms-prod-kpis,.jms-prod-board,.jms-campaign-grid{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;}
+        .panel,.stat,.customer-card,.order-card,.visit-card,.quote-card,.jms-prod-card,.jms-prod-col{width:100%!important;box-sizing:border-box!important;border-radius:18px!important;overflow:hidden!important;}
+        input,select,textarea,button{font-size:16px!important;max-width:100%!important;box-sizing:border-box!important;}
+        table{display:block!important;width:100%!important;overflow-x:auto!important;white-space:nowrap!important;}
+        .sidebar{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;width:min(86vw,360px)!important;max-width:360px!important;height:100dvh!important;z-index:99999!important;transform:translateX(105%)!important;transition:transform .22s ease!important;overflow-y:auto!important;overflow-x:hidden!important;padding:18px 14px 24px!important;box-sizing:border-box!important;background:#0f172a!important;color:#fff!important;border-left:1px solid rgba(255,255,255,.10)!important;box-shadow:-18px 0 40px rgba(15,23,42,.30)!important;}
+        body.jms-mobile-menu-open .sidebar{transform:translateX(0)!important;}
+        body.jms-mobile-menu-open:before{content:'';position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;backdrop-filter:blur(2px);}
+        .sidebar .brand{display:flex!important;gap:10px!important;align-items:center!important;margin-bottom:12px!important;}
+        .sidebar .brand img{width:54px!important;height:54px!important;border-radius:16px!important;object-fit:cover!important;}
+        .sidebar .brand b{color:#fff!important;font-size:18px!important;display:block!important;}
+        .sidebar .brand span{color:#cbd5e1!important;font-size:12px!important;}
+        .sidebar .user-box{background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:18px!important;margin:10px 0 14px!important;padding:12px!important;color:#fff!important;}
+        .sidebar .user-box small,.sidebar .user-box span{color:#cbd5e1!important;}
+        .sidebar nav{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;margin-top:10px!important;}
+        .sidebar .nav{width:100%!important;text-align:right!important;border:0!important;border-radius:14px!important;padding:13px 14px!important;background:rgba(255,255,255,.08)!important;color:#f8fafc!important;font-weight:800!important;}
+        .sidebar .nav.active{background:#dc2626!important;color:#fff!important;}
+        .sidebar .danger,#logoutBtn{width:100%!important;border-radius:14px!important;margin-top:12px!important;padding:13px 14px!important;background:#b91c1c!important;color:#fff!important;border:0!important;}
+        .jms-mobile-topbar{display:flex!important;position:fixed!important;top:0!important;right:0!important;left:0!important;height:60px!important;z-index:99990!important;align-items:center!important;gap:10px!important;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px!important;background:#0f172a!important;color:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.16)!important;box-sizing:content-box!important;}
+        .jms-mobile-topbar button{width:44px!important;height:44px!important;border:0!important;border-radius:14px!important;background:#dc2626!important;color:#fff!important;font-size:22px!important;display:grid!important;place-items:center!important;}
+        .jms-mobile-topbar b{font-size:16px!important;line-height:1.1!important;}
+        .jms-mobile-topbar small{display:block!important;color:#cbd5e1!important;font-size:11px!important;font-weight:500!important;margin-top:2px!important;}
+        .jms-mobile-close{display:block!important;position:sticky!important;top:0!important;margin:0 0 10px!important;width:44px!important;height:44px!important;border:0!important;border-radius:14px!important;background:#1f2937!important;color:#fff!important;font-size:22px!important;z-index:1!important;}
+        .modal,.modal-card{max-width:calc(100vw - 24px)!important;width:calc(100vw - 24px)!important;box-sizing:border-box!important;}
+        .cloud-sync-status{left:12px!important;right:auto!important;bottom:14px!important;max-width:calc(100vw - 24px)!important;}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  function ensureMobileTopbar(){
+    injectStyle();
+    const app=document.getElementById('appView') || document.querySelector('.app');
+    const sidebar=document.querySelector('.sidebar');
+    if(!app || !sidebar) return;
+    if(!document.querySelector('.jms-mobile-topbar')){
+      const bar=document.createElement('div');
+      bar.className='jms-mobile-topbar';
+      bar.innerHTML=`<button type="button" id="jmsMobileMenuBtn" aria-label="فتح القائمة">☰</button><div><b>JMS Factory CRM</b><small id="jmsMobilePageName">القائمة والصفحات</small></div>`;
+      app.insertBefore(bar, app.firstChild);
+    }
+    if(!sidebar.querySelector('.jms-mobile-close')){
+      const close=document.createElement('button');
+      close.type='button'; close.className='jms-mobile-close'; close.textContent='×'; close.setAttribute('aria-label','إغلاق القائمة');
+      sidebar.insertBefore(close, sidebar.firstChild);
+      close.onclick=()=>document.body.classList.remove('jms-mobile-menu-open');
+    }
+    const btn=document.getElementById('jmsMobileMenuBtn');
+    if(btn && btn.dataset.bound!=='1'){
+      btn.dataset.bound='1';
+      btn.onclick=()=>document.body.classList.toggle('jms-mobile-menu-open');
+    }
+    document.querySelectorAll('.sidebar .nav').forEach(n=>{
+      if(n.dataset.mobileCloseBound==='1') return;
+      n.dataset.mobileCloseBound='1';
+      n.addEventListener('click',()=>{
+        const label=n.textContent.trim();
+        const pageName=document.getElementById('jmsMobilePageName'); if(pageName) pageName.textContent=label;
+        if(window.matchMedia('(max-width:920px)').matches) setTimeout(()=>document.body.classList.remove('jms-mobile-menu-open'),80);
+      });
+    });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.body.classList.remove('jms-mobile-menu-open'); });
+  }
+  document.addEventListener('DOMContentLoaded', ensureMobileTopbar);
+  setTimeout(ensureMobileTopbar,300);
+  setTimeout(ensureMobileTopbar,1200);
+  window.jmsFixMobilePwaUI = ensureMobileTopbar;
+})();
