@@ -6222,8 +6222,12 @@ askJmsAI = async function(q){
     if(/عروضي المفتوحة|عروض مفتوحة|العروض المفتوحة|عروض.*متابعة/.test(q)) return scopedNote+quoteList();
     if(/ما زرت|لم ازر|لم تتم زيارتهم|عملاء.*زيارة|زيارات متأخرة/.test(q)) return scopedNote+lateVisitsList();
     if(/رتب.*زيارة|زيارات اليوم|مين ازور|مين أزور|خطة زيارة/.test(q)) return scopedNote+visitPlan();
-    if(/كم.*(دين|رصيد)|الدين|مديون|عليه|متى.*عرض|عرض سعر|اخر زيارة|آخر زيارة|رسالة|واتساب/.test(q)){
-      const f=findCustomer(q);
+    // إذا كتب المندوب اسم العميل فقط مثل: "كتيكت" أو "كتيكت عميلي" اعرض ملف العميل مباشرة.
+    const customerLookup = findCustomer(q);
+    const hasCustomer = !!customerLookup.customer;
+    const asksCustomerData = /كم.*(دين|رصيد)|الدين|مديون|عليه|رصيد|وش عليه|كم عليه|متى.*عرض|عرض سعر|اخر زيارة|آخر زيارة|زيارة|رسالة|واتساب|اكتب|عميل|عميلي/.test(q);
+    if(hasCustomer || asksCustomerData){
+      const f = customerLookup;
       if(f.none) return scopedNote+'لم أجد العميل داخل نطاق صلاحياتك. اكتب جزءًا أوضح من اسم العميل أو رقم الجوال.';
       if(f.ambiguous) return scopedNote+'وجدت أكثر من عميل، اختر الاسم المطلوب واكتب السؤال مرة ثانية:\n'+f.matches.map((c,i)=>`${i+1}. ${c.name} - ${c.phone||'لا يوجد رقم'} - ${c.district||c.city||'-'}`).join('\n');
       const c=f.customer;
@@ -6239,7 +6243,7 @@ askJmsAI = async function(q){
       }
       return scopedNote+customerSummary(c);
     }
-    return scopedNote+'أقدر أساعدك في: ديون عملائي، عروضي المفتوحة، آخر زيارة لعميل، آخر عرض سعر، ترتيب زيارات اليوم، أو كتابة رسالة واتساب. مثال: "مطاعم شاطئ النخيل كم الدين عليه؟"';
+    return scopedNote+'أقدر أساعدك في: ديون عملائي، عروضي المفتوحة، آخر زيارة لعميل، آخر عرض سعر، ترتيب زيارات اليوم، أو كتابة رسالة واتساب. تقدر تكتب اسم العميل فقط مثل: "كتيكت" أو تسأل: "كتيكت كم الدين عليه؟"';
   }
   window.jmsRepAiAnswer = repAiAnswer;
 
@@ -6269,7 +6273,7 @@ askJmsAI = async function(q){
       sec.innerHTML=`
         <div class="page-head with-action"><div><h1>مساعد المندوب الذكي</h1><p>اسأل عن عملائك فقط: الدين، آخر عرض سعر، آخر زيارة، التحصيل، وترتيب الزيارات.</p></div><div class="head-actions"><button class="primary" onclick="jmsRepAiAsk('ديون عملائي')">ديون عملائي</button><button onclick="jmsRepAiAsk('عروضي المفتوحة')">عروضي المفتوحة</button></div></div>
         <div class="jms-rep-ai-grid"><div class="jms-rep-ai-card"><b id="repAiCustomersCount">0</b><span>عملاء في نطاقك</span></div><div class="jms-rep-ai-card"><b id="repAiDebtTotal">0</b><span>إجمالي الرصيد</span></div><div class="jms-rep-ai-card"><b id="repAiOpenQuotes">0</b><span>عروض مفتوحة</span></div><div class="jms-rep-ai-card"><b id="repAiLateVisits">0</b><span>زيارات متأخرة</span></div></div>
-        <div class="panel jms-rep-ai-panel"><div class="jms-rep-ai-actions"><button onclick="jmsRepAiAsk('رتب زيارات اليوم')">رتب زيارات اليوم</button><button onclick="jmsRepAiAsk('عملاء لم تتم زيارتهم من شهر')">عملاء لم أزرهم</button><button onclick="jmsRepAiAsk('عليهم تحصيل')">أولويات التحصيل</button><button onclick="jmsRepAiAsk('اكتب رسالة متابعة')">رسالة متابعة</button></div><div id="repAiBody" class="jms-rep-ai-body"><div class="jms-ai-msg bot">اكتب سؤالك مثل: <b>فلان كم الدين عليه؟</b> أو <b>متى سويت عرض سعر لفلان؟</b></div></div><div class="jms-rep-ai-input"><input id="repAiInput" placeholder="مثال: مطاعم شاطئ النخيل كم الدين عليه؟"><button class="primary" onclick="jmsRepAiAsk()">اسأل</button></div></div>`;
+        <div class="panel jms-rep-ai-panel"><div class="jms-rep-ai-actions"><button onclick="jmsRepAiAsk('رتب زيارات اليوم')">رتب زيارات اليوم</button><button onclick="jmsRepAiAsk('عملاء لم تتم زيارتهم من شهر')">عملاء لم أزرهم</button><button onclick="jmsRepAiAsk('عليهم تحصيل')">أولويات التحصيل</button><button onclick="jmsRepAiAsk('اكتب رسالة متابعة')">رسالة متابعة</button></div><div id="repAiBody" class="jms-rep-ai-body"><div class="jms-ai-msg bot">اكتب اسم العميل فقط أو سؤالك مثل: <b>كتيكت</b> أو <b>كتيكت كم الدين عليه؟</b> أو <b>متى سويت عرض سعر لفلان؟</b></div></div><div class="jms-rep-ai-input"><input id="repAiInput" placeholder="مثال: كتيكت أو كتيكت كم الدين عليه؟"><button class="primary" onclick="jmsRepAiAsk()">اسأل</button></div></div>`;
       main.appendChild(sec);
     }
     injectRepAiStyle();
