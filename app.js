@@ -150,10 +150,10 @@ function showApp(){
   currentUserName.textContent=((currentUser&&currentUser.name)||"");
   currentUserRole.textContent=roleText((currentUser&&currentUser.role));
 
-  const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
+  const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
   document.querySelectorAll('.nav').forEach(btn=>{
     const page = btn.dataset.page;
-    const repAllowed = ['customers','visits','orders','quotes','routes','profile'];
+    const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
     if((currentUser&&currentUser.role) === 'rep' && !repAllowed.includes(page)){
       btn.style.display='none';
     } else if(btn.classList.contains('admin-only') && (currentUser&&currentUser.role) !== 'admin'){
@@ -1481,7 +1481,7 @@ function convertQuoteToOrder(qid){
     if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
     loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
     currentUserName.textContent=((currentUser&&currentUser.name)||""); currentUserRole.textContent=roleText((currentUser&&currentUser.role));
-    const repAllowed=['customers','visits','orders','quotes','routes','profile'];
+    const repAllowed=['customers','visits','orders','quotes','routes','profile','newCustomerRadar'];
     document.querySelectorAll('.nav').forEach(btn=>{
       const page=btn.dataset.page;
       if((currentUser&&currentUser.role)==='rep'&&!repAllowed.includes(page)) btn.style.display='none';
@@ -3521,6 +3521,7 @@ function convertQuoteToOrder(qid){
   };
 
   window.openCustomerImport = function(){
+    if(!currentUser || currentUser.role!=='admin') return alert('استيراد العملاء متاح فقط لمدير النظام');
     ensureImportData();
     modalBody.innerHTML = `<h2>استيراد العملاء من Excel / CSV</h2>
       <div class="import-help">
@@ -3579,6 +3580,8 @@ function convertQuoteToOrder(qid){
   };
 
   function addImportButton(){
+    const oldBtn=document.getElementById('customerImportButton');
+    if(!currentUser || currentUser.role!=='admin'){ if(oldBtn) oldBtn.remove(); return; }
     const head=document.querySelector('#customers .page-head.with-action') || document.querySelector('#customers .page-head');
     if(!head || document.getElementById('customerImportButton')) return;
     const btn=document.createElement('button');
@@ -4688,7 +4691,7 @@ askJmsAI = async function(q){
   function repLabel(rid){return (db.reps||[]).find(r=>r.id===rid)?.name||'-';}
   function customerLabel(cid){return (db.customers||[]).find(c=>c.id===cid)?.name||'-';}
   function isManager(){return currentUser && ((currentUser.role==='admin') || (currentUser.role==='sales'));}
-  function canSeeGrowth(){return currentUser && (currentUser.role==='admin'||currentUser.role==='sales');}
+  function canSeeGrowth(){return currentUser && (currentUser.role==='admin'||currentUser.role==='sales'||currentUser.role==='rep');}
   function ensureGrowthDb(){
     db.leads ||= [];
     db.aiTasks ||= [];
@@ -4719,7 +4722,7 @@ askJmsAI = async function(q){
     if(!nav || !main) return;
     if(!document.querySelector('[data-page="newCustomerRadar"]')){
       const btn=document.createElement('button');
-      btn.className='nav manager-only'; btn.dataset.page='newCustomerRadar'; btn.textContent='رادار العملاء الجدد';
+      btn.className='nav'; btn.dataset.page='newCustomerRadar'; btn.textContent='رادار العملاء الجدد';
       nav.insertBefore(btn, nav.querySelector('[data-page="customers"]') || null);
     }
     if(!document.querySelector('[data-page="aiCommandCenter"]')){
@@ -4733,12 +4736,13 @@ askJmsAI = async function(q){
         <div class="page-head with-action"><div><h1>رادار العملاء الجدد</h1><p>بحث ذكي عن أنشطة جديدة ظهرت في الويب أو الخرائط: افتتاحات، مواقع جديدة، كوفيهات، مطاعم، مصانع، متاجر.</p></div><div class="head-actions"><button class="primary" onclick="jmsRunRadarSearch()">بحث الآن</button><button onclick="jmsOpenManualLead()">إضافة فرصة يدوية</button></div></div>
         <div class="panel"><div class="jms-radar-toolbar">
           <label>المدينة / المنطقة<input id="radarCity" value="جدة" placeholder="جدة، مكة، الصناعية الثانية"></label>
+          <label>الحي / القرب من<input id="radarDistrict" placeholder="مثال: الخمرة، الصناعية الثانية، بحرة"></label>
           <label>النشاط<select id="radarIndustry"><option>مطاعم وكوفيهات جديدة</option><option>مصانع غذائية جديدة</option><option>متاجر إلكترونية جديدة</option><option>مصانع مياه وتمور</option><option>شركات شحن وتغليف</option><option>محلات حلويات ومخابز</option><option>مغاسل وفنادق</option><option>مخصص</option></select></label>
           <label>كلمات إضافية<input id="radarKeywords" placeholder="افتتاح، opening soon، new"></label>
           <label>عدد النتائج<select id="radarLimit"><option>8</option><option selected>12</option><option>20</option></select></label>
           <button class="jms-growth-btn blue" onclick="jmsRunRadarSearch()">🔎 بحث ذكي بالويب</button>
           <button class="jms-growth-btn green" onclick="jmsRadarSaveSearch()">حفظ إعداد البحث</button>
-        </div><div class="jms-radar-note">التنبيه: النتائج من مصادر عامة وتحتاج تحقق قبل الزيارة. النظام لا يسحب أرقام خاصة؛ يستخدم بيانات منشورة فقط.</div></div>
+        </div><div class="jms-radar-note">التنبيه: النتائج من مصادر عامة وتحتاج تحقق قبل الزيارة. النظام لا يسحب أرقام خاصة؛ يستخدم بيانات منشورة فقط. إذا دخل المندوب الحي، يبحث الرادار عن فرص قريبة من نطاقه.</div></div>
         <div class="jms-growth-grid"><div class="jms-growth-card"><b id="radarTotal">0</b><span>فرص محفوظة</span></div><div class="jms-growth-card"><b id="radarHot">0</b><span>فرص قوية</span></div><div class="jms-growth-card"><b id="radarContacted">0</b><span>تم التواصل</span></div><div class="jms-growth-card"><b id="radarConverted">0</b><span>تحولت لعميل</span></div></div>
         <div id="radarStatus"></div><div id="radarLeadList" class="jms-lead-list"></div>`;
       main.appendChild(sec);
@@ -4793,6 +4797,7 @@ askJmsAI = async function(q){
     lead.fit_reason = lead.fit_reason || lead.reason || 'نشاط محتمل يحتاج منتجات تغليف أو أكياس.';
     lead.evidence = lead.evidence || lead.snippet || '';
     lead.status = lead.status || 'new';
+    if(currentUser && currentUser.role==='rep') lead.assigned_rep_id = lead.assigned_rep_id || currentUser.id;
     lead.created_at = lead.created_at || new Date().toISOString();
     lead.score = leadScore(lead);
     lead.suggested_message = lead.suggested_message || makeLeadMessage(lead);
@@ -4812,10 +4817,13 @@ askJmsAI = async function(q){
   }
   window.jmsRunRadarSearch = async function(){
     ensureGrowthDb();
-    if(!canSeeGrowth()) return alert('رادار العملاء للمدير ومدير المبيعات فقط');
-    const city=document.getElementById('radarCity')?.value||'جدة';
+    if(!canSeeGrowth()) return alert('رادار العملاء غير متاح لهذا المستخدم');
+    const baseCity=document.getElementById('radarCity')?.value||'جدة';
+    const district=(document.getElementById('radarDistrict')?.value||'').trim();
+    const city= district ? `${baseCity} ${district}` : baseCity;
     const industry=document.getElementById('radarIndustry')?.value||'مطاعم وكوفيهات جديدة';
-    const keywords=document.getElementById('radarKeywords')?.value||'افتتاح جديد opening soon new';
+    const baseKeywords=document.getElementById('radarKeywords')?.value||'افتتاح جديد opening soon new';
+    const keywords= district ? `${baseKeywords} ${district} قريب nearby near me` : baseKeywords;
     const limit=Number(document.getElementById('radarLimit')?.value||12);
     const status=document.getElementById('radarStatus');
     if(status) status.innerHTML='<div class="jms-thinking">جارٍ البحث في الويب عن فرص جديدة... قد يستغرق 20 إلى 40 ثانية.</div>';
@@ -4832,7 +4840,7 @@ askJmsAI = async function(q){
     renderNewCustomerRadar();
   };
   window.jmsRadarSaveSearch=function(){
-    ensureGrowthDb(); db.aiRadarSettings.last={city:radarCity?.value,industry:radarIndustry?.value,keywords:radarKeywords?.value,limit:radarLimit?.value,updated_at:new Date().toISOString()};
+    ensureGrowthDb(); db.aiRadarSettings.last={city:radarCity?.value,district:radarDistrict?.value||'',industry:radarIndustry?.value,keywords:radarKeywords?.value,limit:radarLimit?.value,updated_at:new Date().toISOString()};
     if(typeof save==='function') save(); alert('تم حفظ إعداد البحث');
   };
   window.jmsOpenManualLead=function(){
@@ -4851,12 +4859,12 @@ askJmsAI = async function(q){
     mergeLeads([lead]); closeModal(); renderNewCustomerRadar();
   };
   window.jmsLeadSetStatus=function(id,status){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; l.status=status; l.updated_at=new Date().toISOString(); if(typeof save==='function')save(); renderNewCustomerRadar();};
-  window.jmsLeadAssign=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const repId=prompt('اكتب ID المندوب أو اتركه فارغًا',l.assigned_rep_id||'rep-yaser'); if(repId===null)return; l.assigned_rep_id=repId; if(typeof save==='function')save(); renderNewCustomerRadar();};
+  window.jmsLeadAssign=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; if(currentUser&&currentUser.role==='rep'){ l.assigned_rep_id=currentUser.id; if(typeof save==='function')save(); renderNewCustomerRadar(); return alert('تم تعيين الفرصة لك'); } const repId=prompt('اكتب ID المندوب أو اتركه فارغًا',l.assigned_rep_id||'rep-yaser'); if(repId===null)return; l.assigned_rep_id=repId; if(typeof save==='function')save(); renderNewCustomerRadar();};
   window.jmsLeadWhatsApp=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const p=normPhone(l.phone); if(!p) return prompt('رسالة جاهزة للنسخ',l.suggested_message||makeLeadMessage(l)); window.open(`https://wa.me/${p}?text=${encodeURIComponent(l.suggested_message||makeLeadMessage(l))}`,'_blank');};
   window.jmsLeadCopyMessage=function(id){const l=(db.leads||[]).find(x=>x.id===id); if(!l)return; const msg=l.suggested_message||makeLeadMessage(l); navigator.clipboard?.writeText(msg); alert('تم نسخ رسالة التواصل');};
   window.jmsLeadConvertToCustomer=function(id){
     const l=(db.leads||[]).find(x=>x.id===id); if(!l)return;
-    const repId=l.assigned_rep_id || (db.reps||[])[0]?.id || 'rep-yaser';
+    const repId=(currentUser&&currentUser.role==='rep') ? currentUser.id : (l.assigned_rep_id || (db.reps||[])[0]?.id || 'rep-yaser');
     db.customers ||= [];
     db.customers.unshift({id:localId(),name:l.name,phone:l.phone||'',city:l.city||'جدة',district:l.area||'',location:l.maps_url||l.website||'',category:l.business_type||'عميل محتمل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:`تحول من رادار العملاء الجدد. السبب: ${l.fit_reason||''}`,created_at:new Date().toISOString()});
     l.status='converted'; l.converted_at=new Date().toISOString();
@@ -4864,7 +4872,12 @@ askJmsAI = async function(q){
   };
   window.renderNewCustomerRadar=function(){
     ensureGrowthDb();
-    const list=(db.leads||[]).slice().sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+    let list=(db.leads||[]).slice();
+    const districtFilter=(document.getElementById('radarDistrict')?.value||'').trim();
+    if(currentUser && currentUser.role==='rep'){
+      list=list.filter(l=>!l.assigned_rep_id || l.assigned_rep_id===currentUser.id || (districtFilter && String([l.city,l.area,l.evidence,l.fit_reason].join(' ')).includes(districtFilter)));
+    }
+    list=list.sort((a,b)=>Number(b.score||0)-Number(a.score||0));
     const total=document.getElementById('radarTotal'); if(total) total.textContent=list.length;
     const hot=document.getElementById('radarHot'); if(hot) hot.textContent=list.filter(l=>Number(l.score||0)>=75).length;
     const contacted=document.getElementById('radarContacted'); if(contacted) contacted.textContent=list.filter(l=>l.status==='contacted'||l.status==='interested').length;
@@ -6060,4 +6073,35 @@ askJmsAI = async function(q){
   });
   setTimeout(()=>{injectStyle(); ensureCloseButton();},300);
   setTimeout(ensureCloseButton,1200);
+})();
+
+
+/* JMS UPDATE 12C: permissions and rep nearby radar enhancement */
+(function(){
+  function enhanceRadarForRep(){
+    try{
+      const btn=document.querySelector('[data-page="newCustomerRadar"]');
+      if(btn){ btn.classList.remove('manager-only','admin-only'); btn.style.display='block'; }
+      const importBtn=document.getElementById('customerImportButton');
+      if(importBtn && (!currentUser || currentUser.role!=='admin')) importBtn.remove();
+      const toolbar=document.querySelector('#newCustomerRadar .jms-radar-toolbar');
+      if(toolbar && !document.getElementById('radarDistrict')){
+        const label=document.createElement('label');
+        label.innerHTML='الحي / القرب من<input id="radarDistrict" placeholder="مثال: الخمرة، الصناعية الثانية، بحرة">';
+        const city=document.getElementById('radarCity');
+        if(city && city.closest('label')) city.closest('label').insertAdjacentElement('afterend',label);
+        else toolbar.insertBefore(label, toolbar.firstChild);
+      }
+      if(currentUser && currentUser.role==='rep'){
+        const title=document.querySelector('#newCustomerRadar h1'); if(title) title.textContent='رادار العملاء القريبين';
+        const hint=document.querySelector('#newCustomerRadar .page-head p');
+        if(hint) hint.textContent='ابحث عن أنشطة جديدة قريبة من الحي أو موقع المندوب، ثم حوّل الفرصة إلى عميل أو افتح الخريطة للزيارة.';
+      }
+    }catch(e){}
+  }
+  const oldRenderAll=window.renderAll;
+  window.renderAll=function(){ if(typeof oldRenderAll==='function') oldRenderAll(); setTimeout(enhanceRadarForRep,150); };
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function') window.showApp=function(){ oldShowApp(); setTimeout(enhanceRadarForRep,250); };
+  setTimeout(enhanceRadarForRep,1000);
 })();
