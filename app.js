@@ -6009,3 +6009,55 @@ askJmsAI = async function(q){
   setTimeout(ensureMobileTopbar,1200);
   window.jmsFixMobilePwaUI = ensureMobileTopbar;
 })();
+
+/* JMS UPDATE 12B - MOBILE MODAL SCROLL AND CLOSE FIX
+   Fixes mobile popups that cover the page and cannot scroll or close. */
+(function(){
+  const STYLE_ID='jmsUpdate12BMobileModalFixStyle';
+  function injectStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    const st=document.createElement('style');
+    st.id=STYLE_ID;
+    st.textContent=`
+      .jms-modal-close-btn{position:sticky!important;top:0!important;z-index:50!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;width:100%!important;min-height:44px!important;margin:0 0 12px!important;border:0!important;border-radius:14px!important;background:#dc2626!important;color:#fff!important;font-weight:900!important;font-size:16px!important;box-shadow:0 10px 18px rgba(220,38,38,.18)!important;}
+      @media (max-width:920px){
+        .modal:not(.hidden){position:fixed!important;inset:0!important;width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;padding:calc(env(safe-area-inset-top,0px) + 76px) 10px calc(env(safe-area-inset-bottom,0px) + 22px)!important;box-sizing:border-box!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;background:rgba(15,23,42,.62)!important;z-index:100500!important;}
+        .modal:not(.hidden) .modal-card,.modal:not(.hidden) .modal-content,.modal:not(.hidden)>div{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 110px)!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;box-sizing:border-box!important;border-radius:22px!important;margin:0 auto!important;padding:14px!important;}
+        #modalBody{display:block!important;width:100%!important;max-width:100%!important;overflow:visible!important;box-sizing:border-box!important;}
+        #modalBody h1,#modalBody h2,#modalBody h3{font-size:22px!important;line-height:1.25!important;margin:8px 0 12px!important;}
+        #modalBody input,#modalBody select,#modalBody textarea,#modalBody button{font-size:16px!important;max-width:100%!important;box-sizing:border-box!important;}
+        #modalBody .form-grid,#modalBody .form-grid.two,#modalBody .form-grid.three,#modalBody .form-grid.four{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;}
+        body:has(.modal:not(.hidden)){overflow:hidden!important;}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  function getModal(){ return window.modal || document.getElementById('modal') || document.querySelector('.modal'); }
+  function closeAnyModal(){
+    try{ if(typeof window.closeModal==='function') return window.closeModal(); }catch(e){}
+    const m=getModal(); if(m) m.classList.add('hidden');
+    const b=window.modalBody || document.getElementById('modalBody'); if(b) b.innerHTML='';
+  }
+  function ensureCloseButton(){
+    injectStyle();
+    const m=getModal(); if(!m || m.classList.contains('hidden')) return;
+    const card=m.querySelector('.modal-card') || m.querySelector('.modal-content') || m.firstElementChild || m;
+    if(!card.querySelector('.jms-modal-close-btn')){
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='jms-modal-close-btn';
+      btn.textContent='إغلاق النافذة';
+      btn.onclick=closeAnyModal;
+      card.insertBefore(btn, card.firstChild);
+    }
+  }
+  window.jmsCloseModalFix=closeAnyModal;
+  window.jmsEnsureMobileModalFix=ensureCloseButton;
+  document.addEventListener('DOMContentLoaded',()=>{
+    injectStyle();
+    setInterval(ensureCloseButton,500);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAnyModal(); });
+  });
+  setTimeout(()=>{injectStyle(); ensureCloseButton();},300);
+  setTimeout(ensureCloseButton,1200);
+})();
