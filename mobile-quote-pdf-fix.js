@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-13-mobile-quote-pdf-5';
+  const VERSION = '2026-08-13-mobile-quote-pdf-6';
 
   function quotePrintCss() {
     return `
@@ -26,7 +26,10 @@
     const approvals = root?.querySelector('.quote-a4-approval');
     if (!approvals || approvals.dataset.compact === '1') return;
     approvals.dataset.compact = '1';
-    approvals.innerHTML = `
+    const english = root?.dataset?.lang === 'en';
+    approvals.innerHTML = english ? `
+      <div class="quote-a4-sign"><b>Customer Approval</b><div class="quote-a4-line">Name: ____________________ &nbsp; Signature: ______________ &nbsp; Date: __________</div></div>
+      <div class="quote-a4-sign"><b>Company Approval</b><div class="quote-a4-line">Authorized by: ____________ &nbsp; Signature & Stamp: ________ &nbsp; Date: __________</div></div>` : `
       <div class="quote-a4-sign"><b>اعتماد العميل</b><div class="quote-a4-line">الاسم: ____________________ &nbsp; التوقيع: ______________ &nbsp; التاريخ: __________</div></div>
       <div class="quote-a4-sign"><b>اعتماد الشركة</b><div class="quote-a4-line">اسم المسؤول: ______________ &nbsp; التوقيع والختم: ____________ &nbsp; التاريخ: __________</div></div>`;
   }
@@ -101,6 +104,7 @@
       holder.remove();
     }
   }
+  window.jmsShareQuotePdf = shareQuotePdf;
 
   function openQuotePrintPage() {
     const source = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
