@@ -10,6 +10,7 @@ export default async function handler(req, res){
       name: body.name || body.email,
       role: body.role || 'rep',
       status: body.status || 'active',
+      permissions: body.permissions || {},
       password_salt: salt,
       password_hash: pbkdf2(body.password, salt)
     };
