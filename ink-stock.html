@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مراقبة مخزون الأحبار</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--ink:#17202f;--muted:#6b7280;--line:#e5e7eb;--nav:#173f67;--green:#166534;--red:#b42318;--amber:#9a6700;}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial;color:var(--ink)}
+header{background:var(--nav);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:21px} header small{opacity:.85}
+main{max-width:1320px;margin:auto;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:15px}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px;box-shadow:0 2px 8px #00000008}
+.kpi b{font-size:25px;display:block;margin-top:5px} .muted{color:var(--muted)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input,select{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;font:inherit}
+input[type="text"]{min-width:190px} .search{flex:1;min-width:240px}
+button{border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}
+.primary{background:var(--nav);color:#fff} .light{background:#eef2f7;color:#17202f} .take{background:#fff0e6;color:#9a3412} .ret{background:#eaf7ee;color:#166534} .danger{background:#fee4e2;color:#b42318}
+table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:right;font-size:13px;vertical-align:middle} th{background:#f8fafc;position:sticky;top:0;z-index:1}
+.badge{display:inline-block;border-radius:99px;padding:4px 8px;font-size:11px;font-weight:700} .ok{background:#e9f7ef;color:var(--green)} .low{background:#fff4d6;color:var(--amber)} .zero{background:#fee4e2;color:var(--red)} .unset{background:#eef2f7;color:#64748b}
+.tabs{display:flex;gap:6px;margin-bottom:12px} .tab{background:#e8edf3} .tab.active{background:var(--nav);color:white}
+.panel{display:none} .panel.active{display:block}
+.scroll{overflow:auto;max-height:65vh}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:15px;z-index:20} .modal.show{display:flex}
+.box{background:#fff;border-radius:14px;padding:18px;width:min(520px,100%)} .box h3{margin-top:0}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px} .form label{font-size:12px;color:var(--muted)} .form .full{grid-column:1/-1} .form input,.form select{width:100%;margin-top:4px}
+.empty{text-align:center;color:var(--muted);padding:28px}
+@media(max-width:900px){.grid{grid-template-columns:1fr 1fr} th:nth-child(2),td:nth-child(2){display:none}}
+@media(max-width:520px){.grid{grid-template-columns:1fr} main{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>مراقبة مخزون الأحبار</h1><small>صرف • إرجاع • عهدة • حد أدنى • سجل حركات</small></div>
+<button class="light" onclick="exportData()">نسخة احتياطية</button>
+</header>
+<main>
+<div class="grid">
+  <div class="card kpi"><span class="muted">عدد الأصناف</span><b id="kItems">0</b></div>
+  <div class="card kpi"><span class="muted">رصيد المستودع</span><b id="kStock">0</b><span class="muted">كجم</span></div>
+  <div class="card kpi"><span class="muted">العهدة المفتوحة</span><b id="kOut">0</b><span class="muted">كجم</span></div>
+  <div class="card kpi"><span class="muted">تحت الحد الأدنى</span><b id="kLow">0</b></div>
+  <div class="card kpi"><span class="muted">المستهلك الفعلي</span><b id="kConsumed">0</b><span class="muted">كجم</span></div>
+</div>
+
+<div class="tabs">
+<button class="tab active" onclick="showTab('inv',this)">المخزون</button>
+<button class="tab" onclick="showTab('mov',this)">سجل الحركات</button>
+<button class="tab" onclick="showTab('cust',this)">العهد الموجودة</button>
+<button class="tab" onclick="showTab('printers',this)">استهلاك الطابعات</button>
+</div>
+
+<section id="inv" class="panel active card">
+<div class="toolbar">
+<input id="q" class="search" type="text" placeholder="ابحث باسم أو رمز الحبر..." oninput="renderInventory()">
+<select id="filter" onchange="renderInventory()">
+<option value="all">كل الأصناف</option>
+<option value="low">تحت الحد الأدنى</option>
+<option value="out">يوجد عهدة</option>
+</select>
+</div>
+<div class="scroll"><table>
+<thead><tr><th>الصنف</th><th>الرمز الداخلي</th><th>الموجود</th><th>العهدة</th><th>الحد الأدنى</th><th>الحالة</th><th>الحركة</th></tr></thead>
+<tbody id="invBody"></tbody>
+</table></div>
+</section>
+
+<section id="mov" class="panel card">
+<div class="toolbar"><input id="mq" class="search" type="text" placeholder="بحث في الحركات..." oninput="renderMoves()"></div>
+<div class="scroll"><table>
+<thead><tr><th>التاريخ</th><th>الحركة</th><th>الصنف</th><th>الكمية</th><th>المستهلك</th><th>الطابعة</th><th>الموظف / الجهة</th><th>ملاحظات</th></tr></thead>
+<tbody id="moveBody"></tbody>
+</table></div>
+</section>
+
+<section id="cust" class="panel card">
+<div class="scroll"><table>
+<thead><tr><th>الموظف / الجهة</th><th>الصنف</th><th>الكمية المفتوحة بالعهدة</th></tr></thead>
+<tbody id="custBody"></tbody>
+</table></div>
+</section>
+
+<section id="printers" class="panel card">
+<div class="toolbar">
+<select id="printerFilter" onchange="renderPrinters()">
+<option value="all">كل الطابعات</option>
+<option>طابعة رقم 1 - فرز ألوان</option>
+<option>طابعة رقم 2 - صيني</option>
+<option>طابعة رقم 3 - هاي بلس</option>
+<option>طابعة رقم 4 - ليلو كبير</option>
+<option>طابعة رقم 5 - ليلو صغير</option>
+</select>
+</div>
+<div class="scroll"><table>
+<thead><tr><th>الطابعة</th><th>إجمالي المصروف</th><th>إجمالي المرتجع</th><th>المستهلك الفعلي</th></tr></thead>
+<tbody id="printerBody"></tbody>
+</table></div>
+</section>
+
+</main>
+
+<div class="modal" id="moveModal"><div class="box">
+<h3 id="moveTitle">حركة مخزون</h3>
+<div class="form">
+<div class="full"><label>الصنف<input id="mItemName" disabled></label></div>
+<div><label>نوع الحركة<select id="mType" onchange="updateMoveTitle()"><option value="receive">وارد / استلام</option><option value="take">صرف / أخذ</option><option value="return">إرجاع وإقفال العهدة</option></select></label></div>
+<div><label>الكمية بالكيلو<input id="mQty" type="number" step="0.01" min="0"></label></div>
+<div class="full"><label>الطابعة
+<select id="mPrinter">
+<option value="">اختر الطابعة</option>
+<option>طابعة رقم 1 - فرز ألوان</option>
+<option>طابعة رقم 2 - صيني</option>
+<option>طابعة رقم 3 - هاي بلس</option>
+<option>طابعة رقم 4 - ليلو كبير</option>
+<option>طابعة رقم 5 - ليلو صغير</option>
+</select></label></div>
+<div class="full"><label>اسم الموظف / الجهة<input id="mPerson" type="text" placeholder="مثال: عامل الطباعة / ماكينة 1"></label></div>
+<div class="full"><label>ملاحظات<input id="mNote" type="text" placeholder="اختياري"></label></div>
+</div>
+<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveMove()">حفظ الحركة</button><button class="light" onclick="closeModal()">إلغاء</button></div>
+<input type="hidden" id="mItemId">
+</div></div>
+
+<div class="modal" id="editModal"><div class="box">
+<h3>تعديل رصيد وحد أدنى</h3>
+<div class="form">
+<div class="full"><label>الصنف<input id="eName" disabled></label></div>
+<div><label>رصيد المستودع الحالي<input id="eStock" type="number" min="0" step="0.01"></label></div>
+<div><label>الحد الأدنى<input id="eMin" type="number" min="0" step="0.01"></label></div>
+</div>
+<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveEdit()">حفظ</button><button class="light" onclick="closeEdit()">إلغاء</button></div>
+<input type="hidden" id="eId">
+</div></div>
+
+<script>
+const DEFAULT_ITEMS=[{"id": "I0001", "name": "FLEXOTOP WHITE 226-0200", "stock": 0, "min": 0}, {"id": "I0002", "name": "flexotop reflex blue 226-0535", "stock": 0, "min": 0}, {"id": "I0003", "name": "FLEXOTOP CYAN 226-0400", "stock": 0, "min": 0}, {"id": "I0004", "name": "FLEXOTOP BLACK 226-0800", "stock": 0, "min": 0}, {"id": "I0005", "name": "ULTRA BRAVO GREEN 4SX27-8439", "stock": 0, "min": 0}, {"id": "I0006", "name": "83226-0032J-20LFLEXOGLOSS PMS 32C RED", "stock": 0, "min": 0}, {"id": "I0007", "name": "FLEXOTOP RHODAMINE RED 226-660", "stock": 0, "min": 0}, {"id": "I0008", "name": "FLEXOTOP PMS ORANGE 226-0165", "stock": 0, "min": 0}, {"id": "I0009", "name": "R/F ULTRA CYAN 271-0400", "stock": 0, "min": 0}, {"id": "I0010", "name": "R/F ULTRA MAGENTA 271-0600", "stock": 0, "min": 0}, {"id": "I0011", "name": "140229 – R/F ULTRA YELLOW 271-0300", "stock": 0, "min": 0}, {"id": "I0012", "name": "FLEXOTOP GOLD -226-0873", "stock": 0, "min": 0}, {"id": "I0013", "name": "140237 – FLEXOTOP SILVER 226-0877", "stock": 0, "min": 0}, {"id": "I0014", "name": "140238 – FLEXOTOP PMS GRAY 226-0010", "stock": 0, "min": 0}, {"id": "I0015", "name": "140240 – FLEXO SUPER RETARDER 660-0900", "stock": 0, "min": 0}, {"id": "I0016", "name": "140213 – ULTRA VARNISH 4SV71-0100", "stock": 0, "min": 0}, {"id": "I0017", "name": "140247 – FLEXOMARNE PMS PURPLE", "stock": 0, "min": 0}, {"id": "I0018", "name": "110349 – FLEXOTOP DARK BLUE 226-0537", "stock": 0, "min": 0}, {"id": "I0019", "name": "110341 – FLEXOTOP YELLOW -226-0508", "stock": 0, "min": 0}, {"id": "I0020", "name": "110348 – FLEXOTOP MARLBORO RED 226-019", "stock": 0, "min": 0}, {"id": "I0021", "name": "110332 – FLEXOTOP MAROON RED 226-0220", "stock": 0, "min": 0}, {"id": "I0022", "name": "4SC27-0486 FLEXOMARINE PMS PINK", "stock": 0, "min": 0}, {"id": "I0023", "name": "4SC27-0610 FLEXOMARINE MAGENTA", "stock": 0, "min": 0}, {"id": "I0024", "name": "4SC27-0310 FLEXOMARINE YELLOW", "stock": 0, "min": 0}, {"id": "I0025", "name": "4ST60-0875 FLEXO MEDIUM SOLVENT", "stock": 0, "min": 0}, {"id": "I0026", "name": "4SC27-0810FLEXOMARINE BLACK", "stock": 0, "min": 0}, {"id": "I0027", "name": "4SV71-0110R/F ULTRA O.P.VARINISH", "stock": 0, "min": 0}, {"id": "I0028", "name": "FLEXOMARINE PMS RED 4SC27-2035", "stock": 0, "min": 0}, {"id": "I0029", "name": "FLEXOMARINE MAGENTA 4SC27 -0610", "stock": 0, "min": 0}, {"id": "I0030", "name": "FLEXOMARINE  CYAN 4SC27-0410", "stock": 0, "min": 0}, {"id": "I0031", "name": "FLEXOSUPER RETARDER 4ST60-0833", "stock": 0, "min": 0}, {"id": "I0032", "name": "FLEXOMARINE PMS ORANGE4SC27-0021", "stock": 0, "min": 0}, {"id": "I0033", "name": "FLEXOMARINE PM GOLD 4SC27-0873", "stock": 0, "min": 0}, {"id": "I0034", "name": "FLEXOMARINE PM REFLEX BLUE 4SC27-0072-20L", "stock": 0, "min": 0}, {"id": "I0035", "name": "R/F ULTRA VOILET 4SC71-0702", "stock": 0, "min": 0}, {"id": "I0036", "name": "FLEXOMARINE PMS BLACK 4SC27-5463", "stock": 0, "min": 0}, {"id": "I0037", "name": "83271-0901J-20L FLEXO SURFACE HI-GLOSS BLACK", "stock": 0, "min": 0}, {"id": "I0038", "name": "FLEXOGLOSS WHITE -83226-2000-20S", "stock": 0, "min": 0}, {"id": "I0039", "name": "FLEXOGLOSS AL KINANAH RED-83226-8044J", "stock": 0, "min": 0}, {"id": "I0040", "name": "MEGA SURFACE YELLOW -83271-9336J-20L", "stock": 0, "min": 0}, {"id": "I0041", "name": "FLEXOMARINE PMS 3035 D.BLUE-4SC27-3035", "stock": 0, "min": 0}, {"id": "I0042", "name": "FLEXOMARINE PMS 7577 ORANGE-4SC27-7577", "stock": 0, "min": 0}, {"id": "I0043", "name": "FLEXOMARINE WHITE-4SC27-0210", "stock": 0, "min": 0}, {"id": "I0044", "name": "FLEXOMARINE PMS GREEN- 4SV27-2258-20L", "stock": 0, "min": 0}, {"id": "I0045", "name": "4SC27-0361-20L- FLEXOMARINE PMS TURQOISE", "stock": 0, "min": 0}, {"id": "I0046", "name": "FLEXOMARINE PMS485 RED4SC27-0485-20L", "stock": 0, "min": 0}, {"id": "I0047", "name": "FLEXOMARINE PMS GREEN4SC27-0368-20L", "stock": 0, "min": 0}, {"id": "I0048", "name": "FLEXOMARINE PMS VOILET4SC27-0531-20L", "stock": 0, "min": 0}, {"id": "I0049", "name": "FLEXOMARINE PMS ORANGE-4SC27-1375-20L", "stock": 0, "min": 0}, {"id": "I0050", "name": "FLEXOMARINE PMS BLUE-4SC27-0285-20L", "stock": 0, "min": 0}, {"id": "I0051", "name": "FLEXOMARINE PMS TURQOLSE 4SA27-0631-20L", "stock": 0, "min": 0}, {"id": "I0052", "name": "FLEXOMARINE PMS  VOILET4SA27-0513-20L", "stock": 0, "min": 0}, {"id": "I0053", "name": "FLEXOMARINE PMS GREEN 4SA27-0368-20L", "stock": 0, "min": 0}, {"id": "I0054", "name": "FLEXOMARINE PMS ORANGR4SA27-1375-20L", "stock": 0, "min": 0}, {"id": "I0055", "name": "FLEXOMARINE PMS 485 RED 4SA27-0485-20L", "stock": 0, "min": 0}, {"id": "I0056", "name": "FLXHORIZ FROZ PMS YELLOW 131 4SC37-0131-20L", "stock": 0, "min": 0}, {"id": "I0057", "name": "FLXHORIZ FROZ BLACK 4SC37-0800N", "stock": 0, "min": 0}, {"id": "I0058", "name": "FLEXO HORIZE WHITE 4SC37-0200N", "stock": 0, "min": 0}, {"id": "I0059", "name": "FLEXOMARINE PMS 421 GRAY 4SC27-0421-20L", "stock": 0, "min": 0}, {"id": "I0060", "name": "FLEXOMARINE PMS BROWN 4SC27-2449-20L", "stock": 0, "min": 0}, {"id": "I0061", "name": "YSFL-004 LNKOF EXSURFACE PROCESS", "stock": 0, "min": 0}, {"id": "I0062", "name": "CSFI-009 LNKOF EXSURFACE PROCESS", "stock": 0, "min": 0}, {"id": "I0063", "name": "MSFI- 008 LNKOF EXSURFACE PROCESS", "stock": 0, "min": 0}, {"id": "I0064", "name": "KSFI-004 LNKOF EXSURFACE PROCESS", "stock": 0, "min": 0}, {"id": "I0065", "name": "WSFI-007  EXSURFACE WHITE", "stock": 0, "min": 0}, {"id": "I0066", "name": "FLXHORIZ FROZ brown4SC37-2320-20L", "stock": 0, "min": 0}, {"id": "I0067", "name": "FLXHORIZ FROZ ORANG 4SC37-0124-20L", "stock": 0, "min": 0}, {"id": "I0068", "name": "FLEXOMARINE PMS ORANG 4SA27-2435-20L", "stock": 0, "min": 0}, {"id": "I0069", "name": "FLEXOMARINE PMS GREEN 4SA27-2458-20L", "stock": 0, "min": 0}, {"id": "I0070", "name": "FLXHORIZ FROZ pms-376 gren 4sc 37-0376-", "stock": 0, "min": 0}, {"id": "I0071", "name": "FLEXOMARINE PMS 7421 RED", "stock": 0, "min": 0}, {"id": "I0072", "name": "FLEXOMARINE PMS 7426 RED", "stock": 0, "min": 0}, {"id": "I0073", "name": "FLEXOMARINE PMS 7427 RED", "stock": 0, "min": 0}, {"id": "I0074", "name": "FLXHORIZ FROZ FROZ PMS 7621 RED", "stock": 0, "min": 0}, {"id": "I0075", "name": "FLXHORIZ FROZ FROZ PMS 355 GREEN", "stock": 0, "min": 0}, {"id": "I0076", "name": "FLEXOMARINE PMS 241 RED", "stock": 0, "min": 0}, {"id": "I0077", "name": "FLEXOMARINE PMS 321  GREEN", "stock": 0, "min": 0}, {"id": "I0078", "name": "فليكسون فالكون ريتاردر - 83271-6258J-20L", "stock": 0, "min": 0}, {"id": "I0079", "name": "ميقا سرفس اصفر - 83271-9417J-20L", "stock": 0, "min": 0}, {"id": "I0080", "name": "فليكسو سرفس بروسيس ازرق 83271-9417", "stock": 0, "min": 0}, {"id": "I0081", "name": "اسود فليكسولوكس 83228-8300jm-20l", "stock": 0, "min": 0}, {"id": "I0082", "name": "R/F ULTRA CPP WHITE 4SC71-0250-20L", "stock": 0, "min": 0}, {"id": "I0083", "name": "FLEXOMARINE PMS 2368 VIOLET 4SC27-2368-20L", "stock": 0, "min": 0}, {"id": "I0084", "name": "FLEXOMARINE PMS 3272 turqois 4SC27-3272-20L", "stock": 0, "min": 0}, {"id": "I0085", "name": "FLEXOMARINE PMS 7515 L.BROW 4SC27-7515-20L", "stock": 0, "min": 0}, {"id": "I0086", "name": "FLEXOMARINE PMS 178 RED 4SC27-0178-20L", "stock": 0, "min": 0}, {"id": "I0087", "name": "FLEXOMARINE PMS VOILET 4SC27-0513-20L", "stock": 0, "min": 0}, {"id": "I0088", "name": "FLEXOMARINE PMS 7709 BLUE 4SC27-7709-20L", "stock": 0, "min": 0}, {"id": "I0089", "name": "FLEXOMARINE PMSRED 4SC27-0186-20L", "stock": 0, "min": 0}, {"id": "I0090", "name": "FLEXOMARINE PMS 113 YELLOW 4SC27-0113-20L", "stock": 0, "min": 0}, {"id": "I0091", "name": "FLEXOMARINE PMS 136 ORANGE 4SC27-136-20L", "stock": 0, "min": 0}, {"id": "I0092", "name": "FLEXOMARINE PMS 7465 GREEN 4SC27-7465-20L", "stock": 0, "min": 0}, {"id": "I0093", "name": "FLEXOMARINE PMS 7723 GREEN 4SC27-7723-20L", "stock": 0, "min": 0}, {"id": "I0094", "name": "FLEXOMARINE PMS COOL GRAY1 4SC27-0001-20L", "stock": 0, "min": 0}, {"id": "I0095", "name": "FLEXOMARINE PMS 286 BLUE 4SC27-0286-20L", "stock": 0, "min": 0}, {"id": "I0096", "name": "FLEXOMARINE PMS BLUE 4SC27-0293-20L", "stock": 0, "min": 0}, {"id": "I0097", "name": "FLEXOMARINE PMS 2228 TURQOLS 4SC27-2228-20L", "stock": 0, "min": 0}, {"id": "I0098", "name": "FLEXOMARINE PMS 7578 ORANGE 4SC27-7578-20L", "stock": 0, "min": 0}, {"id": "I0099", "name": "FLEXOMARINE PMS 7621 RED 4SC27-7621-20L", "stock": 0, "min": 0}, {"id": "I0100", "name": "FLEXOMARINE PMS 7573 BROWN 4SC27-7573-20L", "stock": 0, "min": 0}, {"id": "I0101", "name": "FLEXOMARINE PMS GREEN 4SC27-0349-20L", "stock": 0, "min": 0}, {"id": "I0102", "name": "FLEXOMARINE PMS 5565  GREEN 4SC27-5565-20L", "stock": 0, "min": 0}, {"id": "I0103", "name": "FLEXOMARINE PMS 5575L.GREE 4SC27-5575-20L", "stock": 0, "min": 0}, {"id": "I0104", "name": "FLEXOMARINE PMS 7687 BLUE 4SC27-7687-20L", "stock": 0, "min": 0}, {"id": "I0105", "name": "FLEXOMARINE PMS 621 L.GREEN 4SC27-0621-20L", "stock": 0, "min": 0}, {"id": "I0106", "name": "FLEXOMARINE PMS441 BROWN  4SC27-0411-20L", "stock": 0, "min": 0}, {"id": "I0107", "name": "FLEXOMARINE PMS L.GREEN 4SC27-0376-20L", "stock": 0, "min": 0}, {"id": "I0108", "name": "FLEXOMARINE PMS GRAY 4SC27-0424-20L", "stock": 0, "min": 0}, {"id": "I0109", "name": "FLEXOMARINE PMS7738 GREEN 4SC27-7738-20L", "stock": 0, "min": 0}, {"id": "I0110", "name": "FLEXOMARINE PMS 116 ORANGE 4SC27-0116-20L", "stock": 0, "min": 0}, {"id": "I0111", "name": "FLEXOMARINE PMS 7710 TURQOL 4SC27-7710-20L", "stock": 0, "min": 0}, {"id": "I0112", "name": "FLEXOMARINE PMS 634 BLUE 4SC27-634-20L", "stock": 0, "min": 0}, {"id": "I0113", "name": "FLEXOMARINE PMS 4010ORANGE 4SC27-4010-20L", "stock": 0, "min": 0}, {"id": "I0114", "name": "FLEXOMARINE PMS 517 PINK 4SC27-517-20L", "stock": 0, "min": 0}, {"id": "I0115", "name": "FLXHORIZ FROZ PMS 7706 BLUE", "stock": 0, "min": 0}, {"id": "I0116", "name": "CYAN 828404694819", "stock": 0, "min": 0}, {"id": "I0117", "name": "MAGENTA  655437739249", "stock": 0, "min": 0}, {"id": "I0118", "name": "YELLOW65543773924", "stock": 0, "min": 0}, {"id": "I0119", "name": "BLACK363618504299", "stock": 0, "min": 0}, {"id": "I0120", "name": "WHITE263132211793", "stock": 0, "min": 0}, {"id": "I0121", "name": "FLEXOMARINE PMS 289 D.BLUE 4SC27-0289-20L", "stock": 0, "min": 0}, {"id": "I0122", "name": "FLEXOMARINE PMS 4028 BROWN 4SC27-4028-20L", "stock": 0, "min": 0}, {"id": "I0123", "name": "FLEXOMARINE PMS 7401 BEIGE 4SC27-7401-20L", "stock": 0, "min": 0}, {"id": "I0124", "name": "FLEXOMARINE PMS 0121 YELLOW 4SC27-0121-20L", "stock": 0, "min": 0}, {"id": "I0125", "name": "FLEXOMARINE PMS 345 L.GREEN 4SC27-0345-20L", "stock": 0, "min": 0}, {"id": "I0126", "name": "FLEXOMARINE PMS 180 RED 4SC27-0180-20L", "stock": 0, "min": 0}, {"id": "I0127", "name": "FLEXOMARINE PMS 7454 PLUE 4SC27-7454-20L", "stock": 0, "min": 0}, {"id": "I0128", "name": "FLEXOMARINE PMS 0172 RED 4SC27-172-20L", "stock": 0, "min": 0}, {"id": "I0129", "name": "FLEXOMARINE PMS 241 RED 4SC27-241-20L", "stock": 0, "min": 0}, {"id": "I0130", "name": "FLEXOMARINE PMS 360 GREEN 4SC27-360-20L", "stock": 0, "min": 0}, {"id": "I0131", "name": "FLEXOMARINE PMS 0634 BLUE 4SC27-0634 -20L", "stock": 0, "min": 0}, {"id": "I0132", "name": "FLEXOMARINE PMS 7408 YELLOW 4SC27-7408-20L", "stock": 0, "min": 0}, {"id": "I0133", "name": "FLEXOMARINE PMS 7649 RED 4SC27-7649-20L", "stock": 0, "min": 0}, {"id": "I0134", "name": "FLEXOMARINE PMS 9660J PINK C 4SC27-9660J-20L", "stock": 0, "min": 0}, {"id": "I0135", "name": "FLEXOMARINE PMS 4208 GREEN 4SC27-4208-20L", "stock": 0, "min": 0}, {"id": "I0136", "name": "FLEXOMARINE PMS 7406 YELLOW 4SC27-7406-20L", "stock": 0, "min": 0}, {"id": "I0137", "name": "FLEXOMARINE PMS 164 ORANGE 4SC27-0164-20L", "stock": 0, "min": 0}, {"id": "I0138", "name": "FLEXOMARINE PMS 0144 ORANGE  4SC27-0144-20L", "stock": 0, "min": 0}, {"id": "I0139", "name": "FLEXOMARINE PMS0634 .BLUE 4SC27-0634-20L", "stock": 0, "min": 0}, {"id": "I0140", "name": "FLEXOMARINE PMS 167ORANGE 4SC27-0167-20L", "stock": 0, "min": 0}, {"id": "I0141", "name": "FLEXOMARINE PMS 7409 YELLOW 4SC27-7409 -20L", "stock": 0, "min": 0}, {"id": "I0142", "name": "FLEXOMARINE PMS 7473 GREEN 4SC27-7473 -20L", "stock": 0, "min": 0}, {"id": "I0143", "name": "فليكسو سرفس بروسيس برتقالي 83226-9365", "stock": 0, "min": 0}, {"id": "I0144", "name": "فليكسو سرفس بروسيس فضي - 83226-2416J-20L", "stock": 0, "min": 0}, {"id": "I0145", "name": "فليكسو سرفس بروسيس احمر 83271-9647", "stock": 0, "min": 0}, {"id": "I0146", "name": "فليكسو سرفس بانتون احمر 83226-8953", "stock": 0, "min": 0}, {"id": "I0147", "name": "فليكسو تركواز 83271-7709", "stock": 0, "min": 0}, {"id": "I0148", "name": "فليكسو سيرفس ذهبي 83271-0613", "stock": 0, "min": 0}, {"id": "I0149", "name": "فليكسو فريز ابيض 83237-2000j", "stock": 0, "min": 0}, {"id": "I0150", "name": "فليكسو فريز ازرق 83237-6258", "stock": 0, "min": 0}, {"id": "I0151", "name": "فليكسو قلوس الهدايا ذهبي 83226-8019", "stock": 0, "min": 0}, {"id": "I0152", "name": "فليكسو كريستال بانتون احمر 485 سي 83237-0602", "stock": 0, "min": 0}, {"id": "I0153", "name": "فليكسو كريستال بانتون اصفر 485 سي 83226-0478", "stock": 0, "min": 0}, {"id": "I0154", "name": "فليكسو كريستال بانتون اخضر  485 سي 83226-0564", "stock": 0, "min": 0}, {"id": "I0155", "name": "فليكسو كريستال بانتون احمر 485 سي 83226-0241", "stock": 0, "min": 0}, {"id": "I0156", "name": "فليكسو كريستال بانتون اخضر 7739سي 83271-7739", "stock": 0, "min": 0}, {"id": "I0157", "name": "فليكسو كريستال بانتون برتقالي 172 سي 83271-0172", "stock": 0, "min": 0}, {"id": "I0158", "name": "فليكسو كريستال بانتون رمادي 421 سي  83271-0421", "stock": 0, "min": 0}, {"id": "I0159", "name": "فليكسو كريستال فارنيش 83271-1000", "stock": 0, "min": 0}, {"id": "I0160", "name": "فليكسو كريستال  اخضر فريز 83237-7490", "stock": 0, "min": 0}, {"id": "I0161", "name": "فليكسو كريستال  اصفر فريز 83237-0131", "stock": 0, "min": 0}, {"id": "I0162", "name": "فليكسو كريستال  موف 83271-2597", "stock": 0, "min": 0}, {"id": "I0163", "name": "فليكسو قلوس بانتون رصاصي  83226-5415", "stock": 0, "min": 0}, {"id": "I0164", "name": "فليكسو قلوس بانتون برتقالي  83226-0167", "stock": 0, "min": 0}, {"id": "I0165", "name": "فليكسو قلوسبي ام اس 7409  سي اصفر 83226-7409", "stock": 0, "min": 0}, {"id": "I0166", "name": "فليكسو قلوس بانتون  احمر  83226-9021", "stock": 0, "min": 0}, {"id": "I0167", "name": "فليكسو قلوس بانتون  احمر  83226-9022", "stock": 0, "min": 0}, {"id": "I0168", "name": "فليكسو قلوس بانتون  سي بنفسجي  83271-0253", "stock": 0, "min": 0}, {"id": "I0169", "name": "فليكسو قلوس بانتون  سي 300 ازرق 83271-0300j", "stock": 0, "min": 0}, {"id": "I0170", "name": "فليكسو ميقا لمنشين اصفر  83271-0290", "stock": 0, "min": 0}, {"id": "I0171", "name": "فليكسو قلوس بانتون الاحمر83226 -5625  اخضر", "stock": 0, "min": 0}, {"id": "I0172", "name": "فليكسو سيرفس بانتون اخضر 83271-0321", "stock": 0, "min": 0}, {"id": "I0173", "name": "فليكسو قلوس بانتون احمر 83226-0116", "stock": 0, "min": 0}, {"id": "I0174", "name": "فليكسو سيرف بي ام اس 373 سيرف اخضر 83271-0373", "stock": 0, "min": 0}, {"id": "I0175", "name": "فليكسو سيرف  تو كواز 83271-3125", "stock": 0, "min": 0}, {"id": "I0176", "name": "فليكسو سيرفس بانتون اصفر 83271-0143", "stock": 0, "min": 0}, {"id": "I0177", "name": "فليكسو سبيشال الذهبي 83226-3942", "stock": 0, "min": 0}, {"id": "I0178", "name": "فليكسو قلوس بانتون الاحمر 83226-9079", "stock": 0, "min": 0}, {"id": "I0179", "name": "flexo surf 83271-8971 اخضر", "stock": 0, "min": 0}, {"id": "I0180", "name": "flexo surf 83271-8972 برتقالي", "stock": 0, "min": 0}, {"id": "I0181", "name": "flexo surf 83271-8973 بيج", "stock": 0, "min": 0}, {"id": "I0182", "name": "FLEXOGLOSS PMS 83226-9081", "stock": 0, "min": 0}, {"id": "I0183", "name": "فليكسو سيرفس هاي قلوس ازرق 83271-2188", "stock": 0, "min": 0}, {"id": "I0184", "name": "فليكسو بانتون رفليكس ازرق 83271-2355", "stock": 0, "min": 0}, {"id": "I0185", "name": "فليكسو بانتون رفليكس اخضر  83271-0360", "stock": 0, "min": 0}, {"id": "I0186", "name": "فليكسو بانتون رفليكس برتقالي 83271-0172", "stock": 0, "min": 0}, {"id": "I0187", "name": "فليكسو بانتون رفليكس أزرق 72- 83271-9129", "stock": 0, "min": 0}, {"id": "I0188", "name": "فليكسو قلوس الشامل الازرق الداكن 83226-6199", "stock": 0, "min": 0}, {"id": "I0189", "name": "فيلكسو قلوس بانتون اخضر  83271-9142", "stock": 0, "min": 0}, {"id": "I0190", "name": "فيلكسو قلوس بانتون اخضر  83271-9143", "stock": 0, "min": 0}, {"id": "I0191", "name": "فيلكسو قلوس بانتون احمر 485 - 83226-9141", "stock": 0, "min": 0}, {"id": "I0192", "name": "فيلكسو سيرفس بانتون اصفر 123 بي 83271-0123", "stock": 0, "min": 0}, {"id": "I0193", "name": "فيلكسو سيرفس بانتون اخضر 3262 سي 83271-3272", "stock": 0, "min": 0}, {"id": "I0194", "name": "فيلكسو سيرفس بانتون احمر 485 سي 83271-7687", "stock": 0, "min": 0}, {"id": "I0195", "name": "فيلكسو سيرفس رفليكس ازرق 72 -83271-7635", "stock": 0, "min": 0}, {"id": "I0196", "name": "فليكسو سيرفس 513 سي - 83271-0513", "stock": 0, "min": 0}, {"id": "I0197", "name": "فيلكسو سيرفس رفليكس ازرق 72 - 83271-0080", "stock": 0, "min": 0}, {"id": "I0198", "name": "فيلكسو سيرفس رفليكس ازرق 72 - 83271-0639", "stock": 0, "min": 0}, {"id": "I0199", "name": "فليكسو بانتون رفليكس ازرق 72- 83271-9169", "stock": 0, "min": 0}, {"id": "I0200", "name": "فليكسو بانتون رفليكس ازرق 72- 83271-9170", "stock": 0, "min": 0}, {"id": "I0201", "name": "سطح فليكسو ازرق  83271-9200", "stock": 0, "min": 0}, {"id": "I0202", "name": "سطح فليكسو ازرق  83271-9199", "stock": 0, "min": 0}, {"id": "I0203", "name": "فليكسو سيرفس دايت ببسي لاكير ازرق 83271-0287", "stock": 0, "min": 0}, {"id": "I0204", "name": "flexo surf pms - 83271-0475", "stock": 0, "min": 0}, {"id": "I0205", "name": "flexo surf pms - 83271-8763", "stock": 0, "min": 0}, {"id": "I0206", "name": "سيرفس احمر 83271-9237", "stock": 0, "min": 0}, {"id": "I0207", "name": "سيرفس اصفر 83271-9238", "stock": 0, "min": 0}, {"id": "I0208", "name": "سيرفس ازرق 83271-9239", "stock": 0, "min": 0}, {"id": "I0209", "name": "سيرفس ازرق 83271.9240", "stock": 0, "min": 0}, {"id": "I0210", "name": "فليكسو فايف سنتر احمر  83226-9255", "stock": 0, "min": 0}, {"id": "I0211", "name": "فليكسو فايف سنتر اصفر 83226-9256", "stock": 0, "min": 0}, {"id": "I0212", "name": "فليكسو فايف سنتر ازرق 83226-9257", "stock": 0, "min": 0}, {"id": "I0213", "name": "فيلكسو  ازرق 83226-9275", "stock": 0, "min": 0}, {"id": "I0214", "name": "فيلكسو  ازرق 83271-2378", "stock": 0, "min": 0}, {"id": "I0215", "name": "فيلكسو  كريستال بانتون  الاحمر 485 - 83271-9292j", "stock": 0, "min": 0}, {"id": "I0216", "name": "فيلكسو  كريستال بانتون  الاحمر 485 -83237-9294j", "stock": 0, "min": 0}, {"id": "I0217", "name": "فيلكسو  كريستال بانتون  اصفر 141-83271-0141 شتوي", "stock": 0, "min": 0}, {"id": "I0218", "name": "فيلكسو  كريستال بانتون  برتقالي158- 83271-1585", "stock": 0, "min": 0}, {"id": "I0219", "name": "فيلكسو  كريستال بانتون   ازرق 2746 - 83271-2746", "stock": 0, "min": 0}, {"id": "I0220", "name": "فليكسو غلوس ذهبي - للطباعة على اللون الاسود - 83326-9019", "stock": 0, "min": 0}, {"id": "I0221", "name": "فليكسو سيرفس بانتون اخضر 83271-3262", "stock": 0, "min": 0}, {"id": "I0222", "name": "فليكسو سيرفس بانتون وردي 83271-0214", "stock": 0, "min": 0}, {"id": "I0223", "name": "فليكسو سيرفس بانتون بنفسجي 83271-0260", "stock": 0, "min": 0}, {"id": "I0224", "name": "فليكسو سيرفس بانتون برتقالي 83271-0664", "stock": 0, "min": 0}, {"id": "I0225", "name": "4SC71-0630", "stock": 0, "min": 0}, {"id": "I0226", "name": "4SC71-1575", "stock": 0, "min": 0}, {"id": "I0227", "name": "4SC71-0201A", "stock": 0, "min": 0}];
+const K_ITEMS='ink_items_v3',K_MOV='ink_moves_v3';
+let items=JSON.parse(localStorage.getItem(K_ITEMS)||'null') || DEFAULT_ITEMS;
+let moves=JSON.parse(localStorage.getItem(K_MOV)||'[]');
+
+function n(v){return Number(v)||0}
+function fmt(v){return new Intl.NumberFormat('ar-SA',{maximumFractionDigits:2}).format(n(v))}
+function persist(){localStorage.setItem(K_ITEMS,JSON.stringify(items));localStorage.setItem(K_MOV,JSON.stringify(moves))}
+function outstanding(itemId){
+ return moves.filter(m=>m.itemId===itemId).reduce((s,m)=>s+(m.type==='take'?n(m.qty):m.type==='return'?-n(m.qty)-n(m.consumed):0),0)
+}
+function totalConsumed(){return moves.reduce((s,m)=>s+n(m.consumed),0)}
+function state(x){
+ if(n(x.min)<=0) return ['لم يحدد','unset'];
+ if(n(x.stock)<=0) return ['نفد','zero'];
+ if(n(x.stock)<=n(x.min)) return ['منخفض','low'];
+ return ['جيد','ok'];
+}
+function renderAll(){renderInventory();renderMoves();renderCustody();renderPrinters();renderKPIs()}
+function renderKPIs(){
+ kItems.textContent=items.length;
+ kStock.textContent=fmt(items.reduce((s,x)=>s+n(x.stock),0));
+ kOut.textContent=fmt(items.reduce((s,x)=>s+Math.max(0,outstanding(x.id)),0));
+ kLow.textContent=items.filter(x=>n(x.min)>0&&n(x.stock)<=n(x.min)).length;
+ kConsumed.textContent=fmt(totalConsumed());
+}
+function renderInventory(){
+ const query=(q.value||'').toLowerCase(), f=filter.value;
+ let arr=items.filter(x=>{
+   const out=outstanding(x.id);
+   const ok=(x.name+' '+x.id).toLowerCase().includes(query);
+   return ok && (f==='all'||(f==='low'&&n(x.min)>0&&n(x.stock)<=n(x.min))||(f==='out'&&out>0));
+ });
+ invBody.innerHTML=arr.map(x=>{
+   const out=Math.max(0,outstanding(x.id)), [st,cl]=state(x);
+   return `<tr><td><b>${escapeHtml(x.name)}</b></td><td>${x.id}</td><td>${fmt(x.stock)} كجم</td><td>${fmt(out)} كجم</td><td>${n(x.min)>0?fmt(x.min)+' كجم':'—'}</td><td><span class="badge ${cl}">${st}</span></td><td><div class="toolbar" style="margin:0"><button class="primary" onclick="openMove('${x.id}','receive')">وارد</button><button class="take" onclick="openMove('${x.id}','take')">صرف</button><button class="ret" onclick="openMove('${x.id}','return')">إرجاع</button><button class="light" onclick="openEdit('${x.id}')">الرصيد/الحد</button></div></td></tr>`;
+ }).join('')||'<tr><td colspan="7" class="empty">لا توجد نتائج</td></tr>';
+}
+function renderMoves(){
+ const query=(mq.value||'').toLowerCase();
+ const arr=[...moves].reverse().filter(m=>(m.itemName+' '+(m.printer||'')+' '+m.person+' '+m.note).toLowerCase().includes(query));
+ moveBody.innerHTML=arr.map(m=>`<tr><td>${new Date(m.date).toLocaleString('ar-SA')}</td><td><span class="badge ${m.type==='take'?'low':'ok'}">${m.type==='receive'?'وارد':m.type==='take'?'صرف':'إرجاع'}</span></td><td>${escapeHtml(m.itemName)}</td><td>${fmt(m.qty)} كجم</td><td>${m.type==='return'?fmt(m.consumed||0)+' كجم':'—'}</td><td>${escapeHtml(m.printer||'—')}</td><td>${escapeHtml(m.person||'—')}</td><td>${escapeHtml(m.note||'')}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">لا توجد حركات</td></tr>';
+}
+function renderCustody(){
+ const map={};
+ for(const m of moves){
+   const key=m.person+'||'+m.itemId;
+   if(!map[key]) map[key]={person:m.person,item:m.itemName,qty:0};
+   map[key].qty += m.type==='take'?n(m.qty):m.type==='return'?-n(m.qty)-n(m.consumed):0;
+ }
+ const arr=Object.values(map).filter(x=>x.qty>0.0001).sort((a,b)=>a.person.localeCompare(b.person,'ar'));
+ custBody.innerHTML=arr.map(x=>`<tr><td><b>${escapeHtml(x.person)}</b></td><td>${escapeHtml(x.item)}</td><td>${fmt(x.qty)} كجم</td></tr>`).join('')||'<tr><td colspan="3" class="empty">لا توجد عهد حالية</td></tr>';
+}
+
+const PRINTERS=[
+'طابعة رقم 1 - فرز ألوان',
+'طابعة رقم 2 - صيني',
+'طابعة رقم 3 - هاي بلس',
+'طابعة رقم 4 - ليلو كبير',
+'طابعة رقم 5 - ليلو صغير'
+];
+function renderPrinters(){
+ const f=document.getElementById('printerFilter')?.value||'all';
+ const arr=PRINTERS.filter(p=>f==='all'||p===f).map(p=>{
+   const pm=moves.filter(m=>m.printer===p);
+   const taken=pm.filter(m=>m.type==='take').reduce((s,m)=>s+n(m.qty),0);
+   const returned=pm.filter(m=>m.type==='return').reduce((s,m)=>s+n(m.qty),0);
+   const consumed=pm.reduce((s,m)=>s+n(m.consumed||0),0);
+   return {p,taken,returned,net:consumed};
+ });
+ const body=document.getElementById('printerBody');
+ if(body) body.innerHTML=arr.map(x=>`<tr><td><b>${escapeHtml(x.p)}</b></td><td>${fmt(x.taken)} كجم</td><td>${fmt(x.returned)} كجم</td><td><b>${fmt(x.net)} كجم</b></td></tr>`).join('');
+}
+
+function openMove(id,type){
+ const x=items.find(a=>a.id===id); if(!x)return;
+ mItemId.value=id;mItemName.value=x.name;mType.value=type;mQty.value='';mPrinter.value='';mPerson.value='';mNote.value='';updateMoveTitle();moveModal.classList.add('show');
+}
+function updateMoveTitle(){
+ moveTitle.textContent=mType.value==='receive'?'استلام حبر إلى المستودع':mType.value==='take'?'صرف حبر من المستودع':'إرجاع المتبقي وإقفال العهدة';
+ const needCustody=mType.value!=='receive';
+ mPrinter.disabled=!needCustody;mPerson.disabled=!needCustody;
+}
+function closeModal(){moveModal.classList.remove('show')}
+function saveMove(){
+ const x=items.find(a=>a.id===mItemId.value), qty=n(mQty.value), person=mPerson.value.trim(), printer=mPrinter.value;
+ if(!x||qty<=0){alert('أدخل كمية صحيحة');return}
+ if(mType.value!=='receive'&&!printer){alert('اختر الطابعة التي صُرف أو أُرجع لها الحبر');return}
+ if(mType.value!=='receive'&&!person){alert('اكتب اسم الموظف أو الجهة');return}
+ if(mType.value==='take'&&qty>n(x.stock)){alert('الكمية أكبر من رصيد المستودع');return}
+ let consumed=0;
+ if(mType.value==='return'){
+   const personOut=moves.filter(m=>m.itemId===x.id&&m.person===person).reduce((s,m)=>s+(m.type==='take'?n(m.qty):m.type==='return'?-n(m.qty)-n(m.consumed):0),0);
+   if(qty>personOut+0.0001){alert('كمية الإرجاع أكبر من العهدة المسجلة على هذا الاسم');return}
+   consumed=Math.max(0,personOut-qty);
+ }
+ x.stock=n(x.stock)+(mType.value==='take'?-qty:qty);
+ moves.push({id:Date.now().toString(),date:new Date().toISOString(),type:mType.value,itemId:x.id,itemName:x.name,qty,consumed,printer,person,note:mNote.value.trim()});
+ persist();closeModal();renderAll();
+}
+function openEdit(id){
+ const x=items.find(a=>a.id===id); if(!x)return;
+ eId.value=id;eName.value=x.name;eStock.value=x.stock;eMin.value=x.min;editModal.classList.add('show');
+}
+function closeEdit(){editModal.classList.remove('show')}
+function saveEdit(){
+ const x=items.find(a=>a.id===eId.value);if(!x)return;
+ x.stock=Math.max(0,n(eStock.value));x.min=Math.max(0,n(eMin.value));persist();closeEdit();renderAll();
+}
+function showTab(id,btn){
+ document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+}
+function exportData(){
+ const data={exportedAt:new Date().toISOString(),items,moves};
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='نسخة-احتياطية-مخزون-الأحبار.json';a.click();
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+renderAll();
+</script>
+</body></html>
