@@ -4,7 +4,7 @@
   const number=v=>Number(String(v??'').replace(/[^\d.-]/g,''))||0;
   const text=v=>String(v??'').trim();
   const isRealCustomer=id=>{
-    const c=(window.db?.customers||[]).find(x=>x.id===id);
+    const c=(db?.customers||[]).find(x=>x.id===id);
     return !!c && text(c.name) && !['الاسم','اسم العميل','-'].includes(text(c.name));
   };
   const validOrder=o=>!!o && isRealCustomer(o.customer_id) && text(o.product) &&
@@ -18,7 +18,7 @@
   function markInvalidRecords(){
     document.querySelectorAll('.quote-card,.quote-card-pro').forEach(card=>{
       const no=card.querySelector('h3')?.textContent?.match(/Q-\d+/)?.[0];
-      const q=(window.db?.quotes||[]).find(x=>x.quote_no===no);
+      const q=(db?.quotes||[]).find(x=>x.quote_no===no);
       if(!q || validQuote(q)) return;
       card.classList.add('jms-record-incomplete');
       if(!card.querySelector('.jms-incomplete-note')){
@@ -77,40 +77,40 @@
 
   function installGuards(){
     wrap('approveQuote',qid=>{
-      const q=window.db?.quotes?.find(x=>x.id===qid);
+      const q=db?.quotes?.find(x=>x.id===qid);
       if(!validQuote(q)){alert(invalidMessage);return false;}
     });
     wrap('sendQuote',qid=>{
-      const q=window.db?.quotes?.find(x=>x.id===qid);
+      const q=db?.quotes?.find(x=>x.id===qid);
       if(!validQuote(q)){alert(invalidMessage);return false;}
     });
     wrap('convertQuoteToOrder',qid=>{
-      const q=window.db?.quotes?.find(x=>x.id===qid);
+      const q=db?.quotes?.find(x=>x.id===qid);
       if(!validQuote(q)){alert(invalidMessage);return false;}
-      if(q.converted_to_order || (window.db?.orders||[]).some(o=>o.quote_id===qid||o.source_quote_id===qid)){
+      if(q.converted_to_order || (db?.orders||[]).some(o=>o.quote_id===qid||o.source_quote_id===qid)){
         alert('تم تحويل هذا العرض مسبقًا، ولن يتم إنشاء طلب مكرر.');return false;
       }
     });
     wrap('jms11aQuoteToProduction',qid=>{
-      const q=window.db?.quotes?.find(x=>x.id===qid);
+      const q=db?.quotes?.find(x=>x.id===qid);
       if(!validQuote(q)){alert(invalidMessage);return false;}
     });
     wrap('jms11aApproveOrder',oid=>{
-      const o=window.db?.orders?.find(x=>x.id===oid);
+      const o=db?.orders?.find(x=>x.id===oid);
       if(!validOrder(o)){alert(invalidMessage);return false;}
     });
     wrap('jms11aMarkPaid',oid=>{
-      const o=window.db?.orders?.find(x=>x.id===oid);
+      const o=db?.orders?.find(x=>x.id===oid);
       if(!validOrder(o)){alert(invalidMessage);return false;}
-      const p=(window.db?.productionOrders||[]).find(x=>x.order_id===oid);
+      const p=(db?.productionOrders||[]).find(x=>x.order_id===oid);
       if(!p || !['approved_manager','payment_received'].includes(p.stage)){
         alert('اعتمد المدير الطلب أولًا قبل تسجيل التحويل.');return false;
       }
     });
     wrap('jms11aSendOrderToProduction',oid=>{
-      const o=window.db?.orders?.find(x=>x.id===oid);
+      const o=db?.orders?.find(x=>x.id===oid);
       if(!validOrder(o)){alert(invalidMessage);return false;}
-      const p=(window.db?.productionOrders||[]).find(x=>x.order_id===oid);
+      const p=(db?.productionOrders||[]).find(x=>x.order_id===oid);
       if(!p || !['payment_received','sent_to_production'].includes(p.stage)){
         alert('سجّل تحويل العميل أولًا قبل إرسال الطلب للإنتاج.');return false;
       }
