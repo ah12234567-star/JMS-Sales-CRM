@@ -88,7 +88,8 @@ export default async function handler(req, res){
       email: row.email,
       phone: row.phone || '',
       role: data.role || 'rep',
-      status: data.status || 'active'
+      status: data.status || 'active',
+      permissions: data.permissions || {}
     };
 
     return json(res, 200, { ok:true, user, token: sign({ id:user.id, email:user.email, role:user.role }) });
