@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/auth-update-user", "destination": "/api/auth-create-user?action=update" },
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
