@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-13-mobile-quote-pdf-2';
+  const VERSION = '2026-08-13-mobile-quote-pdf-3';
 
   function quotePrintCss() {
     return `
@@ -65,15 +65,18 @@
       openQuotePrintPage();
     }, true);
 
-    const observer = new MutationObserver(() => {
+    function refreshQuoteUi() {
       document.querySelectorAll('#modalBody .quote-a4').forEach(simplifyApprovals);
       document.querySelectorAll('.quote-toolbar .pdf').forEach(button => {
-        button.textContent = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'حفظ ومشاركة PDF' : 'حفظ PDF / طباعة';
+        const label = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'حفظ ومشاركة PDF' : 'حفظ PDF / طباعة';
+        if (button.textContent !== label) button.textContent = label;
         button.title = 'إنشاء عرض سعر من صفحة واحدة جاهز للإرسال';
       });
-    });
-    observer.observe(document.body, {childList:true, subtree:true});
-    document.querySelectorAll('#modalBody .quote-a4').forEach(simplifyApprovals);
+    }
+    refreshQuoteUi();
+    // A slow timer is deliberate: it avoids a MutationObserver feedback loop on iOS
+    // while still updating a quote shortly after its modal opens.
+    window.setInterval(refreshQuoteUi, 1200);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
