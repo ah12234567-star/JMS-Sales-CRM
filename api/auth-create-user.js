@@ -1,9 +1,32 @@
-import { json, pbkdf2, makeSalt, readBody, upsertUser } from './auth-utils.js';
+import { json, pbkdf2, makeSalt, readBody, supabase, upsertUser } from './auth-utils.js';
 
 export default async function handler(req, res){
   if(req.method !== 'POST') return json(res, 405, {ok:false,error:'method_not_allowed'});
   try{
     const body = await readBody(req);
+    const isUpdate = new URL(req.url, 'https://jms.local').searchParams.get('action') === 'update';
+    if(isUpdate){
+      const id = String(body.id || '').trim();
+      if(!id) return json(res, 400, {ok:false,error:'missing_user_id'});
+      const rows = await supabase('jms_users?id=eq.' + encodeURIComponent(id) + '&limit=1');
+      const row = rows && rows[0];
+      if(!row) return json(res, 404, {ok:false,error:'not_found'});
+      const data = {
+        ...(row.data || {}),
+        name: body.name || row.data?.name || row.email,
+        role: body.role || row.data?.role || 'rep',
+        status: body.status || row.data?.status || 'active',
+        permissions: body.permissions || row.data?.permissions || {}
+      };
+      await upsertUser({
+        ...row,
+        email: String(body.email || row.email).trim().toLowerCase(),
+        phone: body.phone ?? row.phone,
+        data,
+        updated_at: new Date().toISOString()
+      });
+      return json(res, 200, {ok:true,message:'تم تحديث المستخدم والصلاحيات'});
+    }
     if(!body.email || !body.password) return json(res, 400, {ok:false,error:'missing_email_or_password'});
     const salt = makeSalt();
     const data = {
