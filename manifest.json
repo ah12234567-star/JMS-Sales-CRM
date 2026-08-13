@@ -24,5 +24,10 @@
       "src": "/assets/jms-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"
     }
   ],
-  "shortcuts": [{"name":"لوحة التحكم","url":"/?page=dashboard"},{"name":"الزيارات الذكية","url":"/?page=smartVisits"}]
+  "shortcuts": [
+    {"name":"لوحة التحكم","short_name":"الرئيسية","url":"/?page=dashboard","icons":[{"src":"/assets/jms-icon-192.png","sizes":"192x192"}]},
+    {"name":"إنشاء عرض سعر","short_name":"عرض سعر","url":"/?page=quotes&action=new","icons":[{"src":"/assets/jms-icon-192.png","sizes":"192x192"}]},
+    {"name":"الزيارات الذكية","short_name":"زيارة","url":"/?page=smartVisits","icons":[{"src":"/assets/jms-icon-192.png","sizes":"192x192"}]},
+    {"name":"العملاء","short_name":"العملاء","url":"/?page=customers","icons":[{"src":"/assets/jms-icon-192.png","sizes":"192x192"}]}
+  ]
 }
