@@ -9,16 +9,21 @@
 <meta name="apple-mobile-web-app-title" content="JMS CRM">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/jms-logo.svg">
-<link rel="stylesheet" href="style.css?v=20260813-ink-layout-fix">
+<link rel="stylesheet" href="style.css?v=20260813-login-pro">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <section id="loginView" class="login-page">
+  <div class="login-orb login-orb-one"></div>
+  <div class="login-orb login-orb-two"></div>
   <div class="login-card">
-    <img src="assets/jms-logo.svg" class="login-logo jms-real-brand">
-    <h1>JMS Factory CRM</h1>
-    <p>شركة جدة النموذجية للصناعة</p>
+    <div class="login-brand-mark" aria-label="JMS"><span>JMS</span><small>CRM</small></div>
+    <div class="login-title">
+      <span>نظام إدارة المبيعات والمصنع</span>
+      <h1>JMS Factory CRM</h1>
+      <p>شركة جدة النموذجية للصناعة</p>
+    </div>
 
     <div class="role-switch">
       <label><input type="radio" name="loginRole" value="admin" checked><span>مدير النظام</span></label>
@@ -29,12 +34,12 @@
 
     <form id="loginForm">
       <label>البريد الإلكتروني</label>
-      <input id="loginEmail" type="email" placeholder="اكتب بريدك الإلكتروني" autocomplete="username">
+      <div class="login-input-wrap"><span>✉</span><input id="loginEmail" type="email" placeholder="اكتب بريدك الإلكتروني" autocomplete="username"></div>
       <label>كلمة المرور</label>
-      <input id="loginPassword" type="password" placeholder="اكتب كلمة المرور" autocomplete="current-password">
+      <div class="login-input-wrap"><span>●</span><input id="loginPassword" type="password" placeholder="اكتب كلمة المرور" autocomplete="current-password"></div>
       <button class="primary full" type="submit">دخول النظام</button>
       <button type="button" class="link-btn" onclick="openPasswordReset()">نسيت كلمة المرور؟ استعادة عبر واتساب / رسالة</button>
-      <div id="loginHint" class="hint secure-login-note">لن تظهر بيانات الدخول على الصفحة حفاظًا على الأمان</div>
+      <div id="loginHint" class="hint secure-login-note">🔒 دخول آمن — بياناتك محمية ولا تظهر على الصفحة</div>
     </form>
   </div>
 </section>
@@ -42,7 +47,7 @@
 <section id="appView" class="app hidden">
   <aside class="sidebar">
     <div class="brand">
-      <img src="assets/jms-logo.svg" class="jms-real-brand">
+      <div class="sidebar-brand-mark"><span>JMS</span></div>
       <div>
         <b>JMS Factory CRM</b>
         <span>إدارة العملاء والمناديب والإنتاج</span>
