@@ -632,6 +632,17 @@ img[src=""], img:not([src]){display:none!important}
 .customer-more-menu button[disabled]{opacity:.6;cursor:not-allowed}
 @media(max-width:800px){.customer-actions-clean{grid-template-columns:repeat(2,1fr)!important}}
 
+/* Keep long navigation inside the dark sidebar instead of spilling over the page. */
+@media(min-width:851px){
+  .sidebar{overflow:hidden;min-height:0}
+  .sidebar nav{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-left:5px;align-content:start;scrollbar-width:thin;scrollbar-color:#475569 transparent}
+  .sidebar nav::-webkit-scrollbar{width:6px}
+  .sidebar nav::-webkit-scrollbar-thumb{background:#475569;border-radius:999px}
+  #logoutBtn{flex:0 0 auto;margin-top:0}
+  #inkStock{height:calc(100vh - 56px);overflow:hidden}
+  #inkStock iframe{display:block;height:calc(100vh - 145px);min-height:620px}
+}
+
 
 /* JMS AI Phase 1 + Arabic Lock */
 #jmsSafeLang,#fieldLangBox,.jms-lang-switch,.safe-lang-mini,#jmsMainLangSwitch{display:none!important}
