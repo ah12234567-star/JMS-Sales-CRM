@@ -4,15 +4,17 @@
   const VERSION = '2026-08-production-order-edit-v1';
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const number = value => Number(String(value ?? '').replace(/[^\d.-]/g, '')) || 0;
-  const allowed = () => ['admin','sales','manager','production','production_manager'].includes(window.currentUser?.role);
+  const database = () => { try { return db; } catch (_) { return window.db || {}; } };
+  const activeUser = () => { try { return currentUser; } catch (_) { return window.currentUser || null; } };
+  const allowed = () => ['admin','sales','manager','production','production_manager'].includes(activeUser()?.role);
 
   function saveDb() {
     if (typeof window.save === 'function') window.save();
-    else localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(window.db || {}));
+    else localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(database()));
   }
 
   function customerOptions(selected) {
-    return (window.db?.customers || []).map(customer =>
+    return (database().customers || []).map(customer =>
       '<option value="' + esc(customer.id) + '" ' + (customer.id === selected ? 'selected' : '') + '>' + esc(customer.name || 'عميل بدون اسم') + '</option>'
     ).join('');
   }
@@ -32,7 +34,7 @@
 
   window.jmsEditSalesOrder = function (orderId) {
     if (!allowed()) return alert('تعديل بيانات الطلب متاح للمدير ومدير المبيعات فقط');
-    const order = (window.db?.orders || []).find(item => item.id === orderId);
+    const order = (database().orders || []).find(item => item.id === orderId);
     if (!order) return alert('لم يتم العثور على الطلب');
     const modal = document.getElementById('modal');
     const body = document.getElementById('modalBody');
@@ -65,7 +67,7 @@
 
   window.jmsSaveEditedSalesOrder = function (orderId) {
     if (!allowed()) return alert('لا تملك صلاحية تعديل الطلب');
-    const order = (window.db?.orders || []).find(item => item.id === orderId);
+    const order = (database().orders || []).find(item => item.id === orderId);
     if (!order) return alert('لم يتم العثور على الطلب');
     const value = id => document.getElementById(id)?.value?.trim() || '';
     const values = {
@@ -90,9 +92,9 @@
     values.amount_value = values.total_kg * values.price_kg;
     Object.assign(order, values, {
       amount: values.amount_value.toFixed(2) + ' ريال',
-      updated_at: new Date().toISOString(), updated_by: window.currentUser?.name || ''
+      updated_at: new Date().toISOString(), updated_by: activeUser()?.name || ''
     });
-    const production = (window.db?.productionOrders || []).find(item => item.order_id === order.id);
+    const production = (database().productionOrders || []).find(item => item.order_id === order.id);
     if (production) Object.assign(production, {
       customer_id: order.customer_id, product: order.product, material: order.material, color: order.color,
       width: order.width, length: order.length, thickness: order.thickness, total_kg: order.total_kg,
