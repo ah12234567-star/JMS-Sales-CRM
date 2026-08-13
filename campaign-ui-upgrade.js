@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-campaign-ui-v1';
+  const VERSION = '2026-08-campaign-ui-v3';
   let scheduled = false;
 
   function injectStyles() {
@@ -61,7 +61,19 @@
       #whatsappCampaigns #wcLog h3{grid-column:1/-1;margin:8px 0 0;color:#1d2939}
       #whatsappCampaigns .jms-campaign-log-row{border-radius:13px;padding:12px 14px;background:#fafbfc}
       @media(max-width:980px){#whatsappCampaigns .jms-campaign-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}#whatsappCampaigns .jms-campaign-grid{grid-template-columns:repeat(2,1fr)}}
-      @media(max-width:720px){#whatsappCampaigns .page-head{border-radius:18px;padding:19px}.jms-campaign-steps{grid-template-columns:1fr}.jms-campaign-step span:last-child{display:none}#whatsappCampaigns .jms-campaign-toolbar{grid-template-columns:1fr}#whatsappCampaigns .jms-campaign-grid{grid-template-columns:repeat(2,1fr)}.jms-preview-tools{flex-wrap:wrap}.jms-preview-tools input{flex-basis:100%}#whatsappCampaigns #wcLog{grid-template-columns:1fr}}
+      @media(max-width:720px){
+        #whatsappCampaigns{width:100%;max-width:100%;min-width:0;overflow-x:hidden;padding-inline:0}
+        #whatsappCampaigns .page-head{border-radius:18px;padding:18px 16px;margin-inline:0}#whatsappCampaigns .page-head h1{font-size:24px;line-height:1.35}#whatsappCampaigns .page-head p{font-size:12px;line-height:1.7}
+        .jms-campaign-steps{grid-template-columns:1fr}.jms-campaign-step span:last-child{display:none}
+        #whatsappCampaigns>.panel:first-of-type{padding:15px;border-radius:18px}#whatsappCampaigns .jms-campaign-toolbar{grid-template-columns:1fr}#whatsappCampaigns .jms-campaign-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#whatsappCampaigns .jms-campaign-card{min-height:88px;padding:13px}#whatsappCampaigns .jms-campaign-card b{font-size:24px}
+        #whatsappCampaigns .jms-campaign-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}#whatsappCampaigns .jms-campaign-actions button{width:100%;padding:10px 6px;font-size:11px}
+        #whatsappCampaigns #wcPreview{width:100%;max-width:100%;overflow:hidden;border-radius:18px}.jms-preview-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:11px}.jms-preview-tools input{grid-column:1/-1;width:100%;min-width:0}.jms-preview-count{white-space:normal;text-align:center}
+        .jms-campaign-table-wrap{overflow:visible;padding:8px 10px 13px}#whatsappCampaigns .jms-campaign-table{display:block;width:100%;min-width:0;border:0}#whatsappCampaigns .jms-campaign-table tbody{display:grid;gap:11px;width:100%}#whatsappCampaigns .jms-campaign-table tr:first-child{display:none}#whatsappCampaigns .jms-campaign-table tr[data-status]{display:grid!important;grid-template-columns:1fr 1fr;width:100%;min-width:0;overflow:hidden;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.05)}#whatsappCampaigns .jms-campaign-table tr[data-status][style*="display: none"]{display:none!important}
+        #whatsappCampaigns .jms-campaign-table td{display:block;min-width:0;padding:10px 12px;border:0!important;border-bottom:1px solid #edf2f7!important;background:#fff!important;font-size:13px;overflow-wrap:anywhere}#whatsappCampaigns .jms-campaign-table td:before{content:attr(data-label);display:block;margin-bottom:5px;color:#94a3b8;font-size:9px;font-weight:800}#whatsappCampaigns .jms-campaign-table td:nth-child(1),#whatsappCampaigns .jms-campaign-table td:nth-child(5),#whatsappCampaigns .jms-campaign-table td:nth-child(6){grid-column:1/-1}#whatsappCampaigns .jms-campaign-table td:nth-child(1){padding-top:14px;background:#f8fafc!important}#whatsappCampaigns .jms-campaign-table td:nth-child(6){border-bottom:0!important;padding-bottom:13px}
+        #whatsappCampaigns .jms-message-preview{display:block;max-width:none;-webkit-line-clamp:unset;white-space:pre-wrap;line-height:1.7;font-size:12px;color:#334155}#whatsappCampaigns .jms-row-actions{display:grid;grid-template-columns:1fr 1fr 1fr;min-width:0;gap:7px}#whatsappCampaigns .jms-row-actions button{width:100%;min-height:39px;margin:0;padding:7px 4px;font-size:10px}
+        #whatsappCampaigns #wcLog{grid-template-columns:1fr}
+      }
+      @media(max-width:390px){#whatsappCampaigns .jms-campaign-grid{grid-template-columns:1fr}#whatsappCampaigns .jms-campaign-actions{grid-template-columns:1fr}.jms-preview-tools{grid-template-columns:1fr}.jms-preview-tools input{grid-column:auto}#whatsappCampaigns .jms-row-actions{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
   }
