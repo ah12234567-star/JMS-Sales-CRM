@@ -860,3 +860,78 @@ html[dir="ltr"] textarea{
   .login-card .role-switch{grid-template-columns:repeat(2,1fr)}
   .login-card .role-switch span{min-height:46px}
 }
+
+/* JMS dashboard redesign 2026-08-13 */
+.jms-mobile-close{display:none}
+#jmsLogoFallback{display:none!important}
+body{background:#f3f6fb}
+.app{grid-template-columns:300px minmax(0,1fr);background:#f3f6fb}
+.sidebar{
+  padding:24px 16px 18px;gap:14px;
+  background:linear-gradient(180deg,#0b1220 0%,#111827 55%,#171324 100%);
+  border-left:1px solid rgba(255,255,255,.08);
+  box-shadow:-10px 0 35px rgba(15,23,42,.12);
+}
+.sidebar .brand{padding:0 6px 15px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-brand-mark{width:52px;height:52px;flex-basis:52px;border-radius:15px;background:linear-gradient(145deg,#fff,#ffe4e6);color:#881337;box-shadow:none}
+.sidebar .brand b{font-size:17px;letter-spacing:-.2px}
+.sidebar .brand span{font-size:11px;margin-top:4px;color:#94a3b8}
+.sidebar .user-box{position:relative;margin:0;padding:14px 15px 14px 46px;border-radius:17px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);box-shadow:none}
+.sidebar .user-box:before{content:"●";position:absolute;left:16px;top:50%;transform:translateY(-50%);width:19px;height:19px;display:grid;place-items:center;border-radius:50%;color:#22c55e;background:rgba(34,197,94,.14);font-size:10px}
+.sidebar .user-box small{font-size:10px;color:#94a3b8}
+.sidebar .user-box b{font-size:14px;margin-top:3px}
+.sidebar .user-box span{font-size:11px}
+.sidebar nav{gap:4px;padding:4px 3px 8px 0!important}
+.sidebar .nav{position:relative;min-height:42px;padding:10px 38px 10px 12px;border-radius:12px;font-size:13px;color:#cbd5e1;transition:.18s}
+.sidebar .nav:before{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:18px;text-align:center;color:#64748b;font-size:14px}
+.sidebar .nav[data-page="dashboard"]:before{content:"◆"}
+.sidebar .nav[data-page="jmsAI"]:before,.sidebar .nav[data-page="aiCommandCenter"]:before,.sidebar .nav[data-page="repAiAssistant"]:before{content:"✦"}
+.sidebar .nav[data-page="customers"]:before,.sidebar .nav[data-page="newCustomerRadar"]:before{content:"●"}
+.sidebar .nav[data-page="visits"]:before,.sidebar .nav[data-page="smartVisits"]:before{content:"◷"}
+.sidebar .nav[data-page="orders"]:before{content:"▣"}
+.sidebar .nav[data-page="quotes"]:before{content:"▤"}
+.sidebar .nav[data-page="routes"]:before{content:"⌖"}
+.sidebar .nav[data-page="alerts"]:before{content:"!"}
+.sidebar .nav[data-page="inkStock"]:before{content:"◈"}
+.sidebar .nav[data-page="users"]:before,.sidebar .nav[data-page="repsControl"]:before{content:"♟"}
+.sidebar .nav[data-page="profile"]:before{content:"○"}
+.sidebar .nav.active,.sidebar .nav:hover{background:linear-gradient(90deg,rgba(159,18,57,.98),rgba(190,24,93,.82));color:#fff;box-shadow:0 8px 20px rgba(136,19,55,.24)}
+.sidebar .nav.active:before,.sidebar .nav:hover:before{color:#fff}
+#logoutBtn{padding:11px 14px;border-radius:12px;background:rgba(239,68,68,.12);color:#fecaca;border:1px solid rgba(248,113,113,.18)}
+.main{padding:34px;min-width:0;background:linear-gradient(180deg,#f8fafc 0,#f3f6fb 260px)}
+#dashboard .page-head{position:relative;overflow:hidden;padding:25px 28px;margin-bottom:22px;border-radius:24px;background:linear-gradient(135deg,#111827,#1e293b 62%,#4c1222);color:#fff;box-shadow:0 18px 40px rgba(15,23,42,.15)}
+#dashboard .page-head:after{content:"JMS";position:absolute;left:30px;top:50%;transform:translateY(-50%);font-size:62px;font-weight:1000;letter-spacing:4px;color:rgba(255,255,255,.055)}
+#dashboard .page-head h2{font-size:28px;color:#fff}
+#dashboard .page-head p{color:#cbd5e1}
+#dashboard .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+#dashboard .stat{position:relative;overflow:hidden;min-height:132px;padding:20px 20px 18px;border:0;border-radius:20px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.07)}
+#dashboard .stat:before{content:"";position:absolute;right:0;top:0;bottom:0;width:5px;background:#2563eb}
+#dashboard .stat:nth-child(2):before{background:#16a34a}
+#dashboard .stat:nth-child(3):before{background:#7c3aed}
+#dashboard .stat:nth-child(4):before{background:#ef4444}
+#dashboard .stat:nth-child(5):before{background:#0891b2}
+#dashboard .stat:nth-child(6):before{background:#ea580c}
+#dashboard .stat span{font-size:13px;font-weight:800;color:#64748b}
+#dashboard .stat b{font-size:30px;line-height:1;margin:15px 0 9px;color:#0f172a}
+#dashboard .stat small{font-size:12px}
+#dashboard .grid2{grid-template-columns:1.2fr .8fr;gap:16px}
+#dashboard .panel{min-height:360px;border:0;border-radius:22px;padding:22px;box-shadow:0 10px 32px rgba(15,23,42,.07)}
+#dashboard .panel-head{align-items:center;padding-bottom:15px}
+#dashboard .panel-head b{font-size:17px}
+#dashboard .panel-head span{background:#f1f5f9;border-radius:999px;padding:6px 10px;font-size:11px}
+@media(max-width:1150px){
+  .app{grid-template-columns:270px minmax(0,1fr)}
+  .main{padding:24px}
+  #dashboard .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:920px){
+  .jms-mobile-close{display:block}
+  #dashboard .page-head{padding:20px!important}
+  #dashboard .page-head:after{font-size:42px;left:18px}
+  #dashboard .stats{grid-template-columns:1fr 1fr!important}
+  #dashboard .grid2{grid-template-columns:1fr!important}
+}
+@media(max-width:560px){
+  #dashboard .stats{grid-template-columns:1fr!important}
+  #dashboard .stat{min-height:112px}
+}
