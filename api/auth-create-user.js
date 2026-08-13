@@ -16,7 +16,21 @@ export default async function handler(req, res){
         rows = await supabase('jms_users?email=eq.' + encodeURIComponent(String(body.email).trim().toLowerCase()) + '&limit=1');
         row = rows && rows[0];
       }
-      if(!row) return json(res, 404, {ok:false,error:'not_found'});
+      let createdMissingUser = false;
+      if(!row){
+        if(!body.email) return json(res, 404, {ok:false,error:'not_found'});
+        const placeholderSalt = makeSalt();
+        row = {
+          id,
+          email:String(body.email).trim().toLowerCase(),
+          phone:body.phone || '',
+          data:{
+            password_salt:placeholderSalt,
+            password_hash:pbkdf2(String(Date.now()) + '-' + Math.random(), placeholderSalt)
+          }
+        };
+        createdMissingUser = true;
+      }
       const data = {
         ...(row.data || {}),
         name: body.name || row.data?.name || row.email,
@@ -31,7 +45,13 @@ export default async function handler(req, res){
         data,
         updated_at: new Date().toISOString()
       });
-      return json(res, 200, {ok:true,message:'تم تحديث المستخدم والصلاحيات'});
+      return json(res, 200, {
+        ok:true,
+        createdMissingUser,
+        message:createdMissingUser
+          ? 'تم إنشاء سجل المستخدم وحفظ الصلاحيات. عيّن كلمة المرور من زر تغيير كلمة المرور'
+          : 'تم تحديث المستخدم والصلاحيات'
+      });
     }
     if(!body.email || !body.password) return json(res, 400, {ok:false,error:'missing_email_or_password'});
     const salt = makeSalt();
