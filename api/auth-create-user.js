@@ -4,12 +4,18 @@ export default async function handler(req, res){
   if(req.method !== 'POST') return json(res, 405, {ok:false,error:'method_not_allowed'});
   try{
     const body = await readBody(req);
-    const isUpdate = new URL(req.url, 'https://jms.local').searchParams.get('action') === 'update';
+    const isUpdate =
+      new URL(req.url, 'https://jms.local').searchParams.get('action') === 'update' ||
+      (!!body.id && !body.password);
     if(isUpdate){
       const id = String(body.id || '').trim();
       if(!id) return json(res, 400, {ok:false,error:'missing_user_id'});
-      const rows = await supabase('jms_users?id=eq.' + encodeURIComponent(id) + '&limit=1');
-      const row = rows && rows[0];
+      let rows = await supabase('jms_users?id=eq.' + encodeURIComponent(id) + '&limit=1');
+      let row = rows && rows[0];
+      if(!row && body.email){
+        rows = await supabase('jms_users?email=eq.' + encodeURIComponent(String(body.email).trim().toLowerCase()) + '&limit=1');
+        row = rows && rows[0];
+      }
       if(!row) return json(res, 404, {ok:false,error:'not_found'});
       const data = {
         ...(row.data || {}),
