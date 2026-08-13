@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-13-mobile-quote-pdf-4';
+  const VERSION = '2026-08-13-mobile-quote-pdf-5';
 
   function quotePrintCss() {
     return `
@@ -31,6 +31,77 @@
       <div class="quote-a4-sign"><b>اعتماد الشركة</b><div class="quote-a4-line">اسم المسؤول: ______________ &nbsp; التوقيع والختم: ____________ &nbsp; التاريخ: __________</div></div>`;
   }
 
+  function safeFilePart(value) {
+    return String(value || 'عرض-سعر').replace(/[\\/:*?"<>|]+/g, '-').trim();
+  }
+
+  function waitForQuoteElement() {
+    return new Promise(resolve => {
+      let attempts = 0;
+      const check = () => {
+        const element = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
+        if (element || attempts++ > 15) return resolve(element || null);
+        setTimeout(check, 80);
+      };
+      check();
+    });
+  }
+
+  async function shareQuotePdf(qid) {
+    const quote = (window.db?.quotes || (typeof db !== 'undefined' ? db.quotes : []) || []).find(item => item.id === qid);
+    if (!quote) return alert('لم يتم العثور على عرض السعر.');
+    if (!['approved','sent','accepted'].includes(quote.status)) return alert('اعتمد عرض السعر أولاً قبل إرساله للعميل.');
+    if (typeof window.html2pdf !== 'function') return alert('جاري تحميل أداة PDF. انتظر لحظة ثم حاول مرة أخرى.');
+
+    const existing = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
+    if (!existing && typeof window.viewQuote === 'function') window.viewQuote(qid);
+    const source = existing || await waitForQuoteElement();
+    if (!source) return alert('تعذر تجهيز عرض السعر. افتحه أولاً ثم حاول مرة أخرى.');
+
+    const clone = source.cloneNode(true);
+    simplifyApprovals(clone);
+    clone.style.cssText += ';width:794px!important;min-height:0!important;height:auto!important;margin:0!important;box-shadow:none!important;border-radius:0!important;transform:none!important;';
+    const holder = document.createElement('div');
+    holder.setAttribute('aria-hidden', 'true');
+    holder.style.cssText = 'position:fixed;right:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+
+    const fileName = safeFilePart(`عرض-سعر-${quote.quote_no || qid}`) + '.pdf';
+    try {
+      const blob = await window.html2pdf().set({
+        margin: 0,
+        filename: fileName,
+        image: {type:'jpeg', quality:0.98},
+        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:794},
+        jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
+        pagebreak: {mode:['avoid-all','css','legacy']}
+      }).from(clone).outputPdf('blob');
+      const file = new File([blob], fileName, {type:'application/pdf'});
+      if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
+        await navigator.share({files:[file], title:`عرض سعر ${quote.quote_no || ''}`});
+      } else {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob); link.download = fileName; link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+        alert('تم تنزيل ملف عرض السعر. افتحه ثم شاركه عبر واتساب.');
+      }
+      if (quote.status === 'approved') {
+        quote.status = 'sent'; quote.sent_at = new Date().toISOString();
+        if (typeof window.save === 'function') window.save();
+        else if (typeof save === 'function') save();
+        if (typeof window.renderAll === 'function') window.renderAll();
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.error('JMS PDF share error', error);
+        alert('تعذر إنشاء ملف PDF. حاول مرة أخرى بعد التأكد من اتصال الإنترنت.');
+      }
+    } finally {
+      holder.remove();
+    }
+  }
+
   function openQuotePrintPage() {
     const source = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
     if (!source) {
@@ -57,6 +128,7 @@
     screenStyle.textContent = '.quote-a4-approval[data-compact="1"]{grid-template-columns:1fr 1fr!important;gap:7mm!important}.quote-a4-approval[data-compact="1"] .quote-a4-sign{min-height:28mm!important;text-align:right!important}@media(max-width:700px){.quote-a4-approval[data-compact="1"]{grid-template-columns:1fr!important;gap:12px!important}}';
     document.head.appendChild(screenStyle);
     window.downloadQuotePDF = openQuotePrintPage;
+    window.sendQuote = shareQuotePdf;
     document.addEventListener('click', event => {
       const button = event.target.closest('.quote-toolbar .pdf');
       if (!button) return;
@@ -71,6 +143,10 @@
         const label = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'حفظ ومشاركة PDF' : 'حفظ PDF / طباعة';
         if (button.textContent !== label) button.textContent = label;
         button.title = 'إنشاء عرض سعر من صفحة واحدة جاهز للإرسال';
+      });
+      document.querySelectorAll('button[onclick^="sendQuote("]').forEach(button => {
+        button.textContent = 'إرسال ملف PDF';
+        button.title = 'مشاركة عرض السعر كملف PDF';
       });
     }
     refreshQuoteUi();
