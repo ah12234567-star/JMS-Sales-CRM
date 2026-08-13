@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-13-quote-specs-3';
+  const VERSION = '2026-08-13-quote-specs-4';
   let draftItems = [];
   const val = id => document.getElementById(id)?.value?.trim() || '';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,6 +28,14 @@
   function enhanceForm(q) {
     const product = document.getElementById('mqProduct');
     if (!product || document.getElementById('jmsQuoteSpecs')) return;
+    const payment=document.getElementById('mqPayment');
+    if(payment){
+      const current=q?.payment_terms||payment.value||'حسب الاتفاق';
+      const terms=['حسب الاتفاق','الدفع مقدمًا 100%','الدفع خلال 30 يومًا من تاريخ استلام الطلب','الدفع خلال 60 يومًا من تاريخ استلام الطلب','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب'];
+      if(current&&!terms.includes(current)) terms.push(current);
+      const select=document.createElement('select'); select.id='mqPayment'; select.innerHTML=terms.map(term=>`<option value="${esc(term)}" ${term===current?'selected':''}>${esc(term)}</option>`).join('');
+      payment.replaceWith(select);
+    }
     const selected = q?.product || product.value;
     product.innerHTML = optionList(selected);
     const anchor = document.getElementById('mqThicknessUnit')?.closest('.form-grid') || product.closest('.form-grid');
@@ -92,6 +100,7 @@
 
   function translatePrint(value,lang){ if(lang==='ar') return value; return value==='بدون طباعة'?'No printing':value.includes('وجهين')?'Two-side printing':value.includes('وجه')?'One-side printing':value; }
   function translateProduct(value,lang){ if(lang==='ar') return value; const map={'أكياس رول':'Roll bags','أكياس تي شيرت':'T-shirt bags','أكياس بنانا':'Banana-handle bags','أكياس شريط':'Strip-handle bags'}; return map[value]||value; }
+  function translatePayment(value,lang){if(lang==='ar')return value;const map={'حسب الاتفاق':'As agreed','الدفع مقدمًا 100%':'100% advance payment','الدفع خلال 30 يومًا من تاريخ استلام الطلب':'Payment within 30 days from receipt of the order','الدفع خلال 60 يومًا من تاريخ استلام الطلب':'Payment within 60 days from receipt of the order','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب':'50% upon order confirmation and 50% before collection when the order is ready'};return map[value]||value;}
 
   function enhanceQuoteDocument(q,lang='ar') {
     const doc=document.querySelector('#modalBody .quote-a4'); if(!doc||!q) return;
@@ -120,6 +129,8 @@
     const table=doc.querySelector('.quote-a4-table'); if(table){table.hidden=true;table.insertAdjacentElement('afterend',section);} else doc.querySelector('.quote-a4-grid')?.insertAdjacentElement('afterend',section);
     const title=doc.querySelector('.quote-a4-title h2'); if(title) title.textContent=lang==='ar'?'عرض سعر':'QUOTATION';
     if(lang==='en') {
+      const paymentLabel=[...doc.querySelectorAll('b')].find(el=>el.textContent.trim()==='شروط الدفع:');
+      if(paymentLabel&&paymentLabel.nextSibling?.nodeType===3) paymentLabel.nextSibling.nodeValue=` ${translatePayment(q.payment_terms||'',lang)}`;
       const replacements={'بيانات العميل':'Customer Details','بيانات العرض':'Quotation Details','الشروط والملاحظات':'Terms & Notes','الإجمالي قبل الضريبة':'Subtotal','ضريبة القيمة المضافة 15%':'VAT 15%','الإجمالي النهائي':'Grand Total','اعتماد العميل':'Customer Approval','اعتماد الشركة':'Company Approval','اسم العميل:':'Customer:','الجوال:':'Phone:','المدينة:':'City:','العنوان:':'Address:','المندوب:':'Sales representative:','الحالة:':'Status:','شروط الدفع:':'Payment terms:','مدة التسليم:':'Delivery:','رقم العرض:':'Quotation No:','تاريخ الإصدار:':'Issue date:','صالح حتى:':'Valid until:'};
       doc.querySelectorAll('h3,b,span').forEach(el=>{const t=el.textContent.trim();if(replacements[t])el.textContent=replacements[t];});
       const terms=doc.querySelector('.quote-a4-terms ul'); if(terms) terms.innerHTML='<li>Prices apply to the specifications stated in this quotation.</li><li>This quotation is valid until the date shown above.</li><li>Delivery is subject to the production schedule after order confirmation.</li><li>Changes to size, material or printing may affect the price.</li>'+(q.notes?`<li>${esc(q.notes)}</li>`:'');
