@@ -1,14 +1,14 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-13-mobile-quote-pdf-3';
+  const VERSION = '2026-08-13-mobile-quote-pdf-4';
 
   function quotePrintCss() {
     return `
-      @page{size:A4 portrait;margin:0}
+      @page{size:Letter portrait;margin:0}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-      html,body{margin:0!important;padding:0!important;width:210mm!important;height:297mm!important;background:#fff!important;color:#111827!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:hidden!important}
-      .quote-a4{width:210mm!important;height:297mm!important;min-height:297mm!important;max-height:297mm!important;margin:0!important;padding:9mm 10mm 7mm!important;background:#fff!important;color:#111827!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:hidden!important;page-break-after:avoid!important;break-after:avoid!important}
+      html,body{margin:0!important;padding:0!important;width:216mm!important;height:auto!important;min-height:0!important;background:#fff!important;color:#111827!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important}
+      .quote-a4{width:216mm!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8mm 12mm 5mm!important;background:#fff!important;color:#111827!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:visible!important;page-break-before:avoid!important;page-break-after:avoid!important;break-before:avoid!important;break-after:avoid!important}
       .quote-a4-head{display:grid!important;grid-template-columns:32mm 1fr 43mm!important;gap:7mm!important;align-items:center!important;border-bottom:2px solid #111827!important;padding-bottom:5mm!important}
       .quote-a4-logo{display:block!important;width:30mm!important;height:22mm!important;object-fit:contain!important;background:#fff!important}
       .quote-a4-company h1{font-size:16pt!important;line-height:1.2!important;margin:0!important;color:#111827!important}.quote-a4-company p{font-size:7.5pt!important;color:#64748b!important;margin:1.5mm 0!important}
