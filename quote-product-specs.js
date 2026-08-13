@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-13-quote-specs-5';
+  const VERSION = '2026-08-13-quote-specs-6';
   let draftItems = [];
   const val = id => document.getElementById(id)?.value?.trim() || '';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,7 +8,7 @@
   const saveDb = () => { try { if (typeof save === 'function') save(); } catch (_) { localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(database())); } };
 
   const productOptions = [
-    ['أكياس رول','رول'],['أكياس تي شيرت','تيشرت'],['أكياس بنانا','بنانا'],['أكياس شريط','شريط']
+    ['أكياس بلاستيك','أكياس بلاستيك'],['رول بلاستيك','رول بلاستيك']
   ];
   const specFields = [
     ['product','نوع الكيس','Bag type'],['material','نوع المادة','Material'],['color','اللون','Color'],
@@ -20,6 +20,8 @@
   ];
 
   function optionList(selected) {
+    const legacy={'أكياس رول':'رول بلاستيك','أكياس تي شيرت':'أكياس بلاستيك','أكياس بنانا':'أكياس بلاستيك','أكياس شريط':'أكياس بلاستيك','رول':'رول بلاستيك','تيشرت':'أكياس بلاستيك','بنانا':'أكياس بلاستيك','شريط':'أكياس بلاستيك'};
+    selected=legacy[selected]||selected;
     const list = [...productOptions];
     if (selected && !list.some(([value]) => value === selected)) list.push([selected, selected]);
     return list.map(([value,label]) => `<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(label)}</option>`).join('');
@@ -46,8 +48,11 @@
         if(oldPaymentGrid!==dateGrid&&!oldPaymentGrid.children.length) oldPaymentGrid.remove();
       }
     }
-    const selected = q?.product || product.value;
+    const legacyHandle={'أكياس تي شيرت':'تيشرت','أكياس بنانا':'بنانا','أكياس شريط':'شريط','تيشرت':'تيشرت','بنانا':'بنانا','شريط':'شريط'};
+    const selected = ({'أكياس رول':'رول بلاستيك','أكياس تي شيرت':'أكياس بلاستيك','أكياس بنانا':'أكياس بلاستيك','أكياس شريط':'أكياس بلاستيك'}[q?.product]||q?.product||product.value);
     product.innerHTML = optionList(selected);
+    const material=document.getElementById('mqMaterial');
+    if(material){const materialValue=q?.material||material.value;material.innerHTML='<option value="LDPE">LD</option><option value="HDPE">HD</option>';material.value=/^HD/i.test(materialValue)?'HDPE':'LDPE';}
     const anchor = document.getElementById('mqThicknessUnit')?.closest('.form-grid') || product.closest('.form-grid');
     const panel = document.createElement('div');
     panel.id = 'jmsQuoteSpecs'; panel.className = 'jms-quote-spec-panel';
@@ -56,11 +61,14 @@
         <label>الطوية السفلية سم<input id="mqFoldBottom" type="number" min="0" step="0.01" value="${esc(q?.fold_bottom||'')}"></label>
         <label>الطوية العلوية سم<input id="mqFoldTop" type="number" min="0" step="0.01" value="${esc(q?.fold_top||'')}"></label>
         <label>الطوية الجانبية سم<input id="mqFoldSide" type="number" min="0" step="0.01" value="${esc(q?.fold_side||'')}"></label>
-        <label>نوع اليد<input id="mqHandleType" placeholder="تيشرت / بنانا / شريط" value="${esc(q?.handle_type||'')}"></label>
-        <label>لون اليد<input id="mqHandleColor" placeholder="مثال: كريمي" value="${esc(q?.handle_color||'')}"></label>
+        <label id="mqHandleTypeWrap">نوع اليد<select id="mqHandleType"><option value="">اختر</option>${['تيشرت','بنانا','شريط'].map(type=>`<option ${type===(legacyHandle[q?.product]||q?.handle_type)?'selected':''}>${type}</option>`).join('')}</select></label>
+        <label id="mqHandleColorWrap">لون الشريط<input id="mqHandleColor" placeholder="مثال: أحمر" value="${esc(q?.handle_color||'')}"></label>
         <label id="mqPrintColorsWrap">عدد ألوان الطباعة<select id="mqPrintColors"><option value="">اختر</option>${[1,2,3,4,5,6,7,8].map(n=>`<option ${String(q?.print_colors||'')===String(n)?'selected':''}>${n}</option>`).join('')}</select></label>
       </div>`;
     anchor?.insertAdjacentElement('afterend', panel);
+    const handleType=document.getElementById('mqHandleType'),handleTypeWrap=document.getElementById('mqHandleTypeWrap'),handleColor=document.getElementById('mqHandleColor'),handleColorWrap=document.getElementById('mqHandleColorWrap');
+    const toggleHandle=()=>{const isBag=product.value==='أكياس بلاستيك';handleTypeWrap.hidden=!isBag;if(!isBag)handleType.value='';const isStrip=isBag&&handleType.value==='شريط';handleColorWrap.hidden=!isStrip;if(!isStrip)handleColor.value='';};
+    product.addEventListener('change',toggleHandle);handleType.addEventListener('change',toggleHandle);toggleHandle();
     draftItems = Array.isArray(q?.items) ? q.items.slice(1) : [];
     panel.insertAdjacentHTML('beforeend', `<div class="jms-multi-item-actions"><button type="button" onclick="jmsAddQuoteItem()">＋ حفظ الصنف وإضافة صنف آخر</button><span>يمكن إضافة حتى 10 أصناف في عرض واحد</span></div><div id="jmsQuoteDraftItems" class="jms-draft-items"></div>`);
     const print = document.getElementById('mqPrint');
@@ -75,16 +83,17 @@
   }
 
   function readSpecs() {
-    return {fold_bottom:val('mqFoldBottom'),fold_top:val('mqFoldTop'),fold_side:val('mqFoldSide'),handle_type:val('mqHandleType'),handle_color:val('mqHandleColor'),print_colors:val('mqPrintColors'),print:val('mqPrint')};
+    const handle=val('mqProduct')==='أكياس بلاستيك'?val('mqHandleType'):'';
+    return {fold_bottom:val('mqFoldBottom'),fold_top:val('mqFoldTop'),fold_side:val('mqFoldSide'),handle_type:handle,handle_color:handle==='شريط'?val('mqHandleColor'):'',print_colors:val('mqPrintColors'),print:val('mqPrint')};
   }
   function currentItem() {
     const item={product:val('mqProduct'),material:val('mqMaterial'),color:val('mqColor'),width:val('mqWidth'),length:val('mqLength'),size_unit:val('mqSizeUnit'),thickness:val('mqThickness'),thickness_unit:val('mqThicknessUnit'),total_kg:val('mqKg'),price_kg:val('mqPriceKg'),piece_weight:val('mqPiece'),pieces:val('mqPieces'),...readSpecs()};
     item.total_amount=(Number(item.total_kg||0)*Number(item.price_kg||0)).toFixed(2); return item;
   }
-  function validItem(item){return item.product&&Number(item.width)>0&&Number(item.length)>0&&Number(item.thickness)>0&&Number(item.total_kg)>0&&Number(item.price_kg)>0;}
+  function validItem(item){return item.product&&(item.product!=='أكياس بلاستيك'||item.handle_type)&&Number(item.width)>0&&Number(item.length)>0&&Number(item.thickness)>0&&Number(item.total_kg)>0&&Number(item.price_kg)>0;}
   function renderDraftItems(){const box=document.getElementById('jmsQuoteDraftItems');if(!box)return;box.innerHTML=draftItems.map((item,index)=>`<div><b>الصنف ${index+1}: ${esc(item.product)}</b><span>${esc(item.width)} × ${esc(item.length)} ${esc(item.size_unit||'سم')} · ${esc(item.thickness)} ${esc(item.thickness_unit||'ميكرون')} · ${esc(item.total_kg)} كجم</span><button type="button" onclick="jmsRemoveQuoteItem(${index})">حذف</button></div>`).join('');}
   window.jmsRemoveQuoteItem=function(index){draftItems.splice(index,1);renderDraftItems();};
-  window.jmsAddQuoteItem=function(){const item=currentItem();if(!validItem(item))return alert('أكمل نوع الكيس والطول والعرض والسماكة والكمية والسعر قبل إضافة الصنف.');if(draftItems.length>=9)return alert('الحد الأعلى 10 أصناف في العرض الواحد.');draftItems.push(item);renderDraftItems();['mqColor','mqWidth','mqLength','mqThickness','mqKg','mqPriceKg','mqTotal','mqPiece','mqPieces','mqFoldBottom','mqFoldTop','mqFoldSide','mqHandleType','mqHandleColor','mqPrintColors'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const print=document.getElementById('mqPrint');if(print)print.selectedIndex=0;document.getElementById('mqPrintColorsWrap')?.setAttribute('hidden','');document.getElementById('mqProduct')?.focus();};
+  window.jmsAddQuoteItem=function(){const item=currentItem();if(!validItem(item))return alert('أكمل المنتج ونوع اليد للأكياس والطول والعرض والسماكة والكمية والسعر قبل إضافة الصنف.');if(draftItems.length>=9)return alert('الحد الأعلى 10 أصناف في العرض الواحد.');draftItems.push(item);renderDraftItems();['mqColor','mqWidth','mqLength','mqThickness','mqKg','mqPriceKg','mqTotal','mqPiece','mqPieces','mqFoldBottom','mqFoldTop','mqFoldSide','mqHandleType','mqHandleColor','mqPrintColors'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const print=document.getElementById('mqPrint');if(print)print.selectedIndex=0;document.getElementById('mqPrintColorsWrap')?.setAttribute('hidden','');document.getElementById('mqProduct')?.dispatchEvent(new Event('change'));document.getElementById('mqProduct')?.focus();};
   function applyItems(q,current){if(!q)return;const items=[...draftItems,current].filter(validItem).slice(0,10);if(!items.length)return;q.items=items;Object.assign(q,items[0]);q.total_kg=items.reduce((sum,item)=>sum+Number(item.total_kg||0),0);q.total_amount=items.reduce((sum,item)=>sum+Number(item.total_amount||0),0).toFixed(2);q.items_count=items.length;saveDb();draftItems=[];}
   function applySpecs(q, specs) { if (!q) return; Object.assign(q, specs); saveDb(); }
 
@@ -95,9 +104,9 @@
   const oldEdit = window.editQuote;
   if (typeof oldEdit === 'function') window.editQuote = function(qid){ const result=oldEdit.apply(this,arguments); enhanceForm((database().quotes||[]).find(q=>q.id===qid)); return result; };
   const oldSave = window.forceSaveQuote;
-  if (typeof oldSave === 'function') window.forceSaveQuote = function(){ const specs=readSpecs(),item=currentItem(); const before=new Set((database().quotes||[]).map(q=>q.id)); const result=oldSave.apply(this,arguments); const created=(database().quotes||[]).find(q=>!before.has(q.id)); applySpecs(created,specs); applyItems(created,item); return result; };
+  if (typeof oldSave === 'function') window.forceSaveQuote = function(){ const specs=readSpecs(),item=currentItem();if(!validItem(item))return alert('اختر نوع اليد عند اختيار أكياس بلاستيك، وأكمل بيانات الصنف الأساسية.'); const before=new Set((database().quotes||[]).map(q=>q.id)); const result=oldSave.apply(this,arguments); const created=(database().quotes||[]).find(q=>!before.has(q.id)); applySpecs(created,specs); applyItems(created,item); return result; };
   const oldUpdate = window.forceUpdateQuote;
-  if (typeof oldUpdate === 'function') window.forceUpdateQuote = function(qid){ const specs=readSpecs(),item=currentItem(); const result=oldUpdate.apply(this,arguments); const q=(database().quotes||[]).find(q=>q.id===qid); applySpecs(q,specs); applyItems(q,item); return result; };
+  if (typeof oldUpdate === 'function') window.forceUpdateQuote = function(qid){ const specs=readSpecs(),item=currentItem();if(!validItem(item))return alert('اختر نوع اليد عند اختيار أكياس بلاستيك، وأكمل بيانات الصنف الأساسية.'); const result=oldUpdate.apply(this,arguments); const q=(database().quotes||[]).find(q=>q.id===qid); applySpecs(q,specs); applyItems(q,item); return result; };
 
   function valueWithUnit(q,key) {
     const raw=q[key]; if(raw===undefined||raw===null||String(raw).trim()==='') return '';
@@ -109,7 +118,9 @@
   }
 
   function translatePrint(value,lang){ if(lang==='ar') return value; return value==='بدون طباعة'?'No printing':value.includes('وجهين')?'Two-side printing':value.includes('وجه')?'One-side printing':value; }
-  function translateProduct(value,lang){ if(lang==='ar') return value; const map={'أكياس رول':'Roll bags','أكياس تي شيرت':'T-shirt bags','أكياس بنانا':'Banana-handle bags','أكياس شريط':'Strip-handle bags'}; return map[value]||value; }
+  function translateProduct(value,lang){const legacy={'أكياس رول':'رول بلاستيك','أكياس تي شيرت':'أكياس بلاستيك','أكياس بنانا':'أكياس بلاستيك','أكياس شريط':'أكياس بلاستيك'};value=legacy[value]||value;if(lang==='ar')return value;const map={'أكياس بلاستيك':'Plastic bags','رول بلاستيك':'Plastic roll'};return map[value]||value;}
+  function displayMaterial(value){return /^HD/i.test(value||'')?'HD':/^LD/i.test(value||'')?'LD':value;}
+  function displayHandle(item){const legacy={'أكياس تي شيرت':'تيشرت','أكياس بنانا':'بنانا','أكياس شريط':'شريط'};const type=legacy[item.product]||item.handle_type||'';return [type,type==='شريط'?item.handle_color:''].filter(Boolean).join(' - ');}
   function translatePayment(value,lang){if(lang==='ar')return value;const map={'حسب الاتفاق':'As agreed','الدفع مقدمًا 100%':'100% advance payment','الدفع خلال 30 يومًا من تاريخ استلام الطلب':'Payment within 30 days from receipt of the order','الدفع خلال 60 يومًا من تاريخ استلام الطلب':'Payment within 60 days from receipt of the order','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب':'50% upon order confirmation and 50% before collection when the order is ready'};return map[value]||value;}
 
   function enhanceQuoteDocument(q,lang='ar') {
@@ -120,14 +131,14 @@
     const items=Array.isArray(q.items)&&q.items.length?q.items:[q];
     const definitions=[
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
-      ['material',lang==='ar'?'المادة':'Material',item=>item.material,true],
+      ['material',lang==='ar'?'الخامة':'Material',item=>displayMaterial(item.material),true],
       ['color',lang==='ar'?'اللون':'Color',item=>item.color,false],
       ['length',lang==='ar'?'الطول':'Length',item=>item.length?`${item.length} ${item.size_unit||'cm'}`:'',true],
       ['width',lang==='ar'?'العرض':'Width',item=>item.width?`${item.width} ${item.size_unit||'cm'}`:'',true],
       ['fold_side',lang==='ar'?'الطوية الجانبية':'Side gusset',item=>item.fold_side?`${item.fold_side} ${lang==='ar'?'سم':'cm'}`:'',false],
       ['folds',lang==='ar'?'الطوية س/ع':'Bottom/Top fold',item=>[item.fold_bottom,item.fold_top].filter(Boolean).join(' / '),false],
       ['thickness',lang==='ar'?'السماكة':'Thickness',item=>item.thickness?`${item.thickness} ${item.thickness_unit||'micron'}`:'',true],
-      ['handle',lang==='ar'?'اليد':'Handle',item=>[item.handle_type,item.handle_color].filter(Boolean).join(' - '),false],
+      ['handle',lang==='ar'?'نوع اليد':'Handle type',item=>displayHandle(item),false],
       ['print',lang==='ar'?'الطباعة':'Printing',item=>{const p=translatePrint(item.print||'',lang);return [p,item.print_colors?`${item.print_colors} ${lang==='ar'?'ألوان':'colors'}`:''].filter(Boolean).join(' - ')},false],
       ['total_kg',lang==='ar'?'الكمية':'Qty',item=>item.total_kg?`${item.total_kg} ${lang==='ar'?'كجم':'kg'}`:'',true],
       ['price_kg',lang==='ar'?'سعر الكيلو':'Price/kg',item=>item.price_kg?`${item.price_kg} ${lang==='ar'?'ريال':'SAR'}`:'',true],
