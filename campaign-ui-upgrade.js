@@ -30,8 +30,14 @@
       #whatsappCampaigns .jms-campaign-note{border:0;border-radius:13px;background:#fff7ed;color:#9a3412;padding:12px 14px}
       .jms-whatsapp-state{display:flex;align-items:flex-start;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:13px;padding:12px 14px;margin-top:12px;color:#475569;font-size:13px}
       .jms-whatsapp-state i{width:9px;height:9px;margin-top:5px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 4px #fef3c7}
+      .jms-campaign-empty{margin:16px 20px;padding:20px;border:1px dashed #f59e0b;border-radius:16px;background:#fffbeb;text-align:center;color:#92400e}
+      .jms-campaign-empty b{display:block;font-size:16px;margin-bottom:5px}.jms-campaign-empty button{margin-top:12px;border:0;border-radius:10px;background:#172033;color:#fff;padding:9px 14px;font-weight:800;cursor:pointer}
+      .jms-campaign-toast{position:fixed;inset-inline-start:24px;bottom:24px;z-index:99999;display:flex;align-items:center;gap:9px;max-width:min(420px,calc(100vw - 32px));padding:13px 16px;border-radius:13px;background:#172033;color:#fff;box-shadow:0 18px 45px rgba(15,23,42,.28);font-weight:800;animation:jmsToastIn .2s ease}
+      .jms-campaign-toast.ok:before{content:'✓';display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#16a34a}.jms-campaign-toast.warn:before{content:'!';display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#f59e0b}
+      @keyframes jmsToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
       #whatsappCampaigns .jms-campaign-actions{padding-top:14px;border-top:1px solid #edf0f5}
       #whatsappCampaigns .jms-campaign-actions button{min-height:42px;padding:10px 16px;border-radius:11px;font-weight:800;box-shadow:none}
+      #whatsappCampaigns button{transition:transform .12s ease,filter .12s ease,box-shadow .12s ease;cursor:pointer}#whatsappCampaigns button:hover{filter:brightness(.96);box-shadow:0 5px 14px rgba(15,23,42,.12)}#whatsappCampaigns button:active{transform:translateY(1px) scale(.98)}#whatsappCampaigns button:disabled{opacity:.55;cursor:not-allowed}
       #whatsappCampaigns .jms-campaign-grid{grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
       #whatsappCampaigns .jms-campaign-card{position:relative;overflow:hidden;min-height:105px;display:flex;flex-direction:column;justify-content:center;border:0;border-radius:18px;padding:17px 20px;box-shadow:0 9px 28px rgba(15,23,42,.07)}
       #whatsappCampaigns .jms-campaign-card:after{content:'';position:absolute;inset-inline-start:0;top:0;width:5px;height:100%;background:#6478e5}
@@ -64,6 +70,7 @@
     if (!table) return;
     const labels = Array.from(table.querySelectorAll('tr:first-child th')).map(x => x.textContent.trim());
     Array.from(table.querySelectorAll('tr')).slice(1).forEach(row => {
+      if (row.querySelector('td[colspan]')) return;
       row.querySelectorAll('td').forEach((cell, index) => cell.dataset.label = labels[index] || '');
       const status = row.querySelector('.jms-campaign-badge');
       row.dataset.status = status?.classList.contains('ok') ? 'ready' : 'blocked';
@@ -78,6 +85,15 @@
         last.appendChild(wrap);
       }
     });
+  }
+
+  function toast(message, type) {
+    document.querySelector('.jms-campaign-toast')?.remove();
+    const el = document.createElement('div');
+    el.className = 'jms-campaign-toast ' + (type || 'ok');
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2800);
   }
 
   function filterRows() {
@@ -116,6 +132,24 @@
       wrap.appendChild(table);
     }
     addLabels(table);
+    const hasRows = !!table.querySelector('tr[data-status]');
+    const optInOnly = !!document.getElementById('wcOptInOnly')?.checked;
+    let empty = preview.querySelector('.jms-campaign-empty');
+    if (!hasRows) {
+      if (!empty) {
+        empty = document.createElement('div');
+        empty.className = 'jms-campaign-empty';
+        preview.querySelector('.jms-preview-tools')?.insertAdjacentElement('afterend', empty);
+      }
+      empty.innerHTML = optInOnly
+        ? '<b>لا يوجد عملاء مسجل لهم موافقة واتساب</b><span>الخيار المحدد يستبعد أي عميل لم تسجل له موافقة. يمكنك عرض جميع العملاء ثم مراجعتهم يدويًا.</span><br><button type="button" id="wcShowAllCustomers">عرض جميع العملاء</button>'
+        : '<b>لا يوجد عملاء مطابقون للاختيارات الحالية</b><span>غيّر الشريحة أو المندوب أو المدينة، ثم اضغط توليد ومعاينة.</span>';
+      empty.querySelector('#wcShowAllCustomers')?.addEventListener('click', () => {
+        const check = document.getElementById('wcOptInOnly');
+        if (check) check.checked = false;
+        window.jmsGenerateWhatsappCampaign?.();
+      });
+    } else empty?.remove();
     filterRows();
   }
 
@@ -127,6 +161,11 @@
     if (head && !page.querySelector('.jms-campaign-steps')) {
       head.insertAdjacentHTML('afterend', '<div class="jms-campaign-steps"><div class="jms-campaign-step"><span class="jms-step-no">1</span><div><b>حدد العملاء</b><span>الشريحة، المندوب والمدينة</span></div></div><div class="jms-campaign-step"><span class="jms-step-no">2</span><div><b>جهز الرسالة</b><span>اختر النوع والنبرة ثم راجع النص</span></div></div><div class="jms-campaign-step"><span class="jms-step-no">3</span><div><b>راجع وأرسل</b><span>اعتمد الجاهزين فقط وتابع السجل</span></div></div></div>');
     }
+    const headButtons = head?.querySelectorAll('.head-actions button');
+    if (headButtons?.length > 1) {
+      headButtons[0].style.display = 'none';
+      headButtons[1].textContent = 'تحديث البيانات';
+    }
     const builder = page.querySelector(':scope > .panel');
     const toolbar = builder?.querySelector('.jms-campaign-toolbar');
     if (toolbar && !builder.querySelector('.jms-campaign-builder-title')) {
@@ -137,6 +176,18 @@
       actions.insertAdjacentHTML('afterend', '<div class="jms-whatsapp-state"><i></i><div><b>حالة الإرسال:</b> الإرسال التلقائي يحتاج ربط WhatsApp Cloud API. بدون الربط، يجهز النظام الرسائل وروابط واتساب للإرسال اليدوي.</div></div>');
     }
     enhancePreview();
+    if (page.dataset.campaignButtonsBound !== '1') {
+      page.dataset.campaignButtonsBound = '1';
+      page.addEventListener('click', event => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const label = button.textContent.trim();
+        if (label === 'تحديث البيانات') setTimeout(() => toast('تم تحديث بيانات الحملة'), 80);
+        if (label === 'حفظ كمسودة') setTimeout(() => toast('تم تنفيذ حفظ المسودة'), 120);
+        if (label === 'نسخ القائمة') setTimeout(() => toast('تم تجهيز القائمة للنسخ'), 80);
+        if (label === 'نسخ') setTimeout(() => toast('تم نسخ رسالة العميل'), 80);
+      });
+    }
   }
 
   function scheduleEnhance() {
@@ -153,6 +204,13 @@
       const wrapped = function () {
         const result = original.apply(this, arguments);
         scheduleEnhance();
+        if (name === 'jmsGenerateWhatsappCampaign') {
+          setTimeout(() => {
+            const count = Number(document.getElementById('wcTotal')?.textContent || 0);
+            if (count) toast('تم تجهيز معاينة ' + count + ' عميل');
+            else toast('لم يظهر عملاء؛ راجع الموافقة أو خيارات التصفية', 'warn');
+          }, 90);
+        }
         return result;
       };
       wrapped.__campaignUiWrapped = true;
