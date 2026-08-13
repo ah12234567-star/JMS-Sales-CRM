@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-13-quote-specs-4';
+  const VERSION = '2026-08-13-quote-specs-5';
   let draftItems = [];
   const val = id => document.getElementById(id)?.value?.trim() || '';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -35,6 +35,16 @@
       if(current&&!terms.includes(current)) terms.push(current);
       const select=document.createElement('select'); select.id='mqPayment'; select.innerHTML=terms.map(term=>`<option value="${esc(term)}" ${term===current?'selected':''}>${esc(term)}</option>`).join('');
       payment.replaceWith(select);
+      const paymentLabel=select.closest('label');
+      const deliveryLabel=document.getElementById('mqDelivery')?.closest('label');
+      const dateGrid=document.getElementById('mqValid')?.closest('.form-grid');
+      if(paymentLabel&&deliveryLabel&&dateGrid){
+        const oldPaymentGrid=paymentLabel.parentElement;
+        const commercial=document.createElement('div'); commercial.className='form-grid two jms-commercial-terms';
+        commercial.append(paymentLabel,deliveryLabel);
+        dateGrid.insertAdjacentElement('afterend',commercial);
+        if(oldPaymentGrid!==dateGrid&&!oldPaymentGrid.children.length) oldPaymentGrid.remove();
+      }
     }
     const selected = q?.product || product.value;
     product.innerHTML = optionList(selected);
