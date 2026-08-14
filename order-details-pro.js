@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='2026-08-14-order-details-pro-3';
+  const VERSION='2026-08-14-order-details-pro-4';
   const database=()=>{try{return db}catch(_){return window.db||{}}};
   const activeUser=()=>{try{return currentUser}catch(_){return window.currentUser||null}};
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -82,7 +82,7 @@
   }
   function render(){
     const host=document.getElementById('ordersList');if(!host)return;
-    const orders=visibleOrders().filter(order=>!order.archived_at).sort((a,b)=>String(b.created_at||b.date||'').localeCompare(String(a.created_at||a.date||'')));
+    const orders=visibleOrders().filter(order=>!order.archived_at&&!(order.source==='customer_approved_quote'&&!order.manager_approved_at)).sort((a,b)=>String(b.created_at||b.date||'').localeCompare(String(a.created_at||a.date||'')));
     host.innerHTML=orders.length?`<div class="jms-order-list-grid">${orders.map(orderCard).join('')}</div>`:'<div class="jms-order-empty"><i>▣</i><b>لا توجد طلبات حتى الآن</b><span>عند حفظ أول طلب سيظهر هنا ويمكن فتح ملفه الكامل.</span></div>';
   }
   function install(){
