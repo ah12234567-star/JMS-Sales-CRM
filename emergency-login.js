@@ -1,6 +1,19 @@
 (function () {
   'use strict';
 
+  // Keep login fields isolated from legacy document-level handlers that
+  // re-render/translate the app and clear mobile input values.
+  function protectLoginInput(event) {
+    var target = event.target;
+    if (target && (target.id === 'loginEmail' || target.id === 'loginPassword')) {
+      event.stopImmediatePropagation();
+    }
+  }
+  ['beforeinput', 'input', 'change', 'keydown', 'keyup'].forEach(function (type) {
+    document.addEventListener(type, protectLoginInput, true);
+  });
+
+
   function setStatus(message, isError) {
     var hint = document.getElementById('loginHint');
     if (!hint) return;
