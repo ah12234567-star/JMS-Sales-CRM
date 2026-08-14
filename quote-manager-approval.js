@@ -96,3 +96,12 @@ window.JMS_TWO_STAGE_APPROVAL=VERSION;
  script.defer=true;
  document.head.appendChild(script);
 })();
+
+(function loadOfflineSync(){
+ if(document.querySelector('script[data-jms-offline-sync]'))return;
+ const script=document.createElement('script');
+ script.src='offline-sync.js?v=20260814-1';
+ script.dataset.jmsOfflineSync='1';
+ script.defer=true;
+ document.head.appendChild(script);
+})();
