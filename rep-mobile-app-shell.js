@@ -4,7 +4,6 @@
   const STYLE_ID='jmsRepMobileAppShellStyle';
   const isRep=()=>window.currentUser?.role==='rep';
   const tabs=[['repHome','⌂','الرئيسية'],['customers','◎','العملاء'],['smartVisits','⌖','الزيارات'],['quotes','▤','العروض']];
-  let queued=false;
 
   function injectStyle(){
     if(document.getElementById(STYLE_ID))return;
@@ -78,23 +77,20 @@
     });
   }
   function sync(){
-    queued=false;
     if(!isRep())return;
     injectStyle();
     document.body.classList.add('jms-rep-app-shell');
     ensureNav();
     normalizeModal();
   }
-  function queue(){if(queued)return;queued=true;requestAnimationFrame(sync)}
   function install(){
     sync();
-    new MutationObserver(queue).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
     document.addEventListener('click',event=>{
       if(!isRep())return;
       if(event.target.closest('button,[role="button"],a,.nav'))setTimeout(()=>{sync();normalizeModal()},40);
     },true);
     window.addEventListener('pageshow',()=>{sync();if(activePage()==='repHome')resetPagePosition()});
-    window.addEventListener('resize',queue);
+    window.addEventListener('orientationchange',()=>setTimeout(sync,120));
     setTimeout(sync,500);setTimeout(sync,1800);setTimeout(sync,4200);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
