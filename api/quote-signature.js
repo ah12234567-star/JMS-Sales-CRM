@@ -25,7 +25,7 @@ export default async function handler(req,res){
     if(!row||!safeEqual(row.data?.public_token,token))return res.status(404).json({error:'quote_not_found'});
     if(row.data.status==='customer_approved')return res.status(200).json({ok:true,alreadyApproved:true,approvedAt:row.data.customer_approved_at});
     const approvedAt=new Date().toISOString();
-    const next={...row.data,status:'customer_approved',customer_signer_name:String(name).trim(),customer_signature:signature,customer_approved_at:approvedAt,customer_approval_source:'public_quote_link'};
+    const next={...row.data,status:'customer_approved',customer_signer_name:String(name).trim(),customer_signature:signature,customer_approved_at:approvedAt,customer_approval_source:'public_quote_link',manager_review_status:'pending',production_status:'بانتظار مراجعة الإدارة',converted_to_order:false,production_order_id:null};
     const update=await fetch(SUPABASE_URL+'/rest/v1/jms_quotes?id=eq.'+encodeURIComponent(String(id)),{method:'PATCH',headers:headers({Prefer:'return=minimal'}),body:JSON.stringify({data:next,updated_at:approvedAt})});
     if(!update.ok){console.error('signature update failed',update.status,await update.text());return res.status(503).json({error:'save_failed'})}
     return res.status(200).json({ok:true,approvedAt});
