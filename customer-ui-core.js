@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   function database(){try{return db}catch(_){return window.db||{}}}
+  let selectedCustomer=null;
   function customerId(card){
     if(card?.dataset.customerId)return card.dataset.customerId;
     const actions=Array.from(card?.querySelectorAll('[onclick]')||[]);
@@ -72,6 +73,7 @@
     event?.preventDefault();event?.stopPropagation();event?.stopImmediatePropagation?.();
     const customer=customerById(id);
     if(!customer){console.error('JMS customer sheet invalid id',id);return}
+    selectedCustomer=customer;
     const layer=ensureSheet();layer.dataset.customerId=String(customer.id);
     layer.querySelector('#jmsCustomerSheetTitle').textContent=customer.name||'العميل';
     layer.classList.add('open');document.body.classList.add('jms-sheet-open');
@@ -82,8 +84,10 @@
     if(layer)layer.classList.remove('open');document.body.classList.remove('jms-sheet-open');
   };
   window.jmsRunCustomerSheetAction=function(action){
-    const layer=document.getElementById('jmsCustomerBottomSheet'),id=layer?.dataset.customerId||'';
-    const customer=customerById(id);if(!customer){window.jmsCloseCustomerBottomSheet();return}
+    const layer=document.getElementById('jmsCustomerBottomSheet'),storedId=layer?.dataset.customerId||'';
+    const customer=selectedCustomer&&String(selectedCustomer.id)===String(storedId)?selectedCustomer:customerById(storedId);
+    if(!customer){window.jmsCloseCustomerBottomSheet();return}
+    const id=customer.id;
     window.jmsCloseCustomerBottomSheet();
     setTimeout(function(){
       if(action==='edit'){
@@ -95,9 +99,10 @@
       if(action==='location')return window.openCustomerMap?.(id);
       if(action==='transfer')return window.openAssignCustomer?.(id);
       if(action==='profile'){
-        if(typeof window.openCustomer360==='function')return window.openCustomer360(id);
-        return window.jmsOpenCustomer360Growth?.(id);
+        if(typeof window.jmsOpenCustomer360Growth==='function')return window.jmsOpenCustomer360Growth(id);
+        return window.openCustomer360?.(id);
       }
+      selectedCustomer=null;
     },180);
   };
 
@@ -126,5 +131,5 @@
   }
   function install(){injectStyle();ensureSheet();rebuildCards();installObservers();document.addEventListener('keydown',function(event){if(event.key==='Escape')window.jmsCloseCustomerBottomSheet()})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  window.JMS_CUSTOMER_UI_CORE='2026-08-14-v3';
+  window.JMS_CUSTOMER_UI_CORE='2026-08-14-v4';
 })();
