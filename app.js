@@ -144,6 +144,7 @@ window.confirmPasswordReset=async function(){
 logoutBtn.onclick=()=>{currentUser=null;window.currentUser=null;sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
 
 function resetAppViewport(){
+  try{history.scrollRestoration='manual'}catch(_){}
   const reset=()=>{
     const main=document.querySelector('.main');
     if(main){main.scrollTop=0;try{main.scrollTo({top:0,left:0,behavior:'auto'})}catch(_){}}
@@ -154,6 +155,7 @@ function resetAppViewport(){
   reset();
   requestAnimationFrame(reset);
   setTimeout(reset,80);
+  setTimeout(reset,260);
 }
 window.jmsResetAppViewport=resetAppViewport;
 
