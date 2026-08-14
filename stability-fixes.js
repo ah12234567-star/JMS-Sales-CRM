@@ -122,10 +122,9 @@
   }
 
   document.addEventListener('submit',validateOrderForm,true);
-  const observer=new MutationObserver(()=>{cleanupUi();installGuards()});
   document.addEventListener('DOMContentLoaded',()=>{
     installGuards();cleanupUi();
-    observer.observe(document.body,{childList:true,subtree:true});
+    document.addEventListener('click',()=>setTimeout(()=>{cleanupUi();installGuards()},40),true);
   });
   setTimeout(()=>{installGuards();cleanupUi()},800);
   window.JMS_STABILITY_FIXES_VERSION=VERSION;
