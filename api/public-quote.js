@@ -33,7 +33,9 @@ function publicQuote(data) {
     pieces: data.pieces,
     payment_terms: data.payment_terms,
     delivery_terms: data.delivery_terms,
-    notes: data.notes
+    notes: data.notes,
+    customer_signer_name: data.customer_signer_name || '',
+    customer_approved_at: data.customer_approved_at || ''
   };
 }
 
