@@ -4,6 +4,7 @@ export default async function handler(req, res){
   if(req.method !== 'POST') return json(res, 405, {ok:false,error:'method_not_allowed'});
   try{
     const body = await readBody(req);
+    if(String(body.newPassword || '').length < 10) return json(res,400,{ok:false,error:'weak_password',message:'كلمة المرور يجب أن تكون 10 خانات على الأقل'});
     const row = await getUserByEmail(body.email);
     if(!row) return json(res, 404, {ok:false,error:'not_found'});
     const data = row.data || {};
