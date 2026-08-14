@@ -23,12 +23,24 @@
     },120);
   };
 
+  function removeLegacyActions(card){
+    card.querySelectorAll('.customer-actions,.customer-actions-clean,.field-upgrade-actions,.customer-more-menu').forEach(function(element){
+      if(!element.classList.contains('jms-customer-actions-v2'))element.remove();
+    });
+    card.querySelectorAll('.jms-wow-btn,.jms-growth-btn').forEach(function(button){
+      if(!button.closest('.jms-customer-actions-v2'))button.remove();
+    });
+    card.querySelectorAll('button[onclick]').forEach(function(button){
+      if(button.closest('.jms-customer-actions-v2'))return;
+      const action=button.getAttribute('onclick')||'';
+      if(/visit\(|newOrder\(|appointment\(|collect\(|note\(|editCustomer|openCustomer360|jmsOpenCustomer360/.test(action))button.remove();
+    });
+  }
   function rebuildCard(card){
-    if(card.dataset.jmsActionsV2==='1')return;
     const id=customerId(card);if(!id)return;
-    card.dataset.jmsActionsV2='1';
-    const old=card.querySelector('.customer-actions,.customer-actions-clean');
-    if(!old)return;
+    const existing=card.querySelector('.jms-customer-actions-v2');
+    removeLegacyActions(card);
+    if(existing){card.dataset.jmsActionsV2='2';return}
     const safe=esc(id);
     const actions=document.createElement('div');
     actions.className='jms-customer-actions-v2';
@@ -41,8 +53,11 @@
         '<button type="button" onclick="appointment(\''+safe+'\')">تحديد موعد</button>'+
         '<button type="button" onclick="note(\''+safe+'\')">الملاحظات</button>'+
         (typeof window.editCustomer==='function'?'<button type="button" onclick="editCustomer(\''+safe+'\')">تعديل العميل</button>':'')+
+        (typeof window.openCustomer360==='function'?'<button type="button" onclick="openCustomer360(\''+safe+'\')">ملف العميل 360°</button>':'')+
       '</div></details>';
-    old.replaceWith(actions);
+    card.appendChild(actions);
+    card.dataset.jmsActionsV2='2';
+    removeLegacyActions(card);
   }
   function rebuildCards(){
     document.querySelectorAll('#customersGrid .customer-card').forEach(rebuildCard);
@@ -102,5 +117,5 @@
     document.addEventListener('click',closeMenus,true);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  window.JMS_CUSTOMER_UI_CORE='2026-08-14-v1';
+  window.JMS_CUSTOMER_UI_CORE='2026-08-14-v2';
 })();
