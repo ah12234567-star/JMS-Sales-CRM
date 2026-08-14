@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-13-mobile-quote-pdf-10';
+  const VERSION = '2026-08-14-mobile-quote-pdf-11';
 
   function quotePrintCss() {
     return `
@@ -54,9 +54,9 @@
   }
 
   async function shareQuotePdf(qid) {
-    const quote = (window.db?.quotes || (typeof db !== 'undefined' ? db.quotes : []) || []).find(item => item.id === qid);
+    const quote = (window.db?.quotes || (typeof db !== 'undefined' ? db.quotes : []) || []).find(item => String(item.id) === String(qid));
     if (!quote) return alert('لم يتم العثور على عرض السعر.');
-    if (!['approved','sent','accepted'].includes(quote.status)) return alert('اعتمد عرض السعر أولاً قبل إرساله للعميل.');
+    if (!['approved','sent','accepted','customer_approved'].includes(quote.status)) return alert('اعتمد عرض السعر أولاً قبل إرساله للعميل.');
     if (typeof window.html2pdf !== 'function') return alert('جاري تحميل أداة PDF. انتظر لحظة ثم حاول مرة أخرى.');
 
     const existing = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
@@ -66,6 +66,14 @@
 
     const clone = source.cloneNode(true);
     simplifyApprovals(clone);
+    if (quote.status === 'customer_approved' && /^data:image\/png;base64,/i.test(String(quote.customer_signature || ''))) {
+      const customerBox = clone.querySelector('.quote-a4-approval .quote-a4-sign');
+      if (customerBox) {
+        const approvalDate = quote.customer_approved_at ? new Date(quote.customer_approved_at).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'}) : '';
+        customerBox.classList.add('jms-customer-signed');
+        customerBox.innerHTML = '<b>اعتماد العميل ✓</b><img src="'+String(quote.customer_signature)+'" alt="توقيع العميل"><strong>'+String(quote.customer_signer_name||'العميل').replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]})+'</strong><small>'+approvalDate+'</small>';
+      }
+    }
     clone.style.cssText += ';width:794px!important;min-height:0!important;height:auto!important;margin:0!important;box-shadow:none!important;border-radius:0!important;transform:none!important;';
     const holder = document.createElement('div');
     holder.className = 'jms-pdf-export';
@@ -82,7 +90,7 @@
         image: {type:'jpeg', quality:0.98},
         html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:794},
         jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
-        pagebreak: {mode:['css','legacy']}
+        pagebreak: {mode:['css','legacy'], avoid:['.quote-a4-head','.jms-customer-approval-banner','.quote-a4-grid','.jms-smart-specs','.quote-a4-summary','.jms-bank-details','.quote-a4-approval','.quote-a4-footer']}
       }).from(clone).outputPdf('blob');
       const file = new File([blob], fileName, {type:'application/pdf'});
       if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
@@ -134,24 +142,24 @@
   function install() {
     const screenStyle = document.createElement('style');
     screenStyle.textContent = `.quote-a4-approval[data-compact="1"]{grid-template-columns:1fr 1fr!important;gap:7mm!important}.quote-a4-approval[data-compact="1"] .quote-a4-sign{min-height:28mm!important;text-align:right!important}@media(max-width:700px){.quote-a4-approval[data-compact="1"]{grid-template-columns:1fr!important;gap:12px!important}}
-      .jms-pdf-export .quote-a4{box-sizing:border-box!important;width:794px!important;min-height:0!important;height:auto!important;padding:30px 38px 22px!important;margin:0!important;overflow:visible!important;background:#fff!important}
-      .jms-pdf-export .quote-a4-head{display:grid!important;grid-template-columns:115px 1fr 155px!important;gap:24px!important;padding-bottom:18px!important}
+      .jms-pdf-export .quote-a4{box-sizing:border-box!important;width:794px!important;min-height:0!important;height:auto!important;padding:18px 30px 12px!important;margin:0!important;overflow:visible!important;background:#fff!important}
+      .jms-pdf-export .quote-a4-head{display:grid!important;grid-template-columns:115px 1fr 155px!important;gap:20px!important;padding-bottom:11px!important}
       .jms-pdf-export .quote-a4-logo{width:108px!important;height:78px!important}.jms-pdf-export .quote-a4-company h1{font-size:25px!important}.jms-pdf-export .quote-a4-company p{font-size:10px!important}.jms-pdf-export .quote-a4-title{text-align:left!important}.jms-pdf-export .quote-a4-title h2{font-size:31px!important;margin-bottom:8px!important}.jms-pdf-export .quote-a4-title p{font-size:10px!important;margin:3px 0!important}
-      .jms-pdf-export .quote-a4-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:18px!important;margin-top:20px!important}.jms-pdf-export .quote-a4-card{padding:14px!important;border-radius:12px!important}.jms-pdf-export .quote-a4-card h3{font-size:15px!important;margin-bottom:8px!important}.jms-pdf-export .quote-a4-card p{font-size:10px!important;line-height:1.55!important}
-      .jms-pdf-export .quote-a4-table{display:none!important}.jms-pdf-export .jms-smart-specs{margin-top:18px!important;border-radius:12px!important}.jms-pdf-export .jms-smart-spec-title{padding:10px 14px!important}.jms-pdf-export .jms-smart-spec-title b{font-size:15px!important}.jms-pdf-export .jms-smart-spec-title span{font-size:9px!important}.jms-pdf-export .jms-smart-spec-grid{display:grid!important;grid-template-columns:repeat(4,1fr)!important}.jms-pdf-export .jms-smart-spec-grid>div{min-height:48px!important;padding:9px 11px!important}.jms-pdf-export .jms-smart-spec-grid span{font-size:9px!important}.jms-pdf-export .jms-smart-spec-grid b{font-size:11px!important;margin-top:3px!important}
+      .jms-pdf-export .quote-a4-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important;margin-top:11px!important}.jms-pdf-export .quote-a4-card{padding:10px!important;border-radius:12px!important}.jms-pdf-export .quote-a4-card h3{font-size:15px!important;margin-bottom:8px!important}.jms-pdf-export .quote-a4-card p{font-size:10px!important;line-height:1.55!important}
+      .jms-pdf-export .quote-a4-table{display:none!important}.jms-pdf-export .jms-smart-specs{margin-top:11px!important;border-radius:12px!important}.jms-pdf-export .jms-smart-spec-title{padding:10px 14px!important}.jms-pdf-export .jms-smart-spec-title b{font-size:15px!important}.jms-pdf-export .jms-smart-spec-title span{font-size:9px!important}.jms-pdf-export .jms-smart-spec-grid{display:grid!important;grid-template-columns:repeat(4,1fr)!important}.jms-pdf-export .jms-smart-spec-grid>div{min-height:40px!important;padding:6px 9px!important}.jms-pdf-export .jms-smart-spec-grid span{font-size:9px!important}.jms-pdf-export .jms-smart-spec-grid b{font-size:11px!important;margin-top:3px!important}
       .jms-pdf-export .jms-spec-table-wrap{overflow:visible!important}.jms-pdf-export .jms-smart-spec-table{width:100%!important;border-collapse:collapse!important;table-layout:auto!important}.jms-pdf-export .jms-smart-spec-table th{padding:7px 3px!important;font-size:7px!important;white-space:nowrap!important}.jms-pdf-export .jms-smart-spec-table td{padding:7px 3px!important;font-size:7px!important;white-space:nowrap!important}
-      .jms-pdf-export .quote-a4-summary{display:grid!important;grid-template-columns:1fr 245px!important;gap:18px!important;margin-top:18px!important}.jms-pdf-export .quote-a4-terms{padding:14px!important;border-radius:12px!important}.jms-pdf-export .quote-a4-terms h3{font-size:15px!important}.jms-pdf-export .quote-a4-terms ul{font-size:9px!important;line-height:1.5!important}.jms-pdf-export .quote-a4-total-row{padding:10px!important;font-size:10px!important}.jms-pdf-export .quote-a4-total-row.final{font-size:13px!important}
-      .jms-pdf-export .jms-bank-details{display:grid!important;grid-template-columns:150px 1fr!important;margin-top:15px!important;border-radius:11px!important}.jms-pdf-export .jms-bank-heading{padding:10px 12px!important}.jms-pdf-export .jms-bank-heading b{font-size:11px!important}.jms-pdf-export .jms-bank-heading span{font-size:8px!important}.jms-pdf-export .jms-bank-fields{display:grid!important;grid-template-columns:1.2fr 1fr 1.2fr!important;gap:8px!important;padding:10px 12px!important}.jms-pdf-export .jms-bank-fields span{font-size:8px!important}.jms-pdf-export .jms-bank-fields b{font-size:9px!important;white-space:nowrap!important}
-      .jms-pdf-export .quote-a4-approval{display:grid!important;grid-template-columns:1fr 1fr!important;gap:18px!important;margin-top:20px!important}.jms-pdf-export .quote-a4-sign{min-height:74px!important;padding:11px!important;border-radius:11px!important}.jms-pdf-export .quote-a4-sign b{font-size:11px!important}.jms-pdf-export .quote-a4-line{font-size:8px!important;padding-top:8px!important}.jms-pdf-export .quote-a4-footer{margin-top:17px!important;padding-top:10px!important;font-size:8px!important}`;
+      .jms-pdf-export .quote-a4-summary{display:grid!important;grid-template-columns:1fr 245px!important;gap:12px!important;margin-top:11px!important}.jms-pdf-export .quote-a4-terms{padding:10px!important;border-radius:12px!important}.jms-pdf-export .quote-a4-terms h3{font-size:15px!important}.jms-pdf-export .quote-a4-terms ul{font-size:9px!important;line-height:1.5!important}.jms-pdf-export .quote-a4-total-row{padding:7px!important;font-size:10px!important}.jms-pdf-export .quote-a4-total-row.final{font-size:13px!important}
+      .jms-pdf-export .jms-bank-details{display:grid!important;grid-template-columns:150px 1fr!important;margin-top:9px!important;border-radius:11px!important}.jms-pdf-export .jms-bank-heading{padding:10px 12px!important}.jms-pdf-export .jms-bank-heading b{font-size:11px!important}.jms-pdf-export .jms-bank-heading span{font-size:8px!important}.jms-pdf-export .jms-bank-fields{display:grid!important;grid-template-columns:1.2fr 1fr 1.2fr!important;gap:8px!important;padding:10px 12px!important}.jms-pdf-export .jms-bank-fields span{font-size:8px!important}.jms-pdf-export .jms-bank-fields b{font-size:9px!important;white-space:nowrap!important}
+      .jms-pdf-export .quote-a4-approval{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important;margin-top:10px!important}.jms-pdf-export .quote-a4-sign{min-height:82px!important;padding:8px!important;border-radius:11px!important}.jms-pdf-export .quote-a4-sign b{font-size:11px!important}.jms-pdf-export .quote-a4-line{font-size:8px!important;padding-top:8px!important}.jms-pdf-export .quote-a4-footer{margin-top:8px!important;padding-top:6px!important;font-size:8px!important}`;
     document.head.appendChild(screenStyle);
-    window.downloadQuotePDF = openQuotePrintPage;
+    window.downloadQuotePDF = function(){ return shareQuotePdf(window.__jmsCurrentQuoteId || document.querySelector('.quote-a4,.quote-doc')?.dataset.quoteId || ''); };
     window.sendQuote = shareQuotePdf;
     document.addEventListener('click', event => {
       const button = event.target.closest('.quote-toolbar .pdf');
       if (!button) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      openQuotePrintPage();
+      shareQuotePdf(window.__jmsCurrentQuoteId || document.querySelector('.quote-a4,.quote-doc')?.dataset.quoteId || '');
     }, true);
 
     function refreshQuoteUi() {
