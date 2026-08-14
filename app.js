@@ -143,6 +143,20 @@ window.confirmPasswordReset=async function(){
 }
 logoutBtn.onclick=()=>{currentUser=null;window.currentUser=null;sessionStorage.removeItem('jms_current_user');sessionStorage.removeItem('jms_auth_token');location.reload()};
 
+function resetAppViewport(){
+  const reset=()=>{
+    const main=document.querySelector('.main');
+    if(main){main.scrollTop=0;try{main.scrollTo({top:0,left:0,behavior:'auto'})}catch(_){}}
+    document.documentElement.scrollTop=0;
+    document.body.scrollTop=0;
+    try{window.scrollTo({top:0,left:0,behavior:'auto'})}catch(_){window.scrollTo(0,0)}
+  };
+  reset();
+  requestAnimationFrame(reset);
+  setTimeout(reset,80);
+}
+window.jmsResetAppViewport=resetAppViewport;
+
 function showApp(){
   if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
   loginView.classList.add('hidden');
@@ -175,6 +189,7 @@ function showApp(){
 
   if(window.orderDate) orderDate.value=today();
   renderAll();
+  resetAppViewport();
 }
 if(currentUser) showApp();
 
@@ -182,7 +197,9 @@ document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
   btn.classList.add('active');$(btn.dataset.page).classList.add('active');
   renderAll();
+  resetAppViewport();
 });
+window.addEventListener('pageshow',()=>{if(currentUser&&!document.querySelector('.modal:not(.hidden)'))resetAppViewport();});
 
 function renderAll(){if(!requireLogin()) return; renderStats();renderCustomers();renderSelects();if(typeof renderVisitFilters==='function')renderVisitFilters();if(typeof renderVisits==='function')renderVisits();if(typeof renderQuotes==='function')renderQuotes();if(typeof renderVisitNotes==='function')renderVisitNotes();renderOrders();renderRoutes();renderAlerts();renderUsers();calc();if(typeof renderJmsAI==='function')renderJmsAI()}
 function repName(id){return db.reps.find(r=>r.id===id)?.name||'-'}
