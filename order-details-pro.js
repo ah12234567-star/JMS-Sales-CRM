@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='2026-08-14-order-details-pro-2';
+  const VERSION='2026-08-14-order-details-pro-3';
   const database=()=>{try{return db}catch(_){return window.db||{}}};
   const activeUser=()=>{try{return currentUser}catch(_){return window.currentUser||null}};
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -32,6 +32,14 @@
     order.manager_approved_by_id=activeUser()?.id||'';
     order.manager_approval_required=false;
     order.status='معتمد من المدير';
+    const quote=(database().quotes||[]).find(item=>String(item.id)===String(order.source_quote_id||''));
+    if(quote){
+      quote.manager_approved_at=order.manager_approved_at;
+      quote.manager_approved_by=order.manager_approved_by;
+      quote.manager_approved_by_id=order.manager_approved_by_id;
+      quote.production_status='تم اعتماد المدير وإرسال الطلب للإنتاج';
+      quote.production_order_id=order.id;
+    }
     try{if(typeof save==='function')save();else window.save?.()}catch(error){console.error('JMS manager approval save',error)}
     if(typeof window.closeModal==='function')window.closeModal();
     setTimeout(function(){
