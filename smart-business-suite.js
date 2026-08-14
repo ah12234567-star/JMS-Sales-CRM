@@ -59,7 +59,7 @@
     section.innerHTML='<div class="jms-smart-head"><div><small>تحليل دورات الشراء</small><h2>التنبيه الذكي لإعادة الطلب</h2></div><b>'+predictions().length+'</b></div><div class="jms-reorder-list">'+reorderHtml(6)+'</div>';
   }
 
-  function settings(){const store=data();store.businessSettings=store.businessSettings||{};store.businessSettings.materialCosts={...DEFAULT_COSTS,...(store.businessSettings.materialCosts||{})};return store.businessSettings.materialCosts}
+  function settings(){const store=data();store.settings=Array.isArray(store.settings)?store.settings:[];let record=store.settings.find(item=>item.id==='pricing');if(!record){record={id:'pricing',materialCosts:{...DEFAULT_COSTS}};store.settings.push(record)}record.materialCosts={...DEFAULT_COSTS,...(record.materialCosts||store.businessSettings?.materialCosts||{})};return record.materialCosts}
   function priceCalculation(){
     const material=document.getElementById('mqMaterial')?.value||'HDPE',costs=settings();const raw=Number(costs[material]||costs.MIX);
     const calcium=Math.max(0,Math.min(40,Number(document.getElementById('jmsCalciumPct')?.value||0)));const waste=Math.max(0,Number(document.getElementById('jmsWastePct')?.value||costs.waste));const margin=Math.max(0,Number(document.getElementById('jmsMarginPct')?.value||costs.margin));
