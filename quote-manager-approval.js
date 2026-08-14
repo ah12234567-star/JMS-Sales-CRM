@@ -87,3 +87,12 @@ function boot(){style();enhanceFilter();window.renderQuotes?.()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 window.JMS_TWO_STAGE_APPROVAL=VERSION;
 })();
+
+(function loadQuoteSmartAssistant(){
+ if(document.querySelector('script[data-jms-quote-ai]'))return;
+ const script=document.createElement('script');
+ script.src='quote-smart-assistant.js?v=20260814-1';
+ script.dataset.jmsQuoteAi='1';
+ script.defer=true;
+ document.head.appendChild(script);
+})();
