@@ -1,9 +1,11 @@
-import { json, pbkdf2, makeSalt, readBody, supabase, upsertUser } from './auth-utils.js';
+import { json, pbkdf2, makeSalt, readBody, supabase, upsertUser, requireAuth } from './auth-utils.js';
 
 export default async function handler(req, res){
   if(req.method !== 'POST') return json(res, 405, {ok:false,error:'method_not_allowed'});
+  if(!requireAuth(req,res,['admin'])) return;
   try{
     const body = await readBody(req);
+    if(String(body.newPassword || '').length < 10) return json(res,400,{ok:false,error:'weak_password',message:'كلمة المرور يجب أن تكون 10 خانات على الأقل'});
     const rows = await supabase('jms_users?id=eq.' + encodeURIComponent(body.userId) + '&limit=1');
     const row = rows && rows[0];
     if(!row) return json(res, 404, {ok:false,error:'not_found'});
