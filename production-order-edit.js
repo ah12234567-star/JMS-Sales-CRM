@@ -139,7 +139,9 @@
 
   function install() {
     injectStyle(); enhanceCards();
-    new MutationObserver(enhanceCards).observe(document.body, {childList:true, subtree:true});
+    document.addEventListener('click',event=>{
+      if(event.target.closest('[data-page="orders"],#orders button,.jms-edit-sales-order'))setTimeout(enhanceCards,50);
+    },true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
