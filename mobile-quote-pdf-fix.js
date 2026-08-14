@@ -167,9 +167,10 @@
       });
     }
     refreshQuoteUi();
-    // A slow timer is deliberate: it avoids a MutationObserver feedback loop on iOS
-    // while still updating a quote shortly after its modal opens.
-    window.setInterval(refreshQuoteUi, 1200);
+    document.addEventListener('click',event=>{
+      if(event.target.closest('[data-page="quotes"],button[onclick*="Quote"],button[onclick*="quote"]'))setTimeout(refreshQuoteUi,80);
+    },true);
+    document.addEventListener('jms:quote-opened',refreshQuoteUi);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
