@@ -49,6 +49,8 @@
   if(typeof oldShow==='function') window.showApp=function(){const r=oldShow.apply(this,arguments);setTimeout(applyInkAccess,80);return r;};
   const oldRender=window.renderAll;
   if(typeof oldRender==='function') window.renderAll=function(){const r=oldRender.apply(this,arguments);setTimeout(applyInkAccess,80);return r;};
-  new MutationObserver(()=>{enhancePermissionForm();applyInkAccess();}).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('click',event=>{
+    if(event.target.closest('[data-page="users"],button[onclick*="User"],button[onclick*="Permission"]'))setTimeout(()=>{enhancePermissionForm();applyInkAccess()},40);
+  },true);
   enhancePermissionForm(); applyInkAccess(); setTimeout(applyInkAccess,900);
 })();
