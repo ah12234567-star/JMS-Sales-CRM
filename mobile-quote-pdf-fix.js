@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-14-mobile-quote-pdf-12';
+  const VERSION = '2026-08-14-mobile-quote-pdf-13';
   let pdfEnginePromise;
   function loadScriptOnce(src,test){
     if(test())return Promise.resolve();
@@ -89,6 +89,14 @@
         const approvalDate = quote.customer_approved_at ? new Date(quote.customer_approved_at).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'}) : '';
         customerBox.classList.add('jms-customer-signed');
         customerBox.innerHTML = '<b>اعتماد العميل ✓</b><img src="'+String(quote.customer_signature)+'" alt="توقيع العميل"><strong>'+String(quote.customer_signer_name||'العميل').replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]})+'</strong><small>'+approvalDate+'</small>';
+      }
+    }
+    if (quote.manager_approved_at) {
+      const companyBox = clone.querySelectorAll('.quote-a4-approval .quote-a4-sign')?.[1];
+      if (companyBox) {
+        const managerDate = new Date(quote.manager_approved_at).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'});
+        companyBox.classList.add('jms-company-approved');
+        companyBox.innerHTML = '<b>اعتماد الشركة ✓</b><i>✓</i><strong>'+String(quote.manager_approved_by||'مدير النظام').replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]})+'</strong><small>'+managerDate+'</small><em>تم الاعتماد والإرسال للإنتاج</em>';
       }
     }
     clone.style.cssText += ';width:794px!important;min-height:0!important;height:auto!important;margin:0!important;box-shadow:none!important;border-radius:0!important;transform:none!important;';
@@ -182,7 +190,8 @@
       .jms-pdf-export .jms-customer-approval-banner{margin:6px 0!important;padding:7px 9px!important}
       .jms-pdf-export .quote-a4-sign.jms-customer-signed{display:grid!important;grid-template-rows:auto 40px auto auto!important;justify-items:center!important;align-content:center!important;gap:1px!important;min-height:78px!important;padding:6px!important}
       .jms-pdf-export .quote-a4-sign.jms-customer-signed img{display:block!important;width:145px!important;max-width:90%!important;height:40px!important;object-fit:contain!important;border:0!important}
-      .jms-pdf-export .quote-a4-sign.jms-customer-signed strong{font-size:9px!important;color:#065f46!important}.jms-pdf-export .quote-a4-sign.jms-customer-signed small{font-size:7px!important;color:#64748b!important}`;
+      .jms-pdf-export .quote-a4-sign.jms-customer-signed strong{font-size:9px!important;color:#065f46!important}.jms-pdf-export .quote-a4-sign.jms-customer-signed small{font-size:7px!important;color:#64748b!important}
+      .jms-pdf-export .quote-a4-sign.jms-company-approved{display:grid!important;grid-template-rows:auto 30px auto auto auto!important;justify-items:center!important;align-content:center!important;gap:1px!important;min-height:78px!important;padding:6px!important}.jms-pdf-export .quote-a4-sign.jms-company-approved i{display:grid!important;place-items:center!important;width:28px!important;height:28px!important;border-radius:50%!important;background:#1d4ed8!important;color:#fff!important;font-size:18px!important;font-style:normal!important}.jms-pdf-export .quote-a4-sign.jms-company-approved strong{font-size:9px!important;color:#1e3a8a!important}.jms-pdf-export .quote-a4-sign.jms-company-approved small,.jms-pdf-export .quote-a4-sign.jms-company-approved em{font-size:7px!important;color:#64748b!important;font-style:normal!important}`;
     document.head.appendChild(screenStyle);
     window.downloadQuotePDF = function(){ return shareQuotePdf(window.__jmsCurrentQuoteId || document.querySelector('.quote-a4,.quote-doc')?.dataset.quoteId || ''); };
     window.sendQuote = shareQuotePdf;
