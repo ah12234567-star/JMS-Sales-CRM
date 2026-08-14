@@ -52,9 +52,7 @@ export default async function handler(req, res){
     const initPassword = String(process.env.INIT_ADMIN_PASSWORD || '').trim();
     const initPhone = String(process.env.INIT_ADMIN_PHONE || '966500000000').trim();
 
-    // Emergency/bootstrap path: if the initial admin credentials match the Vercel env
-    // (or the default bootstrap password), allow login and sync the user into Supabase.
-    // This prevents being locked out when Supabase has an old password hash.
+    // Optional bootstrap path: it works only when explicit credentials exist in Vercel.
     const isInitialAdmin = !!initEmail && !!initPassword && email === initEmail && password === initPassword;
     if(isInitialAdmin){
       try { await createOrUpdateInitialAdmin(initEmail, password, initPhone); } catch(e) { console.error('admin upsert failed:', e); }
