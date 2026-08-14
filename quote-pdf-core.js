@@ -52,12 +52,24 @@
     const text=openButton?.getAttribute('onclick')||'';
     return text.match(/['"]([^'"]+)['"]/)?.[1]||window.__jmsCurrentQuoteId||'';
   }
+  function closePreview(){
+    if(typeof window.closeModal==='function')window.closeModal();
+    else document.getElementById('modal')?.classList.add('hidden');
+  }
+  function enhancePreview(){
+    const shell=document.querySelector('.quote-print-shell,.quote-print');
+    if(!shell||shell.querySelector('.jms-quote-preview-nav'))return;
+    const nav=document.createElement('div');nav.className='jms-quote-preview-nav';
+    nav.innerHTML='<button type="button" class="jms-quote-back" aria-label="الرجوع إلى التطبيق">← رجوع للتطبيق</button><button type="button" class="jms-quote-close" aria-label="إغلاق معاينة عرض السعر">×</button>';
+    nav.querySelectorAll('button').forEach(function(button){button.onclick=closePreview});
+    shell.prepend(nav);
+  }
   function wrapQuoteViewer(){
     const old=window.viewQuote;if(typeof old!=='function'||old.jmsPdfCore)return;
     const wrapped=function(id){
       window.__jmsCurrentQuoteId=id;
       const result=old.apply(this,arguments);
-      setTimeout(function(){addQr(id)},90);
+      setTimeout(function(){enhancePreview();addQr(id)},90);
       return result;
     };
     wrapped.jmsPdfCore=true;window.viewQuote=wrapped;
@@ -91,6 +103,7 @@
     if(document.getElementById('jmsQuotePdfCoreStyle'))return;
     const element=document.createElement('style');element.id='jmsQuotePdfCoreStyle';
     element.textContent=
+      '.jms-quote-preview-nav{position:sticky;z-index:10020;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:max(10px,env(safe-area-inset-top)) 12px 10px;border-bottom:1px solid #dbe4ef;background:rgba(255,255,255,.98);backdrop-filter:blur(12px)}.jms-quote-preview-nav button{display:grid;place-items:center;min-height:44px;border:0;border-radius:12px;font-weight:900;cursor:pointer}.jms-quote-back{padding:0 16px;background:#111827;color:#fff}.jms-quote-close{width:44px;padding:0;background:#fee2e2;color:#991b1b;font-size:26px}'+
       '.quote-a4,.quote-doc{padding:15mm 11mm!important;background:#fff!important}'+
       '.quote-a4 table th,.quote-a4 table td,.quote-doc table th,.quote-doc table td{padding:10px 8px!important;font-size:11px!important;line-height:1.65!important;vertical-align:middle!important}'+
       '.quote-a4 table,.quote-doc table{table-layout:auto!important;border-collapse:collapse!important}'+
@@ -98,10 +111,10 @@
       '.jms-quote-qr{display:grid;justify-items:center;align-content:start;gap:3px;min-width:102px;padding:7px;border:1px solid #d9e1ea;border-radius:10px;background:#fff;color:#334155}'+
       '.jms-quote-qr-canvas{display:grid;place-items:center;width:86px;height:86px}.jms-quote-qr img,.jms-quote-qr canvas{width:86px!important;height:86px!important}.jms-quote-qr small{font-size:8px}.jms-quote-qr b{font:700 8px monospace}'+
       '@media(max-width:620px){.quote-a4,.quote-doc{padding:10mm 7mm!important}.quote-a4 table th,.quote-a4 table td,.quote-doc table th,.quote-doc table td{padding:8px 5px!important;font-size:10px!important}}'+
-      '@media print{@page{size:A4;margin:0}html,body{margin:0!important;padding:0!important}.quote-toolbar,.quote-actions-print,.modal-close,button{display:none!important}.quote-a4,.quote-doc{box-shadow:none!important;margin:0!important;width:210mm!important;min-height:297mm!important;padding:14mm 11mm!important}tr,.quote-info-card,.quote-a4-summary{break-inside:avoid!important;page-break-inside:avoid!important}}';
+      '@media print{@page{size:A4;margin:0}html,body{margin:0!important;padding:0!important}.quote-toolbar,.quote-actions-print,.modal-close,.jms-quote-preview-nav,button{display:none!important}.quote-a4,.quote-doc{box-shadow:none!important;margin:0!important;width:210mm!important;min-height:297mm!important;padding:14mm 11mm!important}tr,.quote-info-card,.quote-a4-summary{break-inside:avoid!important;page-break-inside:avoid!important}}';
     document.head.appendChild(element);
   }
   function boot(){style();wrapQuoteViewer();setTimeout(wrapQuoteViewer,900)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.JMS_QUOTE_PDF_CORE='2026-08-14-v1';
+  window.JMS_QUOTE_PDF_CORE='2026-08-14-v2';
 })();
