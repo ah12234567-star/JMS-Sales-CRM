@@ -1,7 +1,24 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-14-mobile-quote-pdf-11';
+  const VERSION = '2026-08-14-mobile-quote-pdf-12';
+  let pdfEnginePromise;
+  function loadScriptOnce(src,test){
+    if(test())return Promise.resolve();
+    return new Promise(function(resolve,reject){
+      const existing=Array.from(document.scripts).find(function(script){return script.src===src});
+      if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return}
+      const script=document.createElement('script');script.src=src;script.async=true;script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+    });
+  }
+  function loadPdfEngine(){
+    if(pdfEnginePromise)return pdfEnginePromise;
+    pdfEnginePromise=Promise.all([
+      loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',function(){return typeof window.html2canvas==='function'}),
+      loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',function(){return !!window.jspdf?.jsPDF})
+    ]);
+    return pdfEnginePromise;
+  }
 
   function quotePrintCss() {
     return `
@@ -78,20 +95,31 @@
     const holder = document.createElement('div');
     holder.className = 'jms-pdf-export';
     holder.setAttribute('aria-hidden', 'true');
-    holder.style.cssText = 'position:fixed;right:-10000px;top:0;width:794px;background:#fff;z-index:-1;';
+    holder.style.cssText = 'position:absolute;left:0;right:auto;top:0;width:794px;background:#fff;z-index:-1000;pointer-events:none;overflow:visible;direction:rtl;';
     holder.appendChild(clone);
     document.body.appendChild(holder);
 
+    const duplicateGrid=clone.querySelector('.jms-smart-spec-table')&&clone.querySelector('.jms-smart-spec-grid');
+    if(duplicateGrid)duplicateGrid.remove();
     const fileName = safeFilePart(`عرض-سعر-${quote.quote_no || qid}`) + '.pdf';
     try {
-      const blob = await window.html2pdf().set({
-        margin: 0,
-        filename: fileName,
-        image: {type:'jpeg', quality:0.98},
-        html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:794},
-        jsPDF: {unit:'mm', format:'a4', orientation:'portrait'},
-        pagebreak: {mode:['css','legacy'], avoid:['.quote-a4-head','.jms-customer-approval-banner','.quote-a4-grid','.jms-smart-specs','.quote-a4-summary','.jms-bank-details','.quote-a4-approval','.quote-a4-footer']}
-      }).from(clone).outputPdf('blob');
+      await loadPdfEngine();
+      await new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(resolve)})});
+      const canvas=await window.html2canvas(clone,{
+        scale:2,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,
+        scrollX:0,scrollY:0,x:0,y:0,width:794,height:clone.scrollHeight,windowWidth:1200,windowHeight:Math.max(1123,clone.scrollHeight)
+      });
+      const PDF=window.jspdf?.jsPDF;
+      if(!PDF)throw new Error('pdf_engine_unavailable');
+      const pdf=new PDF({orientation:'portrait',unit:'mm',format:'a4',compress:true,putOnlyUsedFonts:true});
+      const pageWidth=210,pageHeight=297,margin=4,availableWidth=pageWidth-(margin*2),availableHeight=pageHeight-(margin*2);
+      const naturalHeight=canvas.height*availableWidth/canvas.width;
+      const renderHeight=Math.min(availableHeight,naturalHeight);
+      const renderWidth=canvas.width*renderHeight/canvas.height;
+      const x=(pageWidth-renderWidth)/2,y=(pageHeight-renderHeight)/2;
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.98),'JPEG',x,y,renderWidth,renderHeight,undefined,'FAST');
+      pdf.setProperties({title:'عرض سعر '+String(quote.quote_no||''),subject:'عرض سعر معتمد من العميل',creator:'JMS Factory CRM'});
+      const blob=pdf.output('blob');
       const file = new File([blob], fileName, {type:'application/pdf'});
       if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
         await navigator.share({files:[file], title:`عرض سعر ${quote.quote_no || ''}`});
