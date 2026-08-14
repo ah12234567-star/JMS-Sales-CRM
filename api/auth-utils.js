@@ -62,8 +62,39 @@ export async function upsertUser(user){
 }
 
 export function sign(payload){
-  const secret = process.env.AUTH_SECRET || 'jms-dev-secret';
-  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString('base64url');
+  const secret = authSecret();
+  const now = Date.now();
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: now, exp: now + (12 * 60 * 60 * 1000) })).toString('base64url');
   const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
   return body + '.' + sig;
+}
+
+function authSecret(){
+  const secret = process.env.AUTH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!secret) throw new Error('missing_auth_secret');
+  return secret;
+}
+
+export function verify(token){
+  try{
+    const [body, supplied] = String(token || '').split('.');
+    if(!body || !supplied) return null;
+    const expected = crypto.createHmac('sha256', authSecret()).update(body).digest('base64url');
+    const left = Buffer.from(supplied);
+    const right = Buffer.from(expected);
+    if(left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if(!payload?.id || !payload?.role || Number(payload.exp || 0) < Date.now()) return null;
+    return payload;
+  }catch(_){ return null; }
+}
+
+export function requireAuth(req, res, roles = []){
+  const raw = String(req.headers?.authorization || '');
+  const payload = verify(raw.startsWith('Bearer ') ? raw.slice(7) : '');
+  if(!payload){ json(res, 401, {ok:false,error:'unauthorized'}); return null; }
+  if(roles.length && !roles.includes(payload.role)){
+    json(res, 403, {ok:false,error:'forbidden'}); return null;
+  }
+  return payload;
 }
