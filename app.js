@@ -797,8 +797,6 @@ function convertQuoteToOrder(qid){
   window.convertQuoteToOrder=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن تحويل عرض غير معتمد إلى طلب');db.orders.unshift({id:newLocalId(),date:safeToday(),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,width:q.width,length:q.length,thickness:q.thickness,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:q.total_amount+' ريال',amount_value:Number(q.total_amount||0),status:'جديد',notes:'تم التحويل من عرض السعر '+q.quote_no});q.converted_to_order=true;q.converted_at=safeToday();saveDB();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');};
 })();
 
-
-
 /* JMS visit report notes module */
 (function(){
   function localId(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
@@ -4021,7 +4019,6 @@ function convertQuoteToOrder(qid){
   document.addEventListener('DOMContentLoaded', forceArabic);
   document.addEventListener('click', ()=>setTimeout(forceArabic,50), true);
   setTimeout(forceArabic,300);
-  setInterval(forceArabic,1500);
 })();
 
 
@@ -4984,12 +4981,13 @@ askJmsAI = async function(q){
   }
   function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())); }
   function esc(v){ return String(v ?? '').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
-  function roleLabel(role){ return role==='admin'?'مدير النظام':role==='sales'?'مدير مبيعات':'مندوب'; }
+  function roleLabel(role){ return role==='admin'?'مدير النظام':role==='sales'?'مدير مبيعات':role==='warehouse'?'مسؤول الأحبار':'مندوب'; }
   function isManager(){ return currentUser && (currentUser.role==='admin' || currentUser.role==='sales'); }
   function roleDefaults(role){
-    if(role==='admin') return {manage_users:true,manage_permissions:true,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:true,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true};
-    if(role==='sales') return {manage_users:false,manage_permissions:false,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:false,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true};
-    return {manage_users:false,manage_permissions:false,view_all_customers:false,create_customers:true,edit_customers:false,reassign_customers:false,delete_customers:false,view_reports:false,use_ai:true,manage_quotes:false,manage_orders:false};
+    if(role==='admin') return {manage_users:true,manage_permissions:true,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:true,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true,manage_ink:true};
+    if(role==='sales') return {manage_users:false,manage_permissions:false,view_all_customers:true,create_customers:true,edit_customers:true,reassign_customers:true,delete_customers:false,view_reports:true,use_ai:true,manage_quotes:true,manage_orders:true,manage_ink:true};
+    if(role==='warehouse') return {manage_users:false,manage_permissions:false,view_all_customers:false,create_customers:false,edit_customers:false,reassign_customers:false,delete_customers:false,view_reports:false,use_ai:false,manage_quotes:false,manage_orders:false,manage_ink:true};
+    return {manage_users:false,manage_permissions:false,view_all_customers:false,create_customers:true,edit_customers:false,reassign_customers:false,delete_customers:false,view_reports:false,use_ai:true,manage_quotes:false,manage_orders:false,manage_ink:false};
   }
   function normalizeUser(u){
     if(!u) return u;
@@ -5091,7 +5089,7 @@ askJmsAI = async function(q){
         <label>البريد<input id="muEmail" type="email" placeholder="name@jms.local" autocomplete="username"></label>
         <label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
         <label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="كلمة مرور مؤقتة"></label>
-        <label>الدور<select id="muRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label>
+        <label>الدور<select id="muRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep">مندوب</option><option value="warehouse">مسؤول الأحبار فقط</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label>
         <label>الحالة<select id="muStatus"><option value="active">نشط</option><option value="disabled">موقوف</option></select></label>
       </div>
       <h3>الصلاحيات</h3>
@@ -5105,7 +5103,7 @@ askJmsAI = async function(q){
 
   function permissionCheckboxes(perms){
     const list=[
-      ['manage_users','إضافة المستخدمين'],['manage_permissions','تعديل الصلاحيات'],['view_all_customers','عرض كل العملاء'],['create_customers','إضافة عملاء'],['edit_customers','تعديل العملاء'],['reassign_customers','نقل العميل لمندوب'],['delete_customers','حذف العملاء'],['view_reports','عرض التقارير'],['use_ai','استخدام الذكاء'],['manage_quotes','إدارة عروض الأسعار'],['manage_orders','إدارة الطلبات']
+      ['manage_ink','إدارة مخزون الأحبار'],['manage_users','إضافة المستخدمين'],['manage_permissions','تعديل الصلاحيات'],['view_all_customers','عرض كل العملاء'],['create_customers','إضافة عملاء'],['edit_customers','تعديل العملاء'],['reassign_customers','نقل العميل لمندوب'],['delete_customers','حذف العملاء'],['view_reports','عرض التقارير'],['use_ai','استخدام الذكاء'],['manage_quotes','إدارة عروض الأسعار'],['manage_orders','إدارة الطلبات']
     ];
     return list.map(([k,t])=>`<label style="display:flex;gap:6px;align-items:center;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px"><input type="checkbox" class="jmsPerm" data-perm="${k}" ${perms[k]?'checked':''}> ${t}</label>`).join('');
   }
@@ -5145,7 +5143,7 @@ askJmsAI = async function(q){
         <label>الاسم<input id="epName" value="${esc(u.name)}"></label>
         <label>البريد<input id="epEmail" value="${esc(u.email)}"></label>
         <label>الجوال<input id="epPhone" value="${esc(u.phone||'')}"></label>
-        <label>الدور<select id="epRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" ${u.role==='rep'?'selected':''}>مندوب</option><option value="sales" ${u.role==='sales'?'selected':''}>مدير مبيعات</option><option value="admin" ${u.role==='admin'?'selected':''}>مدير نظام</option></select></label>
+        <label>الدور<select id="epRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" ${u.role==='rep'?'selected':''}>مندوب</option><option value="warehouse" ${u.role==='warehouse'?'selected':''}>مسؤول الأحبار فقط</option><option value="sales" ${u.role==='sales'?'selected':''}>مدير مبيعات</option><option value="admin" ${u.role==='admin'?'selected':''}>مدير نظام</option></select></label>
         <label>الحالة<select id="epStatus"><option value="active" ${u.status==='active'?'selected':''}>نشط</option><option value="disabled" ${u.status!=='active'?'selected':''}>موقوف</option></select></label>
       </div>
       <h3>الصلاحيات</h3><div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">${permissionCheckboxes(u.permissions)}</div>
@@ -5189,7 +5187,7 @@ askJmsAI = async function(q){
     normalizeAll();
     const canEdit=can('manage_permissions') || can('manage_users');
     usersList.innerHTML = `<div class="panel"><div class="row-actions"><button class="primary" onclick="openUserForm()">إضافة مستخدم</button></div></div>`+
-    `<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>{normalizeUser(u); const p=[]; if(u.permissions.view_all_customers)p.push('كل العملاء'); if(u.permissions.reassign_customers)p.push('نقل العملاء'); if(u.permissions.view_reports)p.push('تقارير'); if(u.permissions.use_ai)p.push('AI'); return `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${roleLabel(u.role)}</td><td>${p.join('، ')||'-'}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions">${canEdit?`<button onclick="openUserPermissions('${u.id}')">الصلاحيات</button><button onclick="resetPass('${u.id}')">كلمة المرور</button><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button>`:''}</div></td></tr>`}).join('')}</table>`;
+    `<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>{normalizeUser(u); const p=[]; if(u.permissions.manage_ink)p.push('مخزون الأحبار'); if(u.permissions.view_all_customers)p.push('كل العملاء'); if(u.permissions.reassign_customers)p.push('نقل العملاء'); if(u.permissions.view_reports)p.push('تقارير'); if(u.permissions.use_ai)p.push('AI'); return `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${roleLabel(u.role)}</td><td>${p.join('، ')||'-'}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions">${canEdit?`<button onclick="openUserPermissions('${u.id}')">الصلاحيات</button><button onclick="resetPass('${u.id}')">كلمة المرور</button><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button>`:''}</div></td></tr>`}).join('')}</table>`;
   };
 
   // Customer creation/edit/assignment.
@@ -6068,7 +6066,9 @@ askJmsAI = async function(q){
   window.jmsEnsureMobileModalFix=ensureCloseButton;
   document.addEventListener('DOMContentLoaded',()=>{
     injectStyle();
-    setInterval(ensureCloseButton,500);
+    document.addEventListener('click',()=>setTimeout(ensureCloseButton,0),true);
+    const m=getModal();
+    if(m)new MutationObserver(ensureCloseButton).observe(m,{attributes:true,attributeFilter:['class']});
     document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAnyModal(); });
   });
   setTimeout(()=>{injectStyle(); ensureCloseButton();},300);
@@ -6332,4 +6332,28 @@ askJmsAI = async function(q){
   try{ if(typeof renderAll==='function') renderAll=window.renderAll; }catch(e){}
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureRepAi(); renderRepAiDashboard();},800));
   setTimeout(()=>{ensureRepAi(); renderRepAiDashboard();},1200);
+})();
+
+/* JMS UPDATE 14: ink-only warehouse access */
+(function(){
+  function user(){ return window.currentUser || (typeof currentUser!=='undefined' ? currentUser : null); }
+  function applyInkAccess(){
+    const u=user(); if(!u) return;
+    const allowed=!!u.permissions?.manage_ink || ['admin','sales','warehouse'].includes(u.role);
+    const inkButton=document.querySelector('.nav[data-page="inkStock"]');
+    const inkPage=document.getElementById('inkStock');
+    if(inkButton) inkButton.style.display=allowed?'block':'none';
+    if(u.role!=='warehouse') return;
+    document.querySelectorAll('.sidebar .nav').forEach(btn=>btn.style.display=btn.dataset.page==='inkStock'?'block':'none');
+    document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
+    if(inkButton) inkButton.classList.add('active');
+    if(inkPage) inkPage.classList.add('active');
+    const roleBox=document.getElementById('currentUserRole'); if(roleBox) roleBox.textContent='مسؤول مخزون الأحبار';
+  }
+  const oldShow=window.showApp;
+  if(typeof oldShow==='function') window.showApp=function(){ const r=oldShow.apply(this,arguments); setTimeout(applyInkAccess,80); return r; };
+  const oldRender=window.renderAll;
+  if(typeof oldRender==='function') window.renderAll=function(){ const r=oldRender.apply(this,arguments); setTimeout(applyInkAccess,80); return r; };
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(applyInkAccess,700));
+  setTimeout(applyInkAccess,1200);
 })();
