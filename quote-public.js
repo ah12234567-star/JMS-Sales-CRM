@@ -6,8 +6,16 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const money=v=>Number(v||0).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const status=v=>({approved:'معتمد من الإدارة',sent:'مرسل للعميل',customer_approved:'معتمد من العميل'}[v]||'عرض سعر');
 function fail(message){card.innerHTML='<div class="state"><h2>تعذر فتح عرض السعر</h2><p>'+esc(message)+'</p><small>يرجى طلب رابط جديد من مندوب المبيعات.</small></div>'}
+async function ensureProduction(){
+ const state=document.querySelector('[data-production-state]');
+ try{
+  const response=await fetch('/api/quote-production',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,token})});
+  const body=await response.json();if(!response.ok)throw new Error(body.error||'conversion_failed');
+  if(state){state.textContent='✓ تم تحويل العرض تلقائياً إلى طلب تصنيع';state.classList.add('done')}
+ }catch(error){console.error(error);if(state)state.textContent='تم الاعتماد، وسيُعاد إرسال الطلب للتصنيع تلقائياً عند فتح الرابط.'}
+}
 function approvalBlock(q){
- if(q.status==='customer_approved')return '<div class="approved-box"><b>✓ تم اعتماد وتوقيع العرض</b><span>بواسطة '+esc(q.customer_signer_name||'العميل')+' · '+esc(q.customer_approved_at?new Date(q.customer_approved_at).toLocaleString('ar-SA'):'')+'</span></div>';
+ if(q.status==='customer_approved')return '<div class="approved-box"><b>✓ تم اعتماد وتوقيع العرض</b><span>بواسطة '+esc(q.customer_signer_name||'العميل')+' · '+esc(q.customer_approved_at?new Date(q.customer_approved_at).toLocaleString('ar-SA'):'')+'</span><span data-production-state>جاري إرسال الطلب إلى خط الإنتاج…</span></div>';
  return '<div class="next"><button type="button" id="openSignature">اعتماد وتوقيع العرض</button><p>بإتمام التوقيع فإنك توافق على مواصفات العرض وشروطه الموضحة أعلاه.</p></div>';
 }
 function render(q){const vat=Number(q.total_amount||0)*.15,grand=Number(q.total_amount||0)+vat;document.title='عرض سعر '+(q.quote_no||'')+' | JMS Factory';card.innerHTML=
@@ -17,6 +25,7 @@ function render(q){const vat=Number(q.total_amount||0)*.15,grand=Number(q.total_
 '<div class="total"><span>الإجمالي شامل الضريبة</span><b>'+money(grand)+' ريال</b></div>'+
 '<div class="terms"><b>شروط العرض</b><br>الدفع: '+esc(q.payment_terms||'-')+'<br>التسليم: '+esc(q.delivery_terms||'-')+'<br>الملاحظات: '+esc(q.notes||'لا توجد ملاحظات')+'</div>'+approvalBlock(q);
  document.getElementById('openSignature')?.addEventListener('click',openSignature);
+ if(q.status==='customer_approved')ensureProduction();
 }
 function openSignature(){
  const layer=document.createElement('div');layer.className='signature-layer';layer.innerHTML='<section class="signature-sheet"><div class="handle"></div><header><div><small>اعتماد عرض السعر</small><h2>التوقيع الرقمي</h2></div><button type="button" id="closeSignature">×</button></header><label>اسم الشخص المعتمد<input id="signerName" maxlength="100" autocomplete="name" placeholder="اكتب الاسم الكامل"></label><label>وقّع بإصبعك داخل المربع<div class="canvas-wrap"><canvas id="signatureCanvas"></canvas><span id="signHint">التوقيع هنا</span></div></label><div class="signature-actions"><button type="button" id="clearSignature">مسح التوقيع</button><button type="button" id="submitSignature">اعتماد العرض</button></div><p id="signatureMessage" role="status"></p></section>';
@@ -42,7 +51,7 @@ function openSignature(){
      const body=await response.json();
      if(!response.ok)throw new Error(body.error||'save_failed');
      close();card.querySelector('.pill').textContent='معتمد من العميل';
-     card.querySelector('.next').outerHTML='<div class="approved-box"><b>✓ تم اعتماد وتوقيع العرض بنجاح</b><span>بواسطة '+esc(name)+' · '+new Date(body.approvedAt||Date.now()).toLocaleString('ar-SA')+'</span></div>';
+     card.querySelector('.next').outerHTML='<div class="approved-box"><b>✓ تم اعتماد وتوقيع العرض بنجاح</b><span>بواسطة '+esc(name)+' · '+new Date(body.approvedAt||Date.now()).toLocaleString('ar-SA')+'</span><span data-production-state>جاري إرسال الطلب إلى خط الإنتاج…</span></div>';ensureProduction();
    }catch(error){console.error(error);msg.textContent='تعذر حفظ التوقيع. تأكد من الاتصال وحاول مرة أخرى.';this.disabled=false;this.textContent='اعتماد العرض'}
  };
 }
