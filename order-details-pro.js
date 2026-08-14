@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='2026-08-14-order-details-pro-4';
+  const VERSION='2026-08-14-order-details-pro-3';
   const database=()=>{try{return db}catch(_){return window.db||{}}};
   const activeUser=()=>{try{return currentUser}catch(_){return window.currentUser||null}};
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -70,7 +70,7 @@
       ${order.manager_approved_at?`<div class="jms-manager-approved"><b>✓ معتمد من المدير</b><span>${esc(order.manager_approved_by||'المدير')} · ${esc(String(order.manager_approved_at).replace('T',' ').slice(0,16))}</span></div>`:''}
       ${production?`<div class="jms-order-production-link"><div><span>مرتبط بأمر إنتاج</span><b>${esc(production.production_no||'أمر إنتاج')}</b><small>${esc(production.stage||order.production_stage||'قيد المتابعة')}</small></div><button type="button" onclick="closeModal();setTimeout(()=>openProductionOrder('${esc(production.id)}'),80)">فتح أمر الإنتاج</button></div>`:''}
       <div class="jms-order-file-section"><h3>مسار الطلب</h3><div class="jms-order-timeline">${dates.map(([label,date],index)=>`<div><i>${index+1}</i><span>${esc(label)}</span><b>${esc(String(date).replace('T',' ').slice(0,16))}</b></div>`).join('')||'<p>لا يوجد سجل زمني لهذا الطلب القديم.</p>'}</div></div>
-      <footer class="jms-order-file-actions"><button type="button" onclick="closeModal()">إغلاق</button>${manager()?`<button type="button" class="edit" onclick="jmsEditSalesOrder('${esc(order.id)}')">تعديل البيانات</button>`:''}${manager()&&!production&&order.source==='customer_approved_quote'&&order.manager_approval_required===true&&!order.manager_approved_at?`<button type="button" class="production" onclick="jmsApproveCustomerSignedOrder('${esc(order.id)}')">اعتماد المدير وإرسال للإنتاج</button>`:''}${manager()&&!production&&order.source!=='customer_approved_quote'&&typeof window.jms11aSendOrderToProduction==='function'?`<button type="button" class="production" onclick="closeModal();setTimeout(()=>jms11aSendOrderToProduction('${esc(order.id)}'),80)">إرسال للإنتاج</button>`:''}</footer>
+      <footer class="jms-order-file-actions"><button type="button" onclick="closeModal()">إغلاق</button>${manager()?`<button type="button" class="edit" onclick="jmsEditSalesOrder('${esc(order.id)}')">تعديل البيانات</button>`:''}${manager()&&!production&&order.source==='customer_approved_quote'&&!order.manager_approved_at?`<button type="button" class="production" onclick="jmsApproveCustomerSignedOrder('${esc(order.id)}')">اعتماد المدير وإرسال للإنتاج</button>`:''}${manager()&&!production&&order.source!=='customer_approved_quote'&&typeof window.jms11aSendOrderToProduction==='function'?`<button type="button" class="production" onclick="closeModal();setTimeout(()=>jms11aSendOrderToProduction('${esc(order.id)}'),80)">إرسال للإنتاج</button>`:''}</footer>
     </section>`;
     modal.classList.remove('hidden');modal.scrollTop=0;body.scrollTop=0;
     requestAnimationFrame(()=>modal.querySelector('.modal-card')?.scrollTo({top:0,behavior:'auto'}));
