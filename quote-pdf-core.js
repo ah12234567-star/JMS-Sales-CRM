@@ -69,6 +69,11 @@
       customerBox.classList.add('jms-customer-signed');
       customerBox.innerHTML='<b>اعتماد العميل ✓</b><img src="'+String(quote.customer_signature)+'" alt="توقيع العميل"><strong>'+esc(quote.customer_signer_name||'العميل')+'</strong><small>'+esc(approvedAt(quote.customer_approved_at))+'</small>';
     }
+    const companyBox=approval?.querySelectorAll('.quote-a4-sign')?.[1];
+    if(companyBox&&quote.manager_approved_at){
+      companyBox.classList.add('jms-company-approved');
+      companyBox.innerHTML='<b>اعتماد الشركة ✓</b><i>✓</i><strong>'+esc(quote.manager_approved_by||'مدير النظام')+'</strong><small>'+esc(approvedAt(quote.manager_approved_at))+'</small><em>تم الاعتماد والإرسال للإنتاج</em>';
+    }
     const statusCard=Array.from(documentBox.querySelectorAll('.quote-a4-card p')).find(function(p){return p.textContent.includes('الحالة:')});
     if(statusCard)statusCard.innerHTML=statusCard.innerHTML.replace(/(<b>الحالة:<\/b>)\s*[^<]*/,'$1 <span class="jms-approved-status">معتمد من العميل ✓</span><br>');
   }
@@ -145,5 +150,5 @@
   }
   function boot(){style();wrapQuoteViewer();setTimeout(wrapQuoteViewer,900)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.JMS_QUOTE_PDF_CORE='2026-08-14-v4';
+  window.JMS_QUOTE_PDF_CORE='2026-08-14-v5';
 })();
