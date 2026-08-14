@@ -58,7 +58,11 @@
     @media(max-width:850px){#jmsGlobalSearch{top:auto;left:18px;bottom:86px;width:48px;height:48px}.jms-quick-menu{left:18px;bottom:18px}.jms-quick-menu>button{width:54px;height:54px}.jms-connection{top:calc(env(safe-area-inset-top) + 12px);left:50%;transform:translate(-50%,-6px)}.jms-connection.visible{transform:translate(-50%,0)}.jms-command{padding:8vh 12px}.jms-command-card{border-radius:20px}#jmsProToasts{top:calc(env(safe-area-inset-top) + 12px);right:12px;left:12px}.jms-pro-toast{min-width:0;max-width:none;width:100%}}
   `;document.head.appendChild(style);
   installShell();window.addEventListener('online',updateConnection);window.addEventListener('offline',updateConnection);document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch();}if(e.key==='Escape')closeSearch();});
-  new MutationObserver(()=>{document.getElementById('jmsProShell')?.classList.toggle('hidden',!visible());applyLaunchRoute();improveModal();}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class'],childList:true});
+  const refreshExperience=()=>{document.getElementById('jmsProShell')?.classList.toggle('hidden',!visible());applyLaunchRoute();improveModal();};
+  const appView=document.getElementById('appView'),modal=document.getElementById('modal');
+  if(appView)new MutationObserver(refreshExperience).observe(appView,{attributes:true,attributeFilter:['class']});
+  if(modal)new MutationObserver(refreshExperience).observe(modal,{attributes:true,attributeFilter:['class']});
+  document.addEventListener('click',()=>setTimeout(improveModal,30),true);
   document.getElementById('jmsProShell')?.classList.toggle('hidden',!visible());
   applyLaunchRoute();
   window.JMS_PROFESSIONAL_EXPERIENCE_VERSION=VERSION;
