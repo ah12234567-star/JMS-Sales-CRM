@@ -45,7 +45,8 @@
   function install() {
     injectStyle();
     applyAutomaticRoleUi();
-    new MutationObserver(applyAutomaticRoleUi).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+    const app=document.getElementById('appView');
+    if(app)new MutationObserver(applyAutomaticRoleUi).observe(app,{attributes:true,attributeFilter:['class']});
     document.getElementById('loginForm')?.addEventListener('submit', () => setTimeout(applyAutomaticRoleUi, 350));
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
