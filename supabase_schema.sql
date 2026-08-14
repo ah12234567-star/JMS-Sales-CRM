@@ -31,6 +31,12 @@ create table if not exists jms_collections (
   updated_at timestamptz default now()
 );
 
+create table if not exists jms_settings (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+
 alter table jms_customers enable row level security;
 alter table jms_quotes enable row level security;
 alter table jms_visits enable row level security;
