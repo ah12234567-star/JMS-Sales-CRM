@@ -229,8 +229,9 @@
       window[name] = wrapped;
     });
     scheduleEnhance();
-    const observer = new MutationObserver(scheduleEnhance);
-    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('click',event=>{
+      if(event.target.closest('[data-page="whatsappCampaigns"],#whatsappCampaigns button'))scheduleEnhance();
+    },true);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
