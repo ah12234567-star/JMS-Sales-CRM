@@ -55,15 +55,9 @@
       window.currentUser = user;
       setStatus('تم الدخول بنجاح', false);
 
-      if (typeof window.showApp === 'function') {
-        window.showApp();
-      } else {
-        var login = document.getElementById('loginView');
-        var app = document.getElementById('appView');
-        if (login) login.classList.add('hidden');
-        if (app) app.classList.remove('hidden');
-        location.reload();
-      }
+      // Reload so app.js initializes its private currentUser state from sessionStorage.
+      // Calling showApp directly here uses the old in-memory null user and immediately logs out.
+      location.replace('/?login-session=' + Date.now());
     } catch (error) {
       setStatus('تعذر الاتصال بخدمة الدخول. حاول مرة أخرى.', true);
     } finally {
