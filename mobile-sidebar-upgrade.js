@@ -70,6 +70,7 @@
   document.head.appendChild(style);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enhance);
   else enhance();
-  new MutationObserver(enhance).observe(document.documentElement, {childList:true, subtree:true});
+  setTimeout(enhance,500);
+  setTimeout(enhance,1800);
   window.JMS_MOBILE_SIDEBAR_VERSION = VERSION;
 })();
