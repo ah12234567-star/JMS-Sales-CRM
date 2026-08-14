@@ -19,19 +19,19 @@ export default async function handler(req,res){
   const existing=await one('jms_orders',orderId);
   const currentOrder=existing?.data||{};
   if(!existing){
-   const order={id:orderId,date:now.slice(0,10),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,print:q.print,width:q.width,length:q.length,size_unit:q.size_unit,thickness:q.thickness,thickness_unit:q.thickness_unit,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:String(q.total_amount||0)+' ريال',amount_value:Number(q.total_amount||0),status:'بانتظار اعتماد المدير',manager_approval_required:true,source:'customer_approved_quote',source_quote_id:q.id,source_quote_no:q.quote_no,customer_signer_name:q.customer_signer_name,customer_approved_at:q.customer_approved_at,notes:'تم الإنشاء تلقائياً من عرض السعر المعتمد '+(q.quote_no||'')};
+   const order={id:orderId,date:now.slice(0,10),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,print:q.print,width:q.width,length:q.length,size_unit:q.size_unit,thickness:q.thickness,thickness_unit:q.thickness_unit,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:String(q.total_amount||0)+' ريال',amount_value:Number(q.total_amount||0),status:'قيد الإنتاج',manager_approval_required:false,customer_approval_auto_routed:true,sent_to_production_at:now,source:'customer_approved_quote',source_quote_id:q.id,source_quote_no:q.quote_no,customer_signer_name:q.customer_signer_name,customer_approved_at:q.customer_approved_at,notes:'تم الإنشاء تلقائياً من عرض السعر المعتمد '+(q.quote_no||'')};
    const create=await fetch(SUPABASE_URL+'/rest/v1/jms_orders',{method:'POST',headers:headers({Prefer:'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:orderId,data:order,updated_at:now})});
    if(!create.ok){console.error('production order create failed',create.status,await create.text());return res.status(503).json({error:'order_create_failed'})}
-  }else if(!currentOrder.manager_approved_at&&currentOrder.status!=='بانتظار اعتماد المدير'){
-   const pending={...currentOrder,status:'بانتظار اعتماد المدير',manager_approval_required:true};
-   const reset=await fetch(SUPABASE_URL+'/rest/v1/jms_orders?id=eq.'+encodeURIComponent(orderId),{method:'PATCH',headers:headers({Prefer:'return=minimal'}),body:JSON.stringify({data:pending,updated_at:now})});
-   if(!reset.ok)return res.status(503).json({error:'order_status_update_failed'});
+  }else if(currentOrder.source==='customer_approved_quote'&&(currentOrder.manager_approval_required||currentOrder.status==='بانتظار اعتماد المدير')){
+   const routed={...currentOrder,status:'قيد الإنتاج',manager_approval_required:false,customer_approval_auto_routed:true,sent_to_production_at:currentOrder.sent_to_production_at||now};
+   const updateOrder=await fetch(SUPABASE_URL+'/rest/v1/jms_orders?id=eq.'+encodeURIComponent(orderId),{method:'PATCH',headers:headers({Prefer:'return=minimal'}),body:JSON.stringify({data:routed,updated_at:now})});
+   if(!updateOrder.ok)return res.status(503).json({error:'order_status_update_failed'});
   }
   if(!q.converted_to_order||q.production_order_id!==orderId){
-   const next={...q,converted_to_order:true,converted_at:q.converted_at||now,production_order_id:orderId,production_status:'بانتظار اعتماد المدير'};
+   const next={...q,converted_to_order:true,converted_at:q.converted_at||now,production_order_id:orderId,production_status:'قيد الإنتاج'};
    const update=await fetch(SUPABASE_URL+'/rest/v1/jms_quotes?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:headers({Prefer:'return=minimal'}),body:JSON.stringify({data:next,updated_at:now})});
    if(!update.ok)return res.status(503).json({error:'quote_update_failed'});
   }
-  return res.status(200).json({ok:true,orderId,created:!existing});
+  return res.status(200).json({ok:true,orderId,created:!existing,status:'قيد الإنتاج'});
  }catch(error){console.error('quote production conversion failed',error);return res.status(500).json({error:'internal_error'})}
 }
