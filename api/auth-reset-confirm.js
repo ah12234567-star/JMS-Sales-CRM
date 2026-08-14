@@ -27,8 +27,8 @@ export default async function handler(req, res){
     const phone = normalizePhone(body.phone);
     const code = String(body.code || '').replace(/\D/g,'');
     const newPassword = String(body.newPassword || '');
-    if((!email && !phone) || code.length !== 6 || newPassword.length < 8){
-      return json(res,400,{ok:false,error:'invalid_input',message:'أدخل الرمز وكلمة مرور من 8 خانات على الأقل'});
+    if((!email && !phone) || code.length !== 6 || newPassword.length < 10){
+      return json(res,400,{ok:false,error:'invalid_input',message:'أدخل الرمز وكلمة مرور من 10 خانات على الأقل'});
     }
     const row = await findUser(email,phone);
     const data = row?.data || {};
