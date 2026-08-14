@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v6';
+const CACHE_NAME='jms-crm-app-v7';
 const SHELL=['/','/index.html','/style.css','/manifest.json','/assets/jms-icon-192.png','/assets/jms-icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).catch(()=>{}));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)))));self.clients.claim()});
