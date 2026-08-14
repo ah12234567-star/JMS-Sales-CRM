@@ -150,9 +150,12 @@
 
   function install() {
     render();
-    const observer = new MutationObserver(() => requestAnimationFrame(render));
-    observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
-    setInterval(render, 2500);
+    document.addEventListener('click',event=>{
+      if(event.target.closest('.nav[data-page="dashboard"],#jmsCommandCenter button'))setTimeout(render,60);
+    },true);
+    window.addEventListener('focus',render);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+    document.addEventListener('jms:data-synced',render);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
