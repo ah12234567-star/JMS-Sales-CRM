@@ -23,7 +23,8 @@
     for(let index=0;index<text.length;index++){hash^=text.charCodeAt(index);hash=Math.imul(hash,16777619)}
     return (hash>>>0).toString(16).toUpperCase().padStart(8,'0');
   }
-  function qrPayload(quote){
+  async function qrPayload(quote){
+    if(typeof window.jmsGetQuotePublicUrl==='function')return window.jmsGetQuotePublicUrl(quote);
     const query=new URLSearchParams({quote:String(quote?.quote_no||quote?.id||''),date:String(quote?.date||''),total:String(quote?.total_amount||''),ref:fingerprint(quote)});
     return location.origin+'/?verifyQuote='+encodeURIComponent(query.toString());
   }
@@ -39,7 +40,8 @@
     try{
       await loadQr();
       const canvas=wrapper.querySelector('.jms-quote-qr-canvas');
-      new window.QRCode(canvas,{text:qrPayload(quote),width:86,height:86,colorDark:'#111827',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
+      const payload=await qrPayload(quote);
+      new window.QRCode(canvas,{text:payload,width:86,height:86,colorDark:'#111827',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
     }catch(error){
       wrapper.querySelector('.jms-quote-qr-canvas').textContent='JMS';
       console.warn('JMS QR unavailable',error);
@@ -116,5 +118,5 @@
   }
   function boot(){style();wrapQuoteViewer();setTimeout(wrapQuoteViewer,900)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.JMS_QUOTE_PDF_CORE='2026-08-14-v2';
+  window.JMS_QUOTE_PDF_CORE='2026-08-14-v3';
 })();
