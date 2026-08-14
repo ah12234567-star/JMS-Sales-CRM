@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '2026-08-14-mobile-quote-pdf-13';
+  const VERSION = '2026-08-14-mobile-quote-pdf-14';
   let pdfEnginePromise;
   function loadScriptOnce(src,test){
     if(test())return Promise.resolve();
@@ -73,7 +73,7 @@
   async function shareQuotePdf(qid) {
     const quote = (window.db?.quotes || (typeof db !== 'undefined' ? db.quotes : []) || []).find(item => String(item.id) === String(qid));
     if (!quote) return alert('لم يتم العثور على عرض السعر.');
-    if (!['approved','sent','accepted','customer_approved'].includes(quote.status)) return alert('اعتمد عرض السعر أولاً قبل إرساله للعميل.');
+    if (!['approved','sent','accepted','customer_approved','manager_approved'].includes(quote.status)) return alert('اعتمد عرض السعر أولاً قبل إرساله للعميل.');
     if (typeof window.html2pdf !== 'function') return alert('جاري تحميل أداة PDF. انتظر لحظة ثم حاول مرة أخرى.');
 
     const existing = document.querySelector('.quote-print-shell .quote-a4, #modalBody .quote-a4');
