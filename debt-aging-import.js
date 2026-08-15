@@ -1,148 +1,24 @@
 (function(){
 'use strict';
-const VERSION='2026-08-15-debt-aging-import-1';
-
+const VERSION='2026-08-15-debt-aging-import-2';
 function getStore(){ try{return (typeof db!=='undefined'?db:window.db)||{};}catch(_){return window.db||{};} }
 function getUser(){ return window.currentUser || (typeof currentUser!=='undefined'?currentUser:null); }
 function canUse(){ const u=getUser(); return !!u && ['admin','sales'].includes(u.role); }
-function norm(v){
-  return String(v??'').trim().toLowerCase()
-    .replace(/[\u064B-\u065F\u0670]/g,'')
-    .replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
-    .replace(/[^\p{L}\p{N}]+/gu,' ')
-    .replace(/\s+/g,' ').trim();
-}
+function norm(v){return String(v??'').trim().toLowerCase().replace(/[\u064B-\u065F\u0670]/g,'').replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();}
 function num(v){ const n=Number(String(v??0).replace(/,/g,'')); return Number.isFinite(n)?n:0; }
 function money(v){ return Number(v||0).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-
-function injectButton(){
-  if(!canUse() || document.getElementById('jmsDebtAgingImportBtn')) return;
-  const page=document.getElementById('customers');
-  if(!page) return;
-  const head=page.querySelector('.page-head');
-  if(!head) return;
-  let actions=head.querySelector('.head-actions');
-  if(!actions){ actions=document.createElement('div'); actions.className='head-actions'; head.appendChild(actions); }
-  const btn=document.createElement('button');
-  btn.id='jmsDebtAgingImportBtn'; btn.type='button'; btn.className='primary secondary';
-  btn.textContent='استيراد أعمار الديون';
-  btn.onclick=()=>document.getElementById('jmsDebtAgingFileInput')?.click();
-  actions.appendChild(btn);
-
-  const input=document.createElement('input');
-  input.id='jmsDebtAgingFileInput'; input.type='file'; input.accept='.xls,.xlsx'; input.style.display='none';
-  input.onchange=async()=>{ const file=input.files?.[0]; input.value=''; if(file) await processFile(file); };
-  document.body.appendChild(input);
-}
-
-function findHeader(rows){
-  for(let i=0;i<Math.min(rows.length,20);i++){
-    const r=(rows[i]||[]).map(x=>norm(x));
-    if(r.includes('الرمز') && r.includes('الاسم') && r.includes('مندوب الحساب') && r.includes('الرصيد')) return i;
-  }
-  return -1;
-}
-function idx(headers,label){ return headers.findIndex(x=>norm(x)===norm(label)); }
-
-function buildPreview(rows){
-  const headerRow=findHeader(rows);
-  if(headerRow<0) throw new Error('لم أجد عناوين أعمار الديون المطلوبة: الرمز، الاسم، مندوب الحساب، الرصيد');
-  const headers=rows[headerRow]||[];
-  const ix={code:idx(headers,'الرمز'),name:idx(headers,'الاسم'),rep:idx(headers,'مندوب الحساب'),d30:idx(headers,'30 يوم'),d60:idx(headers,'60 يوم'),d90:idx(headers,'90 يوم'),d120:idx(headers,'120 يوم'),d150:idx(headers,'150 يوم'),over150:idx(headers,'فوق 150 يوم'),balance:idx(headers,'الرصيد')};
-  const store=getStore(); const reps=store.reps||[]; const customers=store.customers||[];
-  const yaser=reps.find(r=>norm(r.name).includes('ياسر الحسني')) || reps.find(r=>norm(r.name).includes('ياسر'));
-  const yaserId=yaser?.id || '';
-  const pool=yaserId?customers.filter(c=>String(c.rep_id||'')===String(yaserId)):customers;
-  const codeMap=new Map(); const nameMap=new Map();
-  for(const c of pool){
-    for(const key of ['account_code','customer_code','code','erp_code']){ if(c?.[key]) codeMap.set(String(c[key]).trim(),c); }
-    const n=norm(c.name); if(n){ if(!nameMap.has(n)) nameMap.set(n,[]); nameMap.get(n).push(c); }
-  }
-  const matched=[],unmatched=[];
-  for(let r=headerRow+1;r<rows.length;r++){
-    const row=rows[r]||[]; const repName=String(row[ix.rep]??'').trim(); const name=String(row[ix.name]??'').trim(); const code=String(row[ix.code]??'').trim();
-    if(!name || !norm(repName).includes('ياسر')) continue;
-    const sourceBalance=num(row[ix.balance]);
-    let customer=code?codeMap.get(code):null; let matchType=customer?'code':'';
-    if(!customer){ const arr=nameMap.get(norm(name))||[]; if(arr.length===1){customer=arr[0];matchType='name';} }
-    const item={row:r+1,code,name,repName,sourceBalance,matchType,customer,
-      aging:{d30:num(row[ix.d30]),d60:num(row[ix.d60]),d90:num(row[ix.d90]),d120:num(row[ix.d120]),d150:num(row[ix.d150]),over150:num(row[ix.over150])}};
-    if(customer) matched.push(item); else unmatched.push(item);
-  }
-  return {matched,unmatched,yaserId};
-}
-
-function calculate(item){
-  const b=item.sourceBalance;
-  if(b<0) return {debt_balance:b,advance_balance:Math.abs(b),account_balance_type:'advance',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0}};
-  if(b>0 && b<500) return {debt_balance:0,advance_balance:0,account_balance_type:'zeroed_small',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0}};
-  return {debt_balance:b,advance_balance:0,account_balance_type:b>0?'debt':'clear',aging:item.aging};
-}
-
-async function applyPreview(preview){
-  const store=getStore(); let zeroed=0,advances=0,debts=0;
-  for(const item of preview.matched){
-    const c=item.customer; const calc=calculate(item);
-    c.account_code=item.code || c.account_code || '';
-    c.debt_balance=calc.debt_balance;
-    c.advance_balance=calc.advance_balance;
-    c.account_balance_type=calc.account_balance_type;
-    c.aging_30=calc.aging.d30; c.aging_60=calc.aging.d60; c.aging_90=calc.aging.d90;
-    c.aging_120=calc.aging.d120; c.aging_150=calc.aging.d150; c.aging_over_150=calc.aging.over150;
-    c.debt_aging_updated_at=new Date().toISOString(); c.debt_aging_source='excel';
-    if(calc.account_balance_type==='zeroed_small')zeroed++; else if(calc.account_balance_type==='advance')advances++; else if(calc.account_balance_type==='debt')debts++;
-  }
-  if(typeof save==='function') save();
-  if(typeof window.pushCloudData==='function') await window.pushCloudData();
-  if(typeof renderAll==='function') renderAll();
-  return {zeroed,advances,debts};
-}
-
-function showPreview(preview){
-  const matched=preview.matched; const unmatched=preview.unmatched;
-  const zeroed=matched.filter(x=>x.sourceBalance>0&&x.sourceBalance<500);
-  const advances=matched.filter(x=>x.sourceBalance<0);
-  const debts=matched.filter(x=>x.sourceBalance>=500);
-  const totalAdv=advances.reduce((s,x)=>s+Math.abs(x.sourceBalance),0);
-  const totalDebt=debts.reduce((s,x)=>s+x.sourceBalance,0);
-  const unmatchedHtml=unmatched.slice(0,12).map(x=>`<li>${escapeHtml(x.code)} — ${escapeHtml(x.name)}</li>`).join('');
-  const html=`<h2>مراجعة استيراد أعمار الديون</h2>
-  <div class="panel" style="margin:12px 0"><b>المندوب: ياسر</b><br>
-  مطابق: <b>${matched.length}</b> عميل · غير مطابق: <b>${unmatched.length}</b><br>
-  سيتم تصفير: <b>${zeroed.length}</b> عميل أقل من 500 ريال<br>
-  دفعات مقدمة: <b>${advances.length}</b> عميل بإجمالي ${money(totalAdv)} ريال<br>
-  ديون 500 فأكثر: <b>${debts.length}</b> عميل بإجمالي ${money(totalDebt)} ريال</div>
-  ${unmatched.length?`<div class="panel"><b>لن يتم تعديل العملاء غير المطابقين:</b><ul style="max-height:180px;overflow:auto">${unmatchedHtml}</ul>${unmatched.length>12?`<small>و ${unmatched.length-12} عميل إضافي</small>`:''}</div>`:''}
-  <p class="muted">لن يتم إنشاء عملاء جدد. الرصيد السالب سيُحفظ كدفعة مقدمة، والرصيد الموجب الأقل من 500 سيصبح صفراً.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="jmsApplyDebtAging" class="primary">اعتماد التحديث</button><button onclick="closeModal()">إلغاء</button></div>`;
-  if(window.modalBody && window.modal){ modalBody.innerHTML=html; modal.classList.remove('hidden'); }
-  else { if(!confirm(`مطابق ${matched.length}، غير مطابق ${unmatched.length}. اعتماد التحديث؟`)) return; applyAndNotify(preview); return; }
-  setTimeout(()=>{ const b=document.getElementById('jmsApplyDebtAging'); if(b)b.onclick=()=>applyAndNotify(preview); },0);
-}
-function escapeHtml(v){ return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-async function applyAndNotify(preview){
-  const btn=document.getElementById('jmsApplyDebtAging'); if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...';}
-  try{
-    const out=await applyPreview(preview);
-    if(typeof closeModal==='function') closeModal();
-    alert(`تم تحديث أعمار الديون بنجاح\nتم تصفير: ${out.zeroed}\nدفعات مقدمة: ${out.advances}\nديون 500 فأكثر: ${out.debts}`);
-  }catch(error){ console.error('Debt aging import failed',error); alert('تعذر حفظ تحديث أعمار الديون. لم يكتمل التحديث السحابي.'); if(btn){btn.disabled=false;btn.textContent='اعتماد التحديث';} }
-}
-
-async function processFile(file){
-  if(!canUse()) return alert('هذه الميزة متاحة للمدير فقط');
-  if(!window.XLSX) return alert('مكتبة Excel غير محملة في النظام');
-  try{
-    const buf=await file.arrayBuffer(); const book=XLSX.read(buf,{type:'array'}); const sheet=book.Sheets[book.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
-    const preview=buildPreview(rows);
-    if(!preview.matched.length) return alert('لم أجد عملاء مطابقين لياسر. لم يتم تعديل أي بيانات.');
-    showPreview(preview);
-  }catch(error){ console.error(error); alert(error?.message||'تعذر قراءة ملف أعمار الديون'); }
-}
-
-const observer=new MutationObserver(()=>injectButton());
-observer.observe(document.documentElement,{childList:true,subtree:true});
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectButton);else injectButton();
-window.jmsDebtAgingImport={version:VERSION,processFile};
+function injectButton(){if(!canUse()||document.getElementById('jmsDebtAgingImportBtn'))return;const page=document.getElementById('customers');if(!page)return;const head=page.querySelector('.page-head');if(!head)return;let actions=head.querySelector('.head-actions');if(!actions){actions=document.createElement('div');actions.className='head-actions';head.appendChild(actions)}const btn=document.createElement('button');btn.id='jmsDebtAgingImportBtn';btn.type='button';btn.className='primary secondary';btn.textContent='استيراد أعمار الديون';btn.onclick=()=>document.getElementById('jmsDebtAgingFileInput')?.click();actions.appendChild(btn);const input=document.createElement('input');input.id='jmsDebtAgingFileInput';input.type='file';input.accept='.xls,.xlsx';input.style.display='none';input.onchange=async()=>{const file=input.files?.[0];input.value='';if(file)await processFile(file)};document.body.appendChild(input)}
+function findHeader(rows){for(let i=0;i<Math.min(rows.length,20);i++){const r=(rows[i]||[]).map(x=>norm(x));if(r.includes('الرمز')&&r.includes('الاسم')&&r.includes('مندوب الحساب')&&r.includes('الرصيد'))return i}return -1}
+function idx(headers,label){return headers.findIndex(x=>norm(x)===norm(label))}
+function buildPreview(rows){const headerRow=findHeader(rows);if(headerRow<0)throw new Error('لم أجد عناوين أعمار الديون المطلوبة: الرمز، الاسم، مندوب الحساب، الرصيد');const headers=rows[headerRow]||[];const ix={code:idx(headers,'الرمز'),name:idx(headers,'الاسم'),rep:idx(headers,'مندوب الحساب'),d30:idx(headers,'30 يوم'),d60:idx(headers,'60 يوم'),d90:idx(headers,'90 يوم'),d120:idx(headers,'120 يوم'),d150:idx(headers,'150 يوم'),over150:idx(headers,'فوق 150 يوم'),balance:idx(headers,'الرصيد')};const store=getStore(),reps=store.reps||[],customers=store.customers||[];const yaser=reps.find(r=>norm(r.name).includes('ياسر الحسني'))||reps.find(r=>norm(r.name).includes('ياسر'));const yaserId=yaser?.id||'';const pool=yaserId?customers.filter(c=>String(c.rep_id||'')===String(yaserId)):customers;const codeMap=new Map(),nameMap=new Map();for(const c of pool){for(const key of ['account_code','customer_code','code','erp_code'])if(c?.[key])codeMap.set(String(c[key]).trim(),c);const n=norm(c.name);if(n){if(!nameMap.has(n))nameMap.set(n,[]);nameMap.get(n).push(c)}}const matched=[],unmatched=[];for(let r=headerRow+1;r<rows.length;r++){const row=rows[r]||[],repName=String(row[ix.rep]??'').trim(),name=String(row[ix.name]??'').trim(),code=String(row[ix.code]??'').trim();if(!name||!norm(repName).includes('ياسر'))continue;const sourceBalance=num(row[ix.balance]);let customer=code?codeMap.get(code):null,matchType=customer?'code':'';if(!customer){const arr=nameMap.get(norm(name))||[];if(arr.length===1){customer=arr[0];matchType='name'}}const item={row:r+1,code,name,repName,sourceBalance,matchType,customer,aging:{d30:num(row[ix.d30]),d60:num(row[ix.d60]),d90:num(row[ix.d90]),d120:num(row[ix.d120]),d150:num(row[ix.d150]),over150:num(row[ix.over150])}};(customer?matched:unmatched).push(item)}return{matched,unmatched,yaserId}}
+function ageMeta(aging){if(num(aging.over150)>0)return{code:'over150',label:'أكثر من 150 يوم',overdue:true};if(num(aging.d150)>0)return{code:'121_150',label:'121–150 يوم',overdue:true};if(num(aging.d120)>0)return{code:'91_120',label:'91–120 يوم',overdue:true};if(num(aging.d90)>0)return{code:'61_90',label:'61–90 يوم',overdue:true};if(num(aging.d60)>0)return{code:'31_60',label:'31–60 يوم',overdue:true};if(num(aging.d30)>0)return{code:'0_30',label:'حتى 30 يوم',overdue:false};return{code:'none',label:'بدون مديونية',overdue:false}}
+function calculate(item){const b=item.sourceBalance;if(b<0)return{debt_balance:b,advance_balance:Math.abs(b),account_balance_type:'advance',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0},age:{code:'advance',label:'دفعة مقدمة',overdue:false}};if(b>0&&b<500)return{debt_balance:0,advance_balance:0,account_balance_type:'zeroed_small',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0},age:{code:'zero',label:'صفر',overdue:false}};const age=ageMeta(item.aging);return{debt_balance:b,advance_balance:0,account_balance_type:b>0?'debt':'clear',aging:item.aging,age}}
+async function applyPreview(preview){let zeroed=0,advances=0,debts=0;for(const item of preview.matched){const c=item.customer,calc=calculate(item);c.account_code=item.code||c.account_code||'';c.debt_balance=calc.debt_balance;c.advance_balance=calc.advance_balance;c.account_balance_type=calc.account_balance_type;c.aging_30=calc.aging.d30;c.aging_60=calc.aging.d60;c.aging_90=calc.aging.d90;c.aging_120=calc.aging.d120;c.aging_150=calc.aging.d150;c.aging_over_150=calc.aging.over150;c.debt_age_bucket=calc.age.code;c.debt_age_label=calc.age.label;c.debt_overdue=!!calc.age.overdue;c.debt_aging_updated_at=new Date().toISOString();c.debt_aging_source='excel';if(calc.account_balance_type==='zeroed_small')zeroed++;else if(calc.account_balance_type==='advance')advances++;else if(calc.account_balance_type==='debt')debts++}if(typeof save==='function')save();if(typeof window.pushCloudData==='function')await window.pushCloudData();if(typeof renderAll==='function')renderAll();decorateCards();return{zeroed,advances,debts}}
+function customerForCard(card){const id=card?.dataset?.customerId||'';if(id)return(getStore().customers||[]).find(c=>String(c.id)===String(id));const text=norm(card?.textContent||'');return(getStore().customers||[]).find(c=>text.includes(norm(c.name||'')))}
+function decorateCards(){document.querySelectorAll('#customersGrid .customer-card').forEach(card=>{card.querySelector('.jms-debt-age-badge')?.remove();const c=customerForCard(card);if(!c||!c.debt_age_label)return;const badge=document.createElement('div');badge.className='jms-debt-age-badge '+(c.account_balance_type==='advance'?'advance':c.debt_overdue?'overdue':'current');let extra='';if(c.account_balance_type==='advance')extra=`رصيد دائن ${money(Math.abs(c.debt_balance||0))} ريال`;else if(Number(c.debt_balance||0)>0)extra=`${money(c.debt_balance)} ريال`;else extra='لا توجد مديونية';badge.innerHTML=`<b>${c.debt_age_label}</b><small>${extra}</small>`;const actions=card.querySelector('.jms-customer-actions-v3');if(actions)card.insertBefore(badge,actions);else card.appendChild(badge)})}
+function injectStyle(){if(document.getElementById('jmsDebtAgeStyle'))return;const s=document.createElement('style');s.id='jmsDebtAgeStyle';s.textContent='.jms-debt-age-badge{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px;padding:9px 11px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc}.jms-debt-age-badge b{font-size:12px}.jms-debt-age-badge small{font-size:11px;color:#475569}.jms-debt-age-badge.overdue{background:#fff1f2;border-color:#fecdd3;color:#be123c}.jms-debt-age-badge.current{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.jms-debt-age-badge.advance{background:#ecfdf5;border-color:#a7f3d0;color:#047857}';document.head.appendChild(s)}
+function showPreview(preview){const matched=preview.matched,unmatched=preview.unmatched,zeroed=matched.filter(x=>x.sourceBalance>0&&x.sourceBalance<500),advances=matched.filter(x=>x.sourceBalance<0),debts=matched.filter(x=>x.sourceBalance>=500),totalAdv=advances.reduce((s,x)=>s+Math.abs(x.sourceBalance),0),totalDebt=debts.reduce((s,x)=>s+x.sourceBalance,0);const buckets={d30:0,d60:0,d90:0,d120:0,d150:0,over150:0};debts.forEach(x=>{const m=ageMeta(x.aging);if(m.code==='0_30')buckets.d30++;else if(m.code==='31_60')buckets.d60++;else if(m.code==='61_90')buckets.d90++;else if(m.code==='91_120')buckets.d120++;else if(m.code==='121_150')buckets.d150++;else if(m.code==='over150')buckets.over150++});const html=`<h2>مراجعة استيراد أعمار الديون</h2><div class="panel" style="margin:12px 0"><b>المندوب: ياسر</b><br>مطابق: <b>${matched.length}</b> · غير مطابق: <b>${unmatched.length}</b><br>تصفير أقل من 500: <b>${zeroed.length}</b><br>دفعات مقدمة: <b>${advances.length}</b> بإجمالي ${money(totalAdv)} ريال<br>ديون 500 فأكثر: <b>${debts.length}</b> بإجمالي ${money(totalDebt)} ريال<hr>حتى 30 يوم: <b>${buckets.d30}</b> · 31–60: <b>${buckets.d60}</b> · 61–90: <b>${buckets.d90}</b> · 91–120: <b>${buckets.d120}</b> · 121–150: <b>${buckets.d150}</b> · أكثر من 150: <b>${buckets.over150}</b></div><p class="muted">سيظهر أقدم عمر مديونية على بطاقة كل عميل، وأي عمر فوق 30 يوم سيظهر كمتأخر.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="jmsApplyDebtAging" class="primary">اعتماد التحديث</button><button onclick="closeModal()">إلغاء</button></div>`;if(window.modalBody&&window.modal){modalBody.innerHTML=html;modal.classList.remove('hidden');setTimeout(()=>{const b=document.getElementById('jmsApplyDebtAging');if(b)b.onclick=()=>applyAndNotify(preview)},0)}else if(confirm(`مطابق ${matched.length}. اعتماد التحديث؟`))applyAndNotify(preview)}
+async function applyAndNotify(preview){const btn=document.getElementById('jmsApplyDebtAging');if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...'}try{const out=await applyPreview(preview);if(typeof closeModal==='function')closeModal();alert(`تم تحديث أعمار الديون بنجاح\nتم تصفير: ${out.zeroed}\nدفعات مقدمة: ${out.advances}\nديون 500 فأكثر: ${out.debts}`)}catch(error){console.error(error);alert('تعذر حفظ تحديث أعمار الديون. لم يكتمل التحديث السحابي.');if(btn){btn.disabled=false;btn.textContent='اعتماد التحديث'}}}
+async function processFile(file){if(!canUse())return alert('هذه الميزة متاحة للمدير فقط');if(!window.XLSX)return alert('مكتبة Excel غير محملة في النظام');try{const buf=await file.arrayBuffer(),book=XLSX.read(buf,{type:'array'}),sheet=book.Sheets[book.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''}),preview=buildPreview(rows);if(!preview.matched.length)return alert('لم أجد عملاء مطابقين لياسر. لم يتم تعديل أي بيانات.');showPreview(preview)}catch(error){console.error(error);alert(error?.message||'تعذر قراءة ملف أعمار الديون')}}
+injectStyle();const observer=new MutationObserver(()=>{injectButton();decorateCards()});observer.observe(document.documentElement,{childList:true,subtree:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{injectButton();decorateCards()});else{injectButton();decorateCards()}window.jmsDebtAgingImport={version:VERSION,processFile,decorateCards};
 })();
