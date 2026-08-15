@@ -81,6 +81,44 @@
     },0);
   };
 
+  // Persist permission edits through the API route that already supports user updates.
+  // This replaces the older save path that posted to a non-existent auth-update-user route.
+  window.saveUserPermissions=async function(userId){
+    let store;
+    try{ store=(typeof db!=='undefined'?db:window.db)||{}; }catch(_){ store=window.db||{}; }
+    const u=(store.users||[]).find(x=>String(x.id)===String(userId));
+    if(!u) return alert('تعذر العثور على المستخدم');
+    const permissions={};
+    document.querySelectorAll('.jmsPerm').forEach(x=>permissions[x.dataset.perm]=!!x.checked);
+    const field=id=>document.getElementById(id);
+    const updated={
+      ...u,
+      name:(field('epName')?.value||u.name||'').trim(),
+      email:(field('epEmail')?.value||u.email||'').trim().toLowerCase(),
+      phone:(field('epPhone')?.value||u.phone||'').trim(),
+      role:field('epRole')?.value||u.role||'rep',
+      status:field('epStatus')?.value||u.status||'active',
+      permissions
+    };
+    try{
+      if(typeof jmsPostJson!=='function') throw new Error('missing_api_client');
+      await jmsPostJson('/api/auth-create-user',{
+        id:updated.id,name:updated.name,email:updated.email,phone:updated.phone,
+        role:updated.role,status:updated.status,permissions:updated.permissions
+      });
+      Object.assign(u,updated);
+      const rep=(store.reps||[]).find(r=>String(r.id)===String(u.id)||String(r.email||'')===String(u.email||''));
+      if(rep) Object.assign(rep,{name:u.name,email:u.email,phone:u.phone,status:u.status,permissions:u.permissions});
+      if(typeof save==='function') save();
+      if(typeof closeModal==='function') closeModal();
+      if(typeof renderAll==='function') renderAll();
+      alert('تم حفظ الصلاحيات بنجاح');
+    }catch(error){
+      console.error('JMS permission save failed',error);
+      alert('تعذر حفظ الصلاحيات على السيرفر. لم يتم تطبيق التغيير.');
+    }
+  };
+
   function applyInkAccess(){
     const u=getUser();
     if(!u) return;
@@ -121,7 +159,6 @@
   function installQuoteGuards(){
     if(window.__jmsQuoteCreateGuardsInstalled) return;
     window.__jmsQuoteCreateGuardsInstalled=true;
-
     const guard=(name)=>{
       const original=window[name];
       if(typeof original!=='function' || original.__jmsQuoteGuarded) return;
@@ -167,7 +204,6 @@
   setTimeout(applyInkAccess,900);
   window.addEventListener('load',()=>{
     setTimeout(()=>{
-      // Run after every later feature script has finished defining quote functions.
       window.__jmsQuoteCreateGuardsInstalled=false;
       installQuoteGuards();
       enhancePermissionForm();
