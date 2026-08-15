@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-automatic-role-login-v1';
+  const VERSION = '2026-08-automatic-role-login-v2';
   const labels = {
     admin: 'مدير النظام',
     sales: 'مدير المبيعات',
@@ -38,13 +38,8 @@
     document.head.appendChild(script);
   }
 
-  function loadDebtAgingImport() {
-    loadScript('jmsDebtAgingImportScript', '/debt-aging-import.js?v=20260815-3');
-  }
-
-  function loadRepLiveLocation() {
-    loadScript('jmsRepLiveLocationScript', '/rep-live-location.js?v=20260815-1');
-  }
+  function loadDebtAgingImport() { loadScript('jmsDebtAgingImportScript', '/debt-aging-import.js?v=20260815-3'); }
+  function loadRepLiveLocation() { loadScript('jmsRepLiveLocationScript', '/rep-live-location.js?v=20260815-4'); }
 
   function install() {
     injectStyle();
