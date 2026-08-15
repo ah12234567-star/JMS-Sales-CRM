@@ -42,9 +42,19 @@
     document.head.appendChild(style);
   }
 
+  function loadDebtAgingImport() {
+    if (document.getElementById('jmsDebtAgingImportScript')) return;
+    const script = document.createElement('script');
+    script.id = 'jmsDebtAgingImportScript';
+    script.src = '/debt-aging-import.js?v=20260815-1';
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
   function install() {
     injectStyle();
     applyAutomaticRoleUi();
+    loadDebtAgingImport();
     const app=document.getElementById('appView');
     if(app)new MutationObserver(applyAutomaticRoleUi).observe(app,{attributes:true,attributeFilter:['class']});
     document.getElementById('loginForm')?.addEventListener('submit', () => setTimeout(applyAutomaticRoleUi, 350));
