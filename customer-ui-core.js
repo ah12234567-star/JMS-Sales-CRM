@@ -13,6 +13,7 @@
   }
   function esc(value){return String(value||'').replace(/['\\]/g,'\\$&')}
   function customerById(id){return (database().customers||[]).find(function(customer){return String(customer.id)===String(id)})}
+  function isRepProCard(card){return window.currentUser?.role==='rep'&&card?.classList?.contains('rep-pro-card')}
 
   window.jmsStartQuoteForCustomer=function(id){
     const nav=document.querySelector('.nav[data-page="quotes"]');if(nav)nav.click();
@@ -26,6 +27,7 @@
   };
 
   function removeLegacyActions(card){
+    if(isRepProCard(card))return;
     card.querySelectorAll('.customer-actions,.customer-actions-clean,.field-upgrade-actions,.customer-more-menu').forEach(function(element){
       if(!element.classList.contains('jms-customer-actions-v3'))element.remove();
     });
@@ -40,6 +42,7 @@
   }
 
   function rebuildCard(card){
+    if(isRepProCard(card))return;
     const id=customerId(card);if(!id)return;
     card.dataset.customerId=id;
     const existing=card.querySelector('.jms-customer-actions-v3');
@@ -131,5 +134,5 @@
   }
   function install(){injectStyle();ensureSheet();rebuildCards();installObservers();document.addEventListener('keydown',function(event){if(event.key==='Escape')window.jmsCloseCustomerBottomSheet()})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  window.JMS_CUSTOMER_UI_CORE='2026-08-14-v4';
+  window.JMS_CUSTOMER_UI_CORE='2026-08-15-v5';
 })();
