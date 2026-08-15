@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-automatic-role-login-v1';
+  const VERSION = '2026-08-automatic-role-login-v2';
   const labels = {
     admin: 'مدير النظام',
     sales: 'مدير المبيعات',
@@ -46,7 +46,7 @@
     if (document.getElementById('jmsDebtAgingImportScript')) return;
     const script = document.createElement('script');
     script.id = 'jmsDebtAgingImportScript';
-    script.src = '/debt-aging-import.js?v=20260815-1';
+    script.src = '/debt-aging-import.js?v=20260815-3';
     script.defer = true;
     document.head.appendChild(script);
   }
