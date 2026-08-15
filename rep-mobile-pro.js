@@ -6,14 +6,9 @@
   let observer = null;
   let cleaning = false;
 
-  function isRep() {
-    return window.currentUser?.role === 'rep';
-  }
-
+  function isRep() { return window.currentUser?.role === 'rep'; }
   function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, char => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[char]);
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
   }
 
   function injectStyle() {
@@ -30,6 +25,7 @@
       .rep-pro-summary b{display:block;font-size:21px;color:#0f172a}.rep-pro-summary span{font-size:11px;color:#64748b}
       body.jms-rep-pro #customerSearch{height:50px;border-radius:16px;background:#fff;border:1px solid #dbe3ef;padding:0 16px;margin-bottom:12px;font-size:15px;box-shadow:0 7px 18px rgba(15,23,42,.04)}
       body.jms-rep-pro #customersGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+      body.jms-rep-pro #customersGrid>.customer-card:not(.rep-pro-card),body.jms-rep-pro #customersGrid>.route-item,body.jms-rep-pro #customersGrid>.customer-status-strip{display:none!important}
       .rep-pro-card{position:relative!important;overflow:hidden!important;background:#fff!important;border:1px solid #e2e8f0!important;border-radius:22px!important;padding:16px!important;margin:0!important;box-shadow:0 10px 28px rgba(15,23,42,.07)!important}
       .rep-pro-card:before{content:'';position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed)}
       .rep-pro-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-top:3px}
@@ -42,6 +38,8 @@
       .rep-pro-metric b{display:block;color:#0f172a;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rep-pro-metric span{display:block;color:#94a3b8;font-size:10px;margin-top:3px}
       .rep-pro-primary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       .rep-pro-primary button,.rep-pro-more summary,.rep-pro-more-grid button{min-height:44px;border:0;border-radius:13px;padding:10px;font:inherit;font-size:13px;font-weight:900;cursor:pointer}
+      .rep-pro-primary .jms-go-customer{grid-column:1/-1;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+      .rep-pro-primary .jms-go-customer.active{background:#dbeafe;color:#1e40af;border-color:#60a5fa}
       .rep-pro-primary .visit{background:#0f172a;color:#fff}.rep-pro-primary .order{background:#166534;color:#fff}.rep-pro-primary .meeting{background:#2563eb;color:#fff}.rep-pro-primary .profile{background:#ede9fe;color:#5b21b6}
       .rep-pro-more{margin-top:8px}.rep-pro-more summary{list-style:none;display:flex;align-items:center;justify-content:center;gap:8px;background:#f1f5f9;color:#334155}.rep-pro-more summary::-webkit-details-marker{display:none}.rep-pro-more summary:after{content:'⌄';font-size:16px}.rep-pro-more[open] summary:after{transform:rotate(180deg)}
       .rep-pro-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding-top:8px}.rep-pro-more-grid button{background:#fff;border:1px solid #dbe3ef;color:#334155}.rep-pro-more-grid button.danger{color:#b45309;background:#fff7ed;border-color:#fed7aa}
@@ -71,15 +69,14 @@
   function visitInfo(customer) {
     const date = typeof lastVisit === 'function' ? lastVisit(customer.id) : '';
     const days = typeof daysFrom === 'function' ? daysFrom(date) : 999;
-    if (!date) return { date: 'لم تتم', label: 'يحتاج زيارة', late: true };
-    if (days >= 30) return { date, label: `متأخر ${days} يوم`, late: true };
-    return { date, label: 'متابع', late: false };
+    if (!date) return { date:'لم تتم', label:'يحتاج زيارة', late:true };
+    if (days >= 30) return { date, label:`متأخر ${days} يوم`, late:true };
+    return { date, label:'متابع', late:false };
   }
 
   function renderSummary(list) {
-    const section = document.getElementById('customers');
     const search = document.getElementById('customerSearch');
-    if (!section || !search) return;
+    if (!search) return;
     let summary = document.getElementById('repProSummary');
     if (!summary) {
       summary = document.createElement('div');
@@ -99,28 +96,38 @@
     const phone = String(customer.phone || '').trim();
     const place = [customer.city || 'جدة', customer.district || customer.location].filter(Boolean).join(' · ');
     const code = customer.account_code ? ` · كود ${esc(customer.account_code)}` : '';
-    return `<article class="customer-card rep-pro-card" data-customer-id="${esc(customer.id)}">
-      <div class="rep-pro-head"><div class="rep-pro-title"><h3>${esc(customer.name)}</h3><p>${esc(place || 'جدة')}${code}${phone ? ` · ${esc(phone)}` : ''}</p></div><span class="rep-pro-status ${info.late?'':'ok'}">${esc(info.label)}</span></div>
+    const safeId = esc(customer.id), safeName = esc(customer.name);
+    return `<article class="customer-card rep-pro-card" data-customer-id="${safeId}">
+      <div class="rep-pro-head"><div class="rep-pro-title"><h3>${safeName}</h3><p>${esc(place || 'جدة')}${code}${phone ? ` · ${esc(phone)}` : ''}</p></div><span class="rep-pro-status ${info.late?'':'ok'}">${esc(info.label)}</span></div>
       <div class="rep-pro-metrics">
         <div class="rep-pro-metric"><b>${esc(info.date)}</b><span>آخر زيارة</span></div>
         <div class="rep-pro-metric"><b>${esc(customer.next_date || 'غير محدد')}</b><span>الموعد القادم</span></div>
         <div class="rep-pro-metric"><b>${debt ? esc(typeof money==='function' ? money(debt) : debt) : 'لا يوجد'}</b><span>المديونية</span></div>
       </div>
       <div class="rep-pro-primary">
-        <button class="visit" type="button" onclick="quickVisit('${esc(customer.id)}')">تسجيل زيارة</button>
-        <button class="order" type="button" onclick="openQuoteForm('${esc(customer.id)}')">طلب جديد</button>
-        <button class="meeting" type="button" onclick="appointment('${esc(customer.id)}')">تحديد موعد</button>
-        <button class="profile" type="button" onclick="jmsOpenCustomer360Growth('${esc(customer.id)}')">ملف العميل</button>
+        <button class="jms-go-customer" type="button" onclick="window.jmsRepGoToCustomer&&window.jmsRepGoToCustomer('${safeId}',this.closest('.rep-pro-card').querySelector('h3').textContent.trim())">🚗 متجه للعميل</button>
+        <button class="visit" type="button" onclick="quickVisit('${safeId}')">تسجيل زيارة</button>
+        <button class="order" type="button" onclick="openQuoteForm('${safeId}')">طلب جديد</button>
+        <button class="meeting" type="button" onclick="appointment('${safeId}')">تحديد موعد</button>
+        <button class="profile" type="button" onclick="jmsOpenCustomer360Growth('${safeId}')">ملف العميل</button>
       </div>
       <details class="rep-pro-more"><summary>المزيد من الأدوات</summary><div class="rep-pro-more-grid">
-        <button type="button" onclick="editCustomerPro('${esc(customer.id)}')">تعديل البيانات</button>
-        <button type="button" onclick="openCustomerNote('${esc(customer.id)}')">إضافة ملاحظة</button>
-        <button type="button" onclick="openCustomerMap('${esc(customer.id)}')">فتح الموقع</button>
-        <button class="danger" type="button" onclick="openCollection('${esc(customer.id)}')">تسجيل تحصيل</button>
-        ${phone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${esc(customer.id)}')">رسالة واتساب</button>` : ''}
-        <button type="button" onclick="openQuoteForm('${esc(customer.id)}')">إنشاء عرض سعر</button>
+        <button type="button" onclick="editCustomerPro('${safeId}')">تعديل البيانات</button>
+        <button type="button" onclick="openCustomerNote('${safeId}')">إضافة ملاحظة</button>
+        <button type="button" onclick="openCustomerMap('${safeId}')">فتح الموقع</button>
+        <button class="danger" type="button" onclick="openCollection('${safeId}')">تسجيل تحصيل</button>
+        ${phone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${safeId}')">رسالة واتساب</button>` : ''}
+        <button type="button" onclick="openQuoteForm('${safeId}')">إنشاء عرض سعر</button>
       </div></details>
     </article>`;
+  }
+
+  function removeStrayGridElements() {
+    const grid = document.getElementById('customersGrid');
+    if (!grid) return;
+    Array.from(grid.children).forEach(child => {
+      if (!child.matches('.rep-pro-card,.rep-pro-empty')) child.remove();
+    });
   }
 
   function renderRepCustomers() {
@@ -134,11 +141,13 @@
     cleaning = true;
     grid.innerHTML = list.map(card).join('') || '<div class="rep-pro-empty">لا يوجد عملاء مطابقون للبحث</div>';
     cleaning = false;
+    setTimeout(() => window.jmsRepLiveLocation?.refreshOwnState?.(), 0);
   }
 
   function cleanLegacyEnhancements() {
     if (!isRep() || cleaning) return;
     cleaning = true;
+    removeStrayGridElements();
     document.querySelectorAll('.rep-pro-card').forEach(cardEl => {
       Array.from(cardEl.children).forEach(child => {
         if (!child.matches('.rep-pro-head,.rep-pro-metrics,.rep-pro-primary,.rep-pro-more')) child.remove();
@@ -160,17 +169,15 @@
     renderRepCustomers();
     const grid = document.getElementById('customersGrid');
     if (grid && !observer) {
-      observer = new MutationObserver(() => setTimeout(cleanLegacyEnhancements, 0));
+      observer = new MutationObserver(() => {
+        clearTimeout(window.__jmsRepMobileCleanTimer);
+        window.__jmsRepMobileCleanTimer = setTimeout(cleanLegacyEnhancements, 40);
+      });
       observer.observe(grid, { childList:true, subtree:true });
     }
   }
 
   document.addEventListener('DOMContentLoaded', () => setTimeout(activate, 900));
-  window.addEventListener('load', () => {
-    setTimeout(activate, 1800);
-    setTimeout(activate, 4200);
-  });
-  document.addEventListener('click', event => {
-    if (event.target.closest('.nav[data-page="customers"]')) setTimeout(activate, 120);
-  });
+  window.addEventListener('load', () => { setTimeout(activate, 1800); setTimeout(activate, 4200); });
+  document.addEventListener('click', event => { if (event.target.closest('.nav[data-page="customers"]')) setTimeout(activate, 120); });
 })();
