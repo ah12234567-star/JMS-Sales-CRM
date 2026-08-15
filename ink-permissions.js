@@ -1,19 +1,24 @@
 (function(){
+  'use strict';
   const INK_PERMISSION='manage_ink';
-  const QUOTE_CREATE_PERMISSION='create_quotes';
+  const QUOTE_PERMISSION='manage_quotes';
 
   function getUser(){
     return window.currentUser || (typeof currentUser!=='undefined'?currentUser:null);
   }
 
-  function canCreateQuote(){
+  // Quotation creation now uses the EXISTING "إدارة عروض الأسعار" permission.
+  // Admin always has access. Sales managers keep access unless explicitly disabled.
+  // Representatives must have manage_quotes=true.
+  function canManageQuotes(){
     const u=getUser();
     if(!u) return false;
     if(u.role==='admin') return true;
-    if(u.role==='sales') return u.permissions?.[QUOTE_CREATE_PERMISSION] !== false;
-    return u.permissions?.[QUOTE_CREATE_PERMISSION] === true;
+    if(u.role==='sales') return u.permissions?.[QUOTE_PERMISSION] !== false;
+    return u.permissions?.[QUOTE_PERMISSION] === true;
   }
-  window.jmsCanCreateQuote=canCreateQuote;
+  window.jmsCanCreateQuote=canManageQuotes;
+  window.jmsCanManageQuotes=canManageQuotes;
 
   function addWarehouseOption(select){
     if(!select || select.querySelector('option[value="warehouse"]')) return;
@@ -34,36 +39,10 @@
     if(role==='warehouse') label.querySelector('input').checked=true;
   }
 
-  function addQuoteCreatePermission(){
-    if(document.querySelector(`.jmsPerm[data-perm="${QUOTE_CREATE_PERMISSION}"]`)) return;
-    const manage=document.querySelector('.jmsPerm[data-perm="manage_quotes"]');
-    if(!manage) return;
-    const sourceLabel=manage.closest('label');
-    if(!sourceLabel || !sourceLabel.parentElement) return;
-    const label=document.createElement('label');
-    label.style.cssText='display:flex;gap:6px;align-items:center;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:8px;font-weight:900';
-    label.innerHTML=`<input type="checkbox" class="jmsPerm" data-perm="${QUOTE_CREATE_PERMISSION}"> إنشاء عرض سعر`;
-    sourceLabel.insertAdjacentElement('beforebegin',label);
-
-    const role=document.getElementById('muRole')?.value || document.getElementById('epRole')?.value || '';
-    const editingId=document.getElementById('editUserId')?.value || document.getElementById('muId')?.value || '';
-    let existingUser=null;
-    try{
-      const store=(typeof db!=='undefined'?db:window.db)||{};
-      existingUser=(store.users||[]).find(x=>String(x.id)===String(editingId));
-    }catch(_){}
-    if(existingUser?.permissions && Object.prototype.hasOwnProperty.call(existingUser.permissions,QUOTE_CREATE_PERMISSION)){
-      label.querySelector('input').checked=!!existingUser.permissions[QUOTE_CREATE_PERMISSION];
-    }else{
-      label.querySelector('input').checked=['admin','sales'].includes(role);
-    }
-  }
-
   function enhancePermissionForm(){
     addWarehouseOption(document.getElementById('muRole'));
     addWarehouseOption(document.getElementById('epRole'));
     addInkPermission();
-    addQuoteCreatePermission();
   }
 
   const originalPreset=window.jmsFillPermissionPreset;
@@ -74,20 +53,16 @@
       return;
     }
     if(typeof originalPreset==='function') originalPreset(role);
-    setTimeout(()=>{
-      enhancePermissionForm();
-      const createQuote=document.querySelector(`.jmsPerm[data-perm="${QUOTE_CREATE_PERMISSION}"]`);
-      if(createQuote) createQuote.checked=['admin','sales'].includes(role);
-    },0);
+    setTimeout(enhancePermissionForm,0);
   };
 
-  // Persist permission edits through the API route that already supports user updates.
-  // This replaces the older save path that posted to a non-existent auth-update-user route.
+  // Persist the existing permission checkboxes to the server.
   window.saveUserPermissions=async function(userId){
     let store;
-    try{ store=(typeof db!=='undefined'?db:window.db)||{}; }catch(_){ store=window.db||{}; }
+    try{store=(typeof db!=='undefined'?db:window.db)||{};}catch(_){store=window.db||{};}
     const u=(store.users||[]).find(x=>String(x.id)===String(userId));
     if(!u) return alert('تعذر العثور على المستخدم');
+
     const permissions={};
     document.querySelectorAll('.jmsPerm').forEach(x=>permissions[x.dataset.perm]=!!x.checked);
     const field=id=>document.getElementById(id);
@@ -100,6 +75,7 @@
       status:field('epStatus')?.value||u.status||'active',
       permissions
     };
+
     try{
       if(typeof jmsPostJson!=='function') throw new Error('missing_api_client');
       await jmsPostJson('/api/auth-create-user',{
@@ -140,73 +116,79 @@
     if(!clickable) return false;
     const onclick=String(clickable.getAttribute('onclick')||'');
     const text=String(clickable.textContent||'').trim();
-    if(/openQuoteForm\s*\(|jmsRepeatLastQuote\s*\(/.test(onclick)) return true;
-    return /^(إنشاء|إضافة|عرض سعر جديد|إنشاء عرض سعر)/.test(text) && /عرض/.test(text);
+    if(/openQuoteForm\s*\(|forceQuoteForm\s*\(|jmsRepeatLastQuote\s*\(|createQuoteFromVisit\s*\(/.test(onclick)) return true;
+    return /(إنشاء عرض سعر|عرض سعر جديد|إضافة عرض سعر)/.test(text);
   }
 
-  function applyQuoteCreateAccess(){
+  function applyQuoteAccess(){
     const u=getUser();
     if(!u) return;
-    const allowed=canCreateQuote();
+    const allowed=canManageQuotes();
     document.querySelectorAll('button,a,[role="button"]').forEach(el=>{
       if(!isCreateQuoteControl(el)) return;
       el.dataset.jmsQuoteCreateControl='1';
       el.style.display=allowed?'':'none';
       el.setAttribute('aria-hidden',allowed?'false':'true');
+      if(!allowed) el.setAttribute('tabindex','-1');
+      else el.removeAttribute('tabindex');
     });
   }
 
   function installQuoteGuards(){
-    if(window.__jmsQuoteCreateGuardsInstalled) return;
-    window.__jmsQuoteCreateGuardsInstalled=true;
     const guard=(name)=>{
       const original=window[name];
-      if(typeof original!=='function' || original.__jmsQuoteGuarded) return;
+      if(typeof original!=='function' || original.__jmsManageQuoteGuarded) return;
       const wrapped=function(){
-        if(!canCreateQuote()){
-          alert('لا تملك صلاحية إنشاء عرض سعر. راجع مدير النظام.');
+        if(!canManageQuotes()){
+          alert('لا تملك صلاحية إدارة عروض الأسعار.');
           return false;
         }
         return original.apply(this,arguments);
       };
-      wrapped.__jmsQuoteGuarded=true;
+      wrapped.__jmsManageQuoteGuarded=true;
       window[name]=wrapped;
     };
-    ['openQuoteForm','saveQuote','jmsRepeatLastQuote'].forEach(guard);
-    applyQuoteCreateAccess();
+
+    // Protect every known programmatic entry point into quotation creation.
+    ['openQuoteForm','forceQuoteForm','saveQuote','jmsRepeatLastQuote','createQuoteFromVisit'].forEach(guard);
+    applyQuoteAccess();
   }
 
   const oldShow=window.showApp;
-  if(typeof oldShow==='function') window.showApp=function(){const r=oldShow.apply(this,arguments);setTimeout(()=>{applyInkAccess();applyQuoteCreateAccess();},80);return r;};
+  if(typeof oldShow==='function') window.showApp=function(){
+    const r=oldShow.apply(this,arguments);
+    setTimeout(()=>{applyInkAccess();installQuoteGuards();applyQuoteAccess();},80);
+    return r;
+  };
+
   const oldRender=window.renderAll;
-  if(typeof oldRender==='function') window.renderAll=function(){const r=oldRender.apply(this,arguments);setTimeout(()=>{applyInkAccess();applyQuoteCreateAccess();},80);return r;};
+  if(typeof oldRender==='function') window.renderAll=function(){
+    const r=oldRender.apply(this,arguments);
+    setTimeout(()=>{applyInkAccess();installQuoteGuards();applyQuoteAccess();},80);
+    return r;
+  };
 
   document.addEventListener('click',event=>{
-    if(!canCreateQuote() && isCreateQuoteControl(event.target)){
+    if(!canManageQuotes() && isCreateQuoteControl(event.target)){
       event.preventDefault();
       event.stopImmediatePropagation();
-      alert('لا تملك صلاحية إنشاء عرض سعر. راجع مدير النظام.');
+      alert('لا تملك صلاحية إدارة عروض الأسعار.');
       return;
     }
     if(event.target.closest('[data-page="users"],button[onclick*="User"],button[onclick*="Permission"]')){
-      setTimeout(()=>{enhancePermissionForm();applyInkAccess();applyQuoteCreateAccess();},40);
+      setTimeout(()=>{enhancePermissionForm();applyInkAccess();applyQuoteAccess();},40);
     }
   },true);
 
   const observer=new MutationObserver(()=>{
     enhancePermissionForm();
-    applyQuoteCreateAccess();
+    applyQuoteAccess();
   });
   observer.observe(document.documentElement,{childList:true,subtree:true});
 
   enhancePermissionForm();
   applyInkAccess();
-  setTimeout(applyInkAccess,900);
-  window.addEventListener('load',()=>{
-    setTimeout(()=>{
-      window.__jmsQuoteCreateGuardsInstalled=false;
-      installQuoteGuards();
-      enhancePermissionForm();
-    },0);
-  });
+  installQuoteGuards();
+  setTimeout(()=>{applyInkAccess();installQuoteGuards();applyQuoteAccess();},900);
+  window.addEventListener('load',()=>setTimeout(()=>{installQuoteGuards();enhancePermissionForm();applyQuoteAccess();},0));
 })();
