@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-automatic-role-login-v2';
+  const VERSION = '2026-08-automatic-role-login-v1';
   const labels = {
     admin: 'مدير النظام',
     sales: 'مدير المبيعات',
@@ -29,6 +29,33 @@
     if (role && label && role.textContent !== label) role.textContent = label;
   }
 
+  function loadScript(id, src) {
+    if (document.getElementById(id)) return;
+    const script = document.createElement('script');
+    script.id = id;
+    script.src = src;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  function loadDebtAgingImport() {
+    loadScript('jmsDebtAgingImportScript', '/debt-aging-import.js?v=20260815-3');
+  }
+
+  function loadRepLiveLocation() {
+    loadScript('jmsRepLiveLocationScript', '/rep-live-location.js?v=20260815-1');
+  }
+
+  function install() {
+    injectStyle();
+    applyAutomaticRoleUi();
+    loadDebtAgingImport();
+    loadRepLiveLocation();
+    const app=document.getElementById('appView');
+    if(app)new MutationObserver(applyAutomaticRoleUi).observe(app,{attributes:true,attributeFilter:['class']});
+    document.getElementById('loginForm')?.addEventListener('submit', () => setTimeout(applyAutomaticRoleUi, 350));
+  }
+
   function injectStyle() {
     if (document.getElementById('jmsAutomaticRoleStyle')) return;
     const style = document.createElement('style');
@@ -42,23 +69,6 @@
     document.head.appendChild(style);
   }
 
-  function loadDebtAgingImport() {
-    if (document.getElementById('jmsDebtAgingImportScript')) return;
-    const script = document.createElement('script');
-    script.id = 'jmsDebtAgingImportScript';
-    script.src = '/debt-aging-import.js?v=20260815-3';
-    script.defer = true;
-    document.head.appendChild(script);
-  }
-
-  function install() {
-    injectStyle();
-    applyAutomaticRoleUi();
-    loadDebtAgingImport();
-    const app=document.getElementById('appView');
-    if(app)new MutationObserver(applyAutomaticRoleUi).observe(app,{attributes:true,attributeFilter:['class']});
-    document.getElementById('loginForm')?.addEventListener('submit', () => setTimeout(applyAutomaticRoleUi, 350));
-  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
   window.JMS_AUTOMATIC_ROLE_LOGIN_VERSION = VERSION;
