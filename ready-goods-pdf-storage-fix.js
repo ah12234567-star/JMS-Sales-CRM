@@ -52,13 +52,13 @@
 
   function install(){
     const api=window.JMSReadyGoods;
-    if(!api || api.__pdfFix!=='20260816-production-1')return setTimeout(install,200);
-    if(api.__pdfStorageFix==='20260816-1')return;
+    if(!api || !String(api.__pdfFix||'').startsWith('20260816-production-'))return setTimeout(install,200);
+    if(api.__pdfStorageFix==='20260816-2')return;
     const exportPdf=api.exportPdf;
     const share=api.share;
     api.exportPdf=function(id){exposeNotice(id);return exportPdf.call(this,id);};
     api.share=function(id){exposeNotice(id);return share.call(this,id);};
-    api.__pdfStorageFix='20260816-1';
+    api.__pdfStorageFix='20260816-2';
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,500));
