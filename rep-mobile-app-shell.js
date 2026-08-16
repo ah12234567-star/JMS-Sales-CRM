@@ -95,3 +95,12 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
+
+/* Load isolated Ready Goods Notice trial module. Remove this loader to roll back the feature. */
+(function(){
+  if(document.querySelector('script[data-jms-ready-goods]'))return;
+  const script=document.createElement('script');
+  script.src='ready-goods-notice.js?v=20260816-trial-1';
+  script.dataset.jmsReadyGoods='1';
+  document.head.appendChild(script);
+})();
