@@ -28,3 +28,4 @@
 (function(){if(document.querySelector('script[data-jms-routes-cloud]'))return;const s=document.createElement('script');s.src='routes-cloud-sync.js?v=20260816-routes-cloud-2';s.dataset.jmsRoutesCloud='1';document.head.appendChild(s)})();
 (function(){if(document.querySelector('script[data-jms-route-visit-tx]'))return;const s=document.createElement('script');s.src='route-visit-transaction.js?v=20260816-route-visit-tx-2';s.dataset.jmsRouteVisitTx='1';document.head.appendChild(s)})();
 (function(){if(document.querySelector('script[data-jms-ready-cloud]'))return;const s=document.createElement('script');s.src='ready-goods-cloud-sync.js?v=20260816-ready-cloud-1';s.dataset.jmsReadyCloud='1';document.head.appendChild(s)})();
+(function(){if(document.querySelector('script[data-jms-vendor-local-loader]'))return;const s=document.createElement('script');s.src='vendor-local-loader.js?v=20260816-vendor-local-1';s.dataset.jmsVendorLocalLoader='1';document.head.appendChild(s)})();
