@@ -135,7 +135,7 @@
 (function(){
   if(document.querySelector('script[data-jms-ready-goods-pdf-fix]'))return;
   const script=document.createElement('script');
-  script.src='ready-goods-pdf-fix.js?v=20260816-production-1';
+  script.src='ready-goods-pdf-fix.js?v=20260816-production-2';
   script.dataset.jmsReadyGoodsPdfFix='1';
   document.head.appendChild(script);
 })();
@@ -144,7 +144,7 @@
 (function(){
   if(document.querySelector('script[data-jms-ready-goods-pdf-storage-fix]'))return;
   const script=document.createElement('script');
-  script.src='ready-goods-pdf-storage-fix.js?v=20260816-1';
+  script.src='ready-goods-pdf-storage-fix.js?v=20260816-2';
   script.dataset.jmsReadyGoodsPdfStorageFix='1';
   document.head.appendChild(script);
 })();
