@@ -139,3 +139,12 @@
   script.dataset.jmsReadyGoodsPdfFix='1';
   document.head.appendChild(script);
 })();
+
+/* Resolve persisted notice records for the production PDF renderer. */
+(function(){
+  if(document.querySelector('script[data-jms-ready-goods-pdf-storage-fix]'))return;
+  const script=document.createElement('script');
+  script.src='ready-goods-pdf-storage-fix.js?v=20260816-1';
+  script.dataset.jmsReadyGoodsPdfStorageFix='1';
+  document.head.appendChild(script);
+})();
