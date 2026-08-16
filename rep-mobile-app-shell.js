@@ -113,7 +113,6 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 
-/* Ready Goods Notice is an official representative module. */
 (function(){
   if(document.querySelector('script[data-jms-ready-goods]'))return;
   const script=document.createElement('script');
@@ -122,7 +121,6 @@
   document.head.appendChild(script);
 })();
 
-/* iOS keyboard stability patch for Ready Goods Notice. */
 (function(){
   if(document.querySelector('script[data-jms-ready-goods-keyboard-fix]'))return;
   const script=document.createElement('script');
@@ -131,20 +129,18 @@
   document.head.appendChild(script);
 })();
 
-/* Production PDF renderer for Ready Goods Notice. */
 (function(){
   if(document.querySelector('script[data-jms-ready-goods-pdf-fix]'))return;
   const script=document.createElement('script');
-  script.src='ready-goods-pdf-fix.js?v=20260816-production-2';
+  script.src='ready-goods-pdf-fix.js?v=20260816-production-3';
   script.dataset.jmsReadyGoodsPdfFix='1';
   document.head.appendChild(script);
 })();
 
-/* Resolve persisted notice records for the production PDF renderer. */
 (function(){
   if(document.querySelector('script[data-jms-ready-goods-pdf-storage-fix]'))return;
   const script=document.createElement('script');
-  script.src='ready-goods-pdf-storage-fix.js?v=20260816-2';
+  script.src='ready-goods-pdf-storage-fix.js?v=20260816-3';
   script.dataset.jmsReadyGoodsPdfStorageFix='1';
   document.head.appendChild(script);
 })();
