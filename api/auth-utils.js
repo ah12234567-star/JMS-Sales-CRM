@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 export function json(res, status, body){
   res.statusCode = status;
   res.setHeader('Content-Type','application/json; charset=utf-8');
+  res.setHeader('Cache-Control','no-store, max-age=0');
+  res.setHeader('X-Content-Type-Options','nosniff');
   res.end(JSON.stringify(body));
 }
 
@@ -61,9 +63,42 @@ export async function upsertUser(user){
   });
 }
 
+function authSecret(){
+  const secret = String(process.env.AUTH_SECRET || '').trim();
+  if(!secret || secret.length < 32) throw new Error('missing_or_weak_auth_secret');
+  return secret;
+}
+
 export function sign(payload){
-  const secret = process.env.AUTH_SECRET || 'jms-dev-secret';
+  const secret = authSecret();
   const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString('base64url');
   const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
   return body + '.' + sig;
+}
+
+export function verifyToken(token, maxAgeMs = 12 * 60 * 60 * 1000){
+  const raw = String(token || '').trim();
+  const [body, sig, extra] = raw.split('.');
+  if(!body || !sig || extra) return null;
+  try{
+    const expected = crypto.createHmac('sha256', authSecret()).update(body).digest('base64url');
+    const a = Buffer.from(sig), b = Buffer.from(expected);
+    if(a.length !== b.length || !crypto.timingSafeEqual(a,b)) return null;
+    const payload = JSON.parse(Buffer.from(body,'base64url').toString('utf8'));
+    if(!payload?.id || !payload?.role || !payload?.iat) return null;
+    if(Date.now() - Number(payload.iat) > maxAgeMs) return null;
+    return payload;
+  }catch(_){ return null; }
+}
+
+export function authFromRequest(req){
+  const header = String(req?.headers?.authorization || req?.headers?.Authorization || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return verifyToken(match?.[1] || '');
+}
+
+export function requireRole(req, roles=['admin']){
+  const auth = authFromRequest(req);
+  if(!auth || !roles.includes(auth.role)) return null;
+  return auth;
 }
