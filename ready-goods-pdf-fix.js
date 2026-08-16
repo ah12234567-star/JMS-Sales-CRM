@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const num=v=>Math.max(0,Number(v)||0);
   const fmt=v=>num(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
   const bank=()=>{ try{return JSON.parse(localStorage.getItem('jms_company_bank_v1')||'{}')}catch(_){return {}} };
@@ -49,26 +49,36 @@
   }
 
   async function makeBlob(n){
-    const html2canvasFn=window.html2canvas;
-    const JsPDF=window.jspdf?.jsPDF||window.jsPDF;
-    if(typeof html2canvasFn!=='function'||!JsPDF)throw new Error('PDF engine unavailable');
+    if(typeof window.html2pdf!=='function')throw new Error('PDF engine unavailable');
     ensureCss();
     const stage=document.createElement('div');stage.className='rgn-pdf-stage';stage.innerHTML=noticeHtml(n);document.body.appendChild(stage);
     try{
       if(document.fonts?.ready)await document.fonts.ready;
       await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
       const doc=stage.firstElementChild;
-      const canvas=await html2canvasFn(doc,{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0,width:794,height:1123,windowWidth:794,windowHeight:1123,logging:false});
+      const worker=window.html2pdf().set({
+        margin:0,
+        image:{type:'jpeg',quality:.98},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0,width:794,height:1123,windowWidth:794,windowHeight:1123,logging:false},
+        jsPDF:{unit:'px',format:[794,1123],orientation:'portrait',hotfixes:['px_scaling'],compress:true}
+      }).from(doc).toCanvas();
+      await worker;
+      const canvas=await worker.get('canvas');
       const img=canvas.toDataURL('image/jpeg',0.98);
-      const pdf=new JsPDF({orientation:'portrait',unit:'px',format:[794,1123],hotfixes:['px_scaling'],compress:true});
+      await worker.toPdf();
+      const pdf=await worker.get('pdf');
+      const originalPages=pdf.getNumberOfPages();
+      pdf.addPage([794,1123],'portrait');
+      pdf.setPage(originalPages+1);
       pdf.addImage(img,'JPEG',0,0,794,1123,undefined,'FAST');
+      for(let p=originalPages;p>=1;p--)pdf.deletePage(p);
       return pdf.output('blob');
     } finally { stage.remove(); }
   }
 
   async function exportPdf(id){
     const n=getNotice(id);if(!n)return alert('تعذر العثور على الإشعار');
-    try{const blob=await makeBlob(n);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${n.number}-${n.customer_name||'ready-goods'}.pdf`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}catch(e){console.error(e);alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');}
+    try{const blob=await makeBlob(n);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${n.number}-${n.customer_name||'ready-goods'}.pdf`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}catch(e){console.error('Ready goods PDF export failed',e);alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');}
   }
 
   async function shareNotice(id){
@@ -85,7 +95,7 @@
     if(!window.JMSReadyGoods){setTimeout(install,250);return;}
     window.JMSReadyGoods.exportPdf=exportPdf;
     window.JMSReadyGoods.share=shareNotice;
-    window.JMSReadyGoods.__pdfFix='20260816-production-2';
+    window.JMSReadyGoods.__pdfFix='20260816-production-3';
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));else setTimeout(install,300);
 })();
