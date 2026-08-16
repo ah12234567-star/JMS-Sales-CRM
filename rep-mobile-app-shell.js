@@ -29,6 +29,13 @@
     document.head.appendChild(style);
   }
 
+  function officializeReadyGoods(){
+    const badge=document.querySelector('#readyGoodsNotice .rgn-badge');
+    if(badge) badge.textContent='معتمد بالنظام';
+    const heroText=document.querySelector('#readyGoodsNotice .rgn-hero p');
+    if(heroText) heroText.textContent='إشعار مستقل للبضاعة الجاهزة والكليشة — غير مرتبط بأوامر التصنيع';
+  }
+
   function activePage(){return document.querySelector('.page.active')?.id||'repHome'}
   function closeOverlay(){
     document.body.classList.remove('jms-mobile-menu-open');
@@ -41,25 +48,25 @@
   function go(page){
     closeOverlay();
     if(page==='readyGoodsNotice'){
-      if(window.JMSReadyGoods?.open) window.JMSReadyGoods.open();
+      if(window.JMSReadyGoods?.open){ window.JMSReadyGoods.open(); officializeReadyGoods(); }
       else {
         const loader=document.createElement('script');
-        loader.src='ready-goods-notice.js?v=20260816-trial-2';
-        loader.onload=()=>window.JMSReadyGoods?.open?.();
+        loader.src='ready-goods-notice.js?v=20260816-official-1';
+        loader.onload=()=>{window.JMSReadyGoods?.open?.();setTimeout(officializeReadyGoods,30)};
         document.head.appendChild(loader);
       }
     } else if(typeof window.jmsRepGo==='function')window.jmsRepGo(page);
     else document.querySelector(`.sidebar .nav[data-page="${page}"]`)?.click();
     resetPagePosition();
-    setTimeout(ensureNav,80);
+    setTimeout(()=>{ensureNav();officializeReadyGoods()},80);
   }
   function ensureNav(){
     if(!isRep())return;
     let nav=document.getElementById('repBottomNav');
     if(!nav){nav=document.createElement('nav');nav.id='repBottomNav';document.body.appendChild(nav)}
     nav.className='rep-bottom-nav';
-    if(nav.dataset.shell!=='3'){
-      nav.dataset.shell='3';
+    if(nav.dataset.shell!=='4'){
+      nav.dataset.shell='4';
       nav.innerHTML=tabs.map(([page,icon,label])=>`<button type="button" data-go="${page}"><i>${icon}</i>${label}</button>`).join('');
       nav.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>go(button.dataset.go)));
     }
@@ -91,6 +98,7 @@
     document.body.classList.add('jms-rep-app-shell');
     ensureNav();
     normalizeModal();
+    officializeReadyGoods();
   }
   function install(){
     sync();
@@ -105,11 +113,11 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 
-/* Load isolated Ready Goods Notice trial module. Remove this loader to roll back the feature. */
+/* Ready Goods Notice is an official representative module. */
 (function(){
   if(document.querySelector('script[data-jms-ready-goods]'))return;
   const script=document.createElement('script');
-  script.src='ready-goods-notice.js?v=20260816-trial-2';
+  script.src='ready-goods-notice.js?v=20260816-official-1';
   script.dataset.jmsReadyGoods='1';
   document.head.appendChild(script);
 })();
