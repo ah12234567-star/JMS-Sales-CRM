@@ -130,3 +130,12 @@
   script.dataset.jmsReadyGoodsKeyboardFix='1';
   document.head.appendChild(script);
 })();
+
+/* Production PDF renderer for Ready Goods Notice. */
+(function(){
+  if(document.querySelector('script[data-jms-ready-goods-pdf-fix]'))return;
+  const script=document.createElement('script');
+  script.src='ready-goods-pdf-fix.js?v=20260816-production-1';
+  script.dataset.jmsReadyGoodsPdfFix='1';
+  document.head.appendChild(script);
+})();
