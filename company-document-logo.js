@@ -36,3 +36,12 @@
   script.dataset.jmsVisitReasonPlanner='1';
   document.head.appendChild(script);
 })();
+
+/* Daily route save reliability fix. */
+(function(){
+  if(document.querySelector('script[data-jms-route-save-fix]'))return;
+  const script=document.createElement('script');
+  script.src='route-save-fix.js?v=20260816-route-save-1';
+  script.dataset.jmsRouteSaveFix='1';
+  document.head.appendChild(script);
+})();
