@@ -27,3 +27,12 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
+
+/* Daily visit planner reason selector. */
+(function(){
+  if(document.querySelector('script[data-jms-visit-reason-planner]'))return;
+  const script=document.createElement('script');
+  script.src='visit-reason-planner.js?v=20260816-visit-reason-1';
+  script.dataset.jmsVisitReasonPlanner='1';
+  document.head.appendChild(script);
+})();
