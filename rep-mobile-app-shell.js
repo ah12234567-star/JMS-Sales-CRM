@@ -121,3 +121,12 @@
   script.dataset.jmsReadyGoods='1';
   document.head.appendChild(script);
 })();
+
+/* iOS keyboard stability patch for Ready Goods Notice. */
+(function(){
+  if(document.querySelector('script[data-jms-ready-goods-keyboard-fix]'))return;
+  const script=document.createElement('script');
+  script.src='ready-goods-keyboard-fix.js?v=20260816-ios-keyboard-1';
+  script.dataset.jmsReadyGoodsKeyboardFix='1';
+  document.head.appendChild(script);
+})();
