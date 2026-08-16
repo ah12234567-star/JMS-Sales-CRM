@@ -12,5 +12,5 @@ export default async function handler(req,res){
       result[table]={available:false,error:String(error?.message||error)};
     }
   }
-  return json(res,200,{ok:true,tables:result});
+  return json(res,200,{ok:true,tables:result,dbEnv:{DATABASE_URL:!!process.env.DATABASE_URL,SUPABASE_DB_URL:!!process.env.SUPABASE_DB_URL,POSTGRES_URL:!!process.env.POSTGRES_URL}});
 }
