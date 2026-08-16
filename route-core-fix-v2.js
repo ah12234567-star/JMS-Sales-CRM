@@ -1,0 +1,29 @@
+/* JMS daily route core reliability v2: persist selected routes and render them deterministically. */
+(function(){
+  'use strict';
+  const VERSION='20260816-route-core-2';
+  const KEY='jms_daily_routes_v2';
+  const STORE='jms_factory_crm_pro_v4';
+  const user=()=>window.currentUser||null;
+  const dbRef=()=>{try{return db}catch(_){return window.db||null}};
+  const localDate=()=>{const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`};
+  const uid=()=>globalThis.crypto?.randomUUID?.()||String(Date.now()+Math.random());
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+  const reasonLabel=v=>({scheduled:'زيارة دورية / مجدولة',new_order:'طلب جديد',quotation:'عرض سعر',collection:'تحصيل',payment_followup:'متابعة سداد',follow_up:'متابعة عميل',sample:'تسليم / استلام عينة',complaint:'شكوى أو ملاحظة',other:'أخرى'})[v]||v||'';
+  function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
+  function write(list){try{localStorage.setItem(KEY,JSON.stringify(list))}catch(e){console.error('JMS route store write',e)}}
+  function mergeIntoDb(){const d=dbRef();if(!d)return;d.routes ||= [];const map=new Map(d.routes.filter(Boolean).map(r=>[r.id,r]));for(const r of read()){if(r?.id)map.set(r.id,{...(map.get(r.id)||{}),...r})}d.routes=[...map.values()];try{localStorage.setItem(STORE,JSON.stringify(d))}catch(_){}}
+  function selectedRows(){return [...document.querySelectorAll('#jmsSelectedVisits .jms-selected-item')].map((row,index)=>{const btn=[...row.querySelectorAll('button')].find(b=>String(b.getAttribute('onclick')||'').includes('JMSVisitPlanner.remove'));const cid=String(btn?.getAttribute('onclick')||'').match(/remove\(['"]([^'"]+)['"]\)/)?.[1]||'';if(!cid)return null;const reason=row.querySelector('.jms-visit-reason-select')?.value||'';const note=row.querySelector('.jms-visit-reason-note')?.value||'';return {customer_id:cid,order:index+1,status:'pending',visit_reason:reason,visit_reason_label:reasonLabel(reason),visit_reason_note:note}}).filter(Boolean)}
+  function persistFromPlanner(){const u=user(),d=dbRef();if(!u||u.role!=='rep'||!d)return null;const items=selectedRows();if(!items.length)return null;mergeIntoDb();let route=(d.routes||[]).find(r=>String(r.rep_id)===String(u.id)&&String(r.date||'').slice(0,10)===localDate());if(route){const old=new Map((route.items||[]).map(i=>[i.customer_id,i]));route.items=items.map(i=>({...old.get(i.customer_id),...i}));route.updated_at=new Date().toISOString();route.source='rep_daily_plan'}else{route={id:uid(),date:localDate(),rep_id:u.id,items,source:'rep_daily_plan',created_at:new Date().toISOString()};d.routes.unshift(route)}const stored=read().filter(r=>!(String(r.rep_id)===String(route.rep_id)&&String(r.date||'').slice(0,10)===localDate()));stored.unshift(JSON.parse(JSON.stringify(route)));write(stored);try{if(typeof save==='function')save();else localStorage.setItem(STORE,JSON.stringify(d))}catch(e){console.error('JMS route save v2',e)}return route}
+  function customerName(id){const d=dbRef();return (d?.customers||[]).find(c=>String(c.id)===String(id))?.name||'-'}
+  function repName(id){const d=dbRef();return (d?.reps||[]).find(r=>String(r.id)===String(id))?.name||user()?.name||'-'}
+  function visibleRoutes(){mergeIntoDb();const d=dbRef();let list=(d?.routes||[]).slice();if(user()?.role==='rep')list=list.filter(r=>String(r.rep_id)===String(user().id));return list.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}
+  function render(){const box=document.getElementById('routesList');if(!box)return;const routes=visibleRoutes();box.innerHTML=routes.map(r=>`<div class="route-card"><div class="jms-plan-head"><div><b>مسار ${esc(r.date||'-')} - ${esc(repName(r.rep_id))}</b><br><span>${(r.items||[]).length} زيارة</span></div></div><div class="jms-plan-list">${(r.items||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0)).map(i=>`<div class="jms-plan-row"><span class="jms-plan-order">${i.order||''}</span><div><h4>${esc(customerName(i.customer_id))}</h4>${i.visit_reason?`<span class="jms-purpose-badge">سبب الزيارة: ${esc(reasonLabel(i.visit_reason))}${i.visit_reason_note?` — ${esc(i.visit_reason_note)}`:''}</span>`:''}</div></div>`).join('')||'<div class="smart-note">لا يوجد عملاء في هذا المسار</div>'}</div></div>`).join('')||'<div class="panel">لا توجد مسارات</div>'}
+  function patch(){mergeIntoDb();const p=window.JMSVisitPlanner;if(p&&!p.__routeCoreV2){p.__routeCoreV2=true;const oldSave=p.save;p.save=function(){const route=persistFromPlanner();const result=oldSave?.apply(this,arguments);setTimeout(()=>{mergeIntoDb();render();if(route){const saved=visibleRoutes().find(r=>r.id===route.id);if(!saved)console.error('JMS route verification failed',route.id)}},100);return result}}
+    window.renderRoutes=render;window.JMSRouteCoreV2={version:VERSION,render,merge:mergeIntoDb,persist:persistFromPlanner};
+    const routesNav=document.querySelector('.nav[data-page="routes"]');routesNav?.addEventListener('click',()=>setTimeout(render,80));
+    document.addEventListener('click',e=>{if(e.target.closest('[data-page="routes"],#routes,.jms-route-planner'))setTimeout(render,120)},true);
+    const box=document.getElementById('routesList');if(box){new MutationObserver(()=>{if(document.getElementById('routes')?.classList.contains('active')&&box.textContent.trim()==='لا توجد مسارات'&&visibleRoutes().length)setTimeout(render,0)}).observe(box,{childList:true,subtree:true,characterData:true})}
+    render();return !!p}
+  const t=setInterval(()=>{if(patch())clearInterval(t)},100);setTimeout(()=>clearInterval(t),15000);window.addEventListener('pageshow',()=>setTimeout(()=>{mergeIntoDb();render()},100));
+})();
