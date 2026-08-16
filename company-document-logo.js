@@ -45,3 +45,12 @@
   script.dataset.jmsRouteSaveFix='1';
   document.head.appendChild(script);
 })();
+
+/* Daily route deterministic persistence and rendering v2. */
+(function(){
+  if(document.querySelector('script[data-jms-route-core-v2]'))return;
+  const script=document.createElement('script');
+  script.src='route-core-fix-v2.js?v=20260816-route-core-2';
+  script.dataset.jmsRouteCoreV2='1';
+  document.head.appendChild(script);
+})();
