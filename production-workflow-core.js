@@ -6,13 +6,13 @@
     ['film_production','إنتاج الفيلم'],['sent_to_cutting','إرسال للمقص'],['cutting','المقص'],
     ['packing','التغليف'],['ready_delivery','جاهز للتسليم'],['delivered','تم التسليم']
   ];
-  const NEW_PRODUCTION_URL='/production.html?v=20260817-mixing-live-2';
+  const NEW_PRODUCTION_URL='/production-v2.html?v=20260817-ux3';
   function database(){try{return db}catch(_){return window.db||{}}}
   function user(){try{return currentUser}catch(_){return window.currentUser||null}}
   function allowed(){return ['admin','sales','production','production_manager','manager','mfg_operator'].includes(user()?.role)}
   function label(key){return STAGES.find(function(stage){return stage[0]===key})?.[1]||key}
   function goNewProduction(){
-    if(location.pathname==='/production.html')return;
+    if(location.pathname==='/production-v2.html')return;
     location.assign(NEW_PRODUCTION_URL);
   }
   function isProductionEntry(target){
@@ -126,5 +126,5 @@
   }
   function boot(){style();install();setTimeout(install,800)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.JMS_PRODUCTION_UX='2026-08-17-new-production-entry-v2';
+  window.JMS_PRODUCTION_UX='2026-08-17-production-v2-shell';
 })();
