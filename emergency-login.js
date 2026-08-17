@@ -13,7 +13,6 @@
     document.addEventListener(type, protectLoginInput, true);
   });
 
-
   function setStatus(message, isError) {
     var hint = document.getElementById('loginHint');
     if (!hint) return;
@@ -63,13 +62,18 @@
         email: data.user.email,
         role: data.user.role
       };
-      sessionStorage.setItem('jms_current_user', JSON.stringify(user));
-      if (data.token) sessionStorage.setItem('jms_auth_token', data.token);
+      var userJson = JSON.stringify(user);
+      sessionStorage.setItem('jms_current_user', userJson);
+      localStorage.setItem('jms_current_user', userJson);
+      if (data.token) {
+        sessionStorage.setItem('jms_auth_token', data.token);
+        localStorage.setItem('jms_auth_token', data.token);
+        localStorage.setItem('jms_auth_token_saved_at', String(Date.now()));
+      }
       window.currentUser = user;
       setStatus('تم الدخول بنجاح', false);
 
-      // Reload so app.js initializes its private currentUser state from sessionStorage.
-      // Calling showApp directly here uses the old in-memory null user and immediately logs out.
+      // Reload so app.js initializes its private currentUser state from storage.
       location.replace('/?login-session=' + Date.now());
     } catch (error) {
       setStatus('تعذر الاتصال بخدمة الدخول. حاول مرة أخرى.', true);
