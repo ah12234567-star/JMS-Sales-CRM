@@ -3,7 +3,7 @@ import { json, authFromRequest, supabase } from './auth-utils.js';
 export default async function handler(req,res){
   const auth=authFromRequest(req);
   if(!auth) return json(res,401,{ok:false,error:'unauthorized'});
-  if(!['admin','sales','rep'].includes(auth.role)) return json(res,403,{ok:false,error:'forbidden'});
+  if(!['admin','sales','rep','production','mfg_operator'].includes(auth.role)) return json(res,403,{ok:false,error:'forbidden'});
   if(req.method!=='GET') return json(res,405,{ok:false,error:'method_not_allowed'});
   try{
     let orderPath='jms_mfg_orders?select=*&order=updated_at.desc&limit=200';
@@ -32,5 +32,8 @@ export default async function handler(req,res){
       ready_stock_pcs:(stock||[]).filter(x=>x.status==='available').reduce((a,x)=>a+Number(x.qty_pcs||0),0)
     };
     return json(res,200,{ok:true,summary,orders:list});
-  }catch(e){console.error('manufacturing-dashboard failed',e);return json(res,500,{ok:false,error:'server_error',message:e.message});}
+  }catch(e){
+    console.error('manufacturing-dashboard failed',e);
+    return json(res,500,{ok:false,error:'server_error',message:e.message});
+  }
 }
