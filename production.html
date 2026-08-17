@@ -18,12 +18,13 @@
 <section id="cutting" class="view"><div id="cuttingList"></div></section>
 </main><div id="toast" class="toast"></div>
 <script>
-const token=sessionStorage.getItem('jms_auth_token');let DATA={summary:{},orders:[]};
+let token=sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token')||'';let DATA={summary:{},orders:[]};let loading=false;let lastLoaded=0;
 const names={mixing:'الخلطة',extrusion:'السحب',printing:'الطباعة',cutting:'القص'};
 function headers(){return {'Content-Type':'application/json','Authorization':'Bearer '+token}}
 function toast(s){let t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
-async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...headers(),...(opt.headers||{})}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||j.error||('HTTP '+r.status));return j}
-async function load(){try{const j=await api('/api/manufacturing-dashboard');DATA=j;renderAll()}catch(e){toast('تعذر تحميل الإنتاج: '+e.message)}}
+function showAuthGate(){app.hidden=true;authGate.hidden=false}
+async function api(url,opt={}){const sep=url.includes('?')?'&':'?';const r=await fetch(url+sep+'_ts='+Date.now(),{cache:'no-store',...opt,headers:{...headers(),...(opt.headers||{})}});const j=await r.json().catch(()=>({}));if(r.status===401){sessionStorage.removeItem('jms_auth_token');localStorage.removeItem('jms_auth_token');localStorage.removeItem('jms_auth_token_saved_at');token='';showAuthGate();throw new Error('انتهت جلسة الدخول')};if(!r.ok)throw new Error(j.message||j.error||('HTTP '+r.status));return j}
+async function load(force=false){if(!token||loading||!navigator.onLine)return;if(!force&&Date.now()-lastLoaded<1200)return;loading=true;try{const j=await api('/api/manufacturing-dashboard');DATA=j;lastLoaded=Date.now();renderAll()}catch(e){toast('تعذر تحديث الإنتاج: '+e.message)}finally{loading=false}}
 function pct(o){return Math.round(Number(o.progress_percent||0))}
 function cur(o){return (o.operations||[]).find(x=>['ready','in_progress'].includes(x.status))||(o.operations||[]).find(x=>x.status==='waiting')}
 function customer(o){return o.data?.customer_name||o.product_spec?.customer_name||o.customer_name||o.customer_id||'-'}
@@ -41,15 +42,15 @@ return `<div class="card field${compact}"><div class="row"><div><h3>${o.order_no
 async function loadLots(){try{let j=await api('/api/manufacturing-material');document.querySelectorAll('select[id^="lot-"]').forEach(s=>{s.innerHTML='<option value="">اختر من المخزون</option>'+j.lots.map(x=>`<option value="${x.id}" data-code="${x.material_code}">${x.material_code} · ${x.lot_no||'-'} · ${Number(x.qty_kg).toLocaleString('ar-SA')} كجم</option>`).join('')})}catch(e){}}
 function renderCenters(){['mixing','extrusion','printing','cutting'].forEach(c=>{let el=document.getElementById(c+'List'),list=opOrders(c);el.innerHTML=list.length?list.map(o=>fieldCard(o,(o.operations||[]).find(x=>x.work_center===c&&['ready','in_progress'].includes(x.status)))).join(''):'<div class="empty">لا توجد أوامر جاهزة لهذا القسم</div>'});loadLots()}
 function renderAll(){renderDashboard();renderCenters()}
-async function startOp(id){try{await api('/api/manufacturing-operation',{method:'POST',body:JSON.stringify({operation_id:id,action:'start'})});toast('تم بدء المرحلة');await load()}catch(e){toast('تعذر البدء: '+e.message)}}
+async function startOp(id){try{await api('/api/manufacturing-operation',{method:'POST',body:JSON.stringify({operation_id:id,action:'start'})});toast('تم بدء المرحلة');await load(true)}catch(e){toast('تعذر البدء: '+e.message)}}
 const val=id=>document.getElementById(id)?.value||'';
 async function completeOp(orderId,opId,center){try{let actual={},outputKg=Number(val('outkg-'+opId)||0),outputPcs=Number(val('pcs-'+opId)||0),waste=Number(val('waste-'+opId)||0),wasteType={mixing:'raw_material',extrusion:'film',printing:'ink',cutting:'cutting'}[center],batch=val('batch-'+opId)||`${centerPrefix(center)}-${Date.now()}`;
 if(center==='mixing'){let s=document.getElementById('lot-'+opId),lot=s?.value,qty=Number(val('consume-'+opId)||0);if(lot&&qty>0){let code=s.options[s.selectedIndex].dataset.code;await api('/api/manufacturing-material',{method:'POST',body:JSON.stringify({manufacturing_order_id:orderId,operation_id:opId,inventory_lot_id:lot,material_code:code,qty_kg:qty,client_event_id:'ui-mat-'+Date.now(),attributes:{source:'production-ui'}})});actual.consumed_kg=qty;actual.material_code=code}}
 if(center==='extrusion')actual={machine_id:val('machine-'+opId),width_cm:Number(val('width-'+opId)||0),micron:Number(val('micron-'+opId)||0)};
 if(center==='printing')actual={colors:Number(val('colors-'+opId)||0),print_face:val('face-'+opId),cylinders:[val('c1-'+opId),val('c2-'+opId)].filter(Boolean)};
 if(center==='cutting')actual={packs_or_cartons:Number(val('packs-'+opId)||0)};
-await api('/api/manufacturing-operation',{method:'POST',body:JSON.stringify({operation_id:opId,action:'complete',actual,output_kg:outputKg,output_pcs:outputPcs,waste_kg:waste,waste_type:wasteType,batch_no:batch,client_event_id:'ui-op-'+Date.now()})});toast('تم إتمام المرحلة بنجاح');await load()}catch(e){toast('تعذر الإتمام: '+e.message)}}
-function net(){document.getElementById('net').textContent=navigator.onLine?'متصل':'بدون إنترنت';document.getElementById('net').classList.toggle('off',!navigator.onLine)}window.addEventListener('online',()=>{net();load()});window.addEventListener('offline',net);net();
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.view').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.v).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})});
-if(!token){authGate.hidden=false}else{app.hidden=false;load()}
+await api('/api/manufacturing-operation',{method:'POST',body:JSON.stringify({operation_id:opId,action:'complete',actual,output_kg:outputKg,output_pcs:outputPcs,waste_kg:waste,waste_type:wasteType,batch_no:batch,client_event_id:'ui-op-'+Date.now()})});toast('تم إتمام المرحلة بنجاح');await load(true)}catch(e){toast('تعذر الإتمام: '+e.message)}}
+function net(){document.getElementById('net').textContent=navigator.onLine?'متصل':'بدون إنترنت';document.getElementById('net').classList.toggle('off',!navigator.onLine)}window.addEventListener('online',()=>{net();load(true)});window.addEventListener('offline',net);window.addEventListener('pageshow',()=>load(true));window.addEventListener('focus',()=>load(true));document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load(true)});net();
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.view').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.v).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});load(true)});
+if(!token){showAuthGate()}else{sessionStorage.setItem('jms_auth_token',token);app.hidden=false;load(true);setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine)load(false)},30000)}
 </script></body></html>
