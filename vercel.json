@@ -3,6 +3,9 @@
     { "source": "/vendor/xlsx.min.js", "destination": "/api/vendor-xlsx" },
     { "source": "/vendor/html2pdf.bundle.min.js", "destination": "/api/vendor-html2pdf" },
     { "source": "/quote", "destination": "/quote.html" },
+    { "source": "/production", "destination": "/production.html" },
+    { "source": "/production.html", "destination": "/production.html" },
+    { "source": "/production-preview.html", "destination": "/production-preview.html" },
     { "source": "/api/auth-update-user", "destination": "/api/auth-create-user?action=update" },
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
