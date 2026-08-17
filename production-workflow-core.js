@@ -6,10 +6,29 @@
     ['film_production','إنتاج الفيلم'],['sent_to_cutting','إرسال للمقص'],['cutting','المقص'],
     ['packing','التغليف'],['ready_delivery','جاهز للتسليم'],['delivered','تم التسليم']
   ];
+  const NEW_PRODUCTION_URL='/production.html?v=20260817-mixing-live-2';
   function database(){try{return db}catch(_){return window.db||{}}}
   function user(){try{return currentUser}catch(_){return window.currentUser||null}}
-  function allowed(){return ['admin','sales','production','production_manager','manager'].includes(user()?.role)}
+  function allowed(){return ['admin','sales','production','production_manager','manager','mfg_operator'].includes(user()?.role)}
   function label(key){return STAGES.find(function(stage){return stage[0]===key})?.[1]||key}
+  function goNewProduction(){
+    if(location.pathname==='/production.html')return;
+    location.assign(NEW_PRODUCTION_URL);
+  }
+  function isProductionEntry(target){
+    const el=target?.closest?.('button,a,[data-page]');if(!el)return false;
+    const page=String(el.dataset?.page||'').toLowerCase();
+    const text=String(el.textContent||'').replace(/\s+/g,' ').trim();
+    return ['productionworkflow','production','manufacturing','mfg'].includes(page)||text==='الإنتاج'||text==='خط الإنتاج';
+  }
+  function legacyScreenVisible(){
+    const nodes=document.querySelectorAll('h1,h2,.page-head,.jms-production-head');
+    return Array.from(nodes).some(function(el){
+      const text=String(el.textContent||'').replace(/\s+/g,' ').trim();
+      const visible=!!(el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+      return visible&&(text.includes('خط الإنتاج وأوامر التصنيع')||text==='خط الإنتاج');
+    });
+  }
   function idFromCard(card){
     const text=card.querySelector('[onclick*="openProductionOrder"]')?.getAttribute('onclick')||'';
     return text.match(/openProductionOrder\(['"]([^'"]+)/)?.[1]||'';
@@ -86,8 +105,18 @@
     }
     enhance();
     document.addEventListener('click',function(event){
+      if(isProductionEntry(event.target)){
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        goNewProduction();
+        return;
+      }
       if(event.target.closest('.nav[data-page="productionWorkflow"]'))setTimeout(enhance,160);
     },true);
+    const observer=new MutationObserver(function(){if(legacyScreenVisible())goNewProduction()});
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
+    setTimeout(function(){if(legacyScreenVisible())goNewProduction()},250);
   }
   function style(){
     if(document.getElementById('jmsProductionUxStyle'))return;
@@ -97,5 +126,5 @@
   }
   function boot(){style();install();setTimeout(install,800)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.JMS_PRODUCTION_UX='2026-08-14-v1';
+  window.JMS_PRODUCTION_UX='2026-08-17-new-production-entry-v2';
 })();
