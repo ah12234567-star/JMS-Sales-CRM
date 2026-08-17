@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JMS Production</title>
+<meta name="theme-color" content="#0f172a">
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#f4f7fb;font-family:Arial,sans-serif;color:#0f172a}.shell{height:100%;display:grid;grid-template-rows:auto 1fr}.bar{position:relative;z-index:5;background:#0f172a;color:#fff;padding:10px 12px;display:flex;gap:8px;align-items:center;justify-content:space-between;box-shadow:0 8px 24px #0f172a1f}.brand b{display:block;font-size:18px}.brand small{color:#94a3b8}.actions{display:flex;gap:7px;align-items:center}.btn{border:0;border-radius:12px;padding:10px 12px;font-weight:900;cursor:pointer}.btn.white{background:#fff;color:#0f172a}.btn.green{background:#16a34a;color:#fff}.btn.blue{background:#2563eb;color:#fff}.btn.red{background:#ef4444;color:#fff}.frame{width:100%;height:100%;border:0;background:#f4f7fb}.modal{position:fixed;inset:0;background:#0f172a99;z-index:50;display:none;align-items:flex-end;justify-content:center}.modal.show{display:flex}.sheet{background:#fff;width:min(920px,100%);max-height:88vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px;box-shadow:0 -20px 60px #0f172a33}.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.sheet h2{margin:0}.close{border:0;background:#e2e8f0;border-radius:10px;padding:9px 12px;font-weight:900}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px}.kpi small{display:block;color:#64748b}.kpi b{display:block;font-size:22px;margin-top:4px}.lots{display:grid;gap:8px}.lot{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:11px;border:1px solid #e2e8f0;border-radius:14px}.lot b,.lot span{display:block}.lot span{font-size:12px;color:#64748b}.qty{font-size:18px;font-weight:900;color:#166534}.form{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}.field{border:1px solid #cbd5e1;border-radius:13px;padding:9px}.field label{display:block;color:#64748b;font-size:11px}.field input,.field select{width:100%;border:0;outline:0;font:inherit;font-weight:900;font-size:17px;padding:6px 0;background:transparent}.full{grid-column:1/-1}.notice{padding:10px;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-size:12px;margin-top:10px}.toast{position:fixed;z-index:80;left:14px;right:14px;bottom:16px;max-width:520px;margin:auto;background:#0f172a;color:#fff;padding:12px;border-radius:12px;display:none}.toast.show{display:block}@media(max-width:720px){.bar{padding-top:max(10px,env(safe-area-inset-top));}.brand b{font-size:16px}.btn{padding:9px 10px;font-size:12px}.actions .desktop{display:none}.sheet{padding-bottom:max(18px,env(safe-area-inset-bottom))}.kpis{grid-template-columns:1fr 1fr}.form{grid-template-columns:1fr}.full{grid-column:1}.lot{grid-template-columns:1fr}.qty{text-align:right}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="bar"><div class="brand"><b>JMS Production</b><small>تشغيل المصنع — الخلطة أولاً</small></div><div class="actions"><button class="btn white" onclick="refreshInner()">تحديث</button><button class="btn blue" onclick="openInventory()">مخزون الخامات</button><button class="btn green desktop" onclick="createTestMO()">أمر اختبار</button></div></header>
+<iframe id="prod" class="frame" src="/production.html?inner=1&v=20260817-ux3"></iframe>
+</div>
+<div id="inventoryModal" class="modal"><div class="sheet"><div class="sheet-head"><div><h2>مخزون المواد الخام</h2><div style="color:#64748b;font-size:12px">Inventory Lots المتاحة للخلطة</div></div><button class="close" onclick="closeInventory()">إغلاق</button></div><div id="invKpis" class="kpis"></div><div id="lots" class="lots"></div><div class="notice">إضافة الشحنة تزيد رصيد اللوت إذا كان موجوداً، أو تنشئ Lot جديداً إذا لم يكن موجوداً.</div><div class="form"><div class="field"><label>كود الخامة</label><input id="materialCode" placeholder="HD952 / LD4023 / LLD218N"></div><div class="field"><label>اسم الخامة</label><input id="materialName" placeholder="مثال: HDPE 952"></div><div class="field"><label>رقم اللوت</label><input id="lotNo" placeholder="LOT-2026-001"></div><div class="field"><label>الكمية كجم</label><input id="lotQty" type="number" step="0.001" inputmode="decimal" placeholder="1000"></div><button class="btn green full" onclick="receiveLot()">+ إضافة / تغذية شحنة خام</button></div></div></div>
+<div id="toast" class="toast"></div>
+<script>
+const frame=document.getElementById('prod');
+const token=()=>sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token')||'';
+function H(){return {'Content-Type':'application/json','Authorization':'Bearer '+token()}}
+function say(s){const t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+async function api(u,o={}){const sep=u.includes('?')?'&':'?';const r=await fetch(u+sep+'_ts='+Date.now(),{cache:'no-store',...o,headers:{...H(),...(o.headers||{})}});const j=await r.json().catch(()=>({}));if(r.status===401){location.href='/';throw new Error('انتهت الجلسة')}if(!r.ok)throw new Error(j.message||j.error||('HTTP '+r.status));return j}
+function refreshInner(){frame.contentWindow?.location.reload();}
+function tuneInner(){
+  try{
+    const d=frame.contentDocument;if(!d)return;
+    const top=d.querySelector('.top');if(top)top.style.display='none';
+    const tabs=[...d.querySelectorAll('.tab')];
+    const mixing=tabs.find(x=>x.dataset.v==='mixing');
+    if(mixing&&!mixing.classList.contains('active')) mixing.click();
+    d.body.style.paddingTop='0';
+    const style=d.createElement('style');style.textContent=`
+      body{font-family:Arial,sans-serif!important;background:#f4f7fb!important}.wrap{max-width:1180px!important;padding:10px!important}.tabs{position:sticky;top:0;z-index:15;background:#f4f7fb;padding:9px 0 10px;margin:0 0 8px!important}.tab{min-height:54px;border-radius:16px!important;padding:12px 18px!important;font-size:16px!important;box-shadow:0 4px 12px #0f172a0a}.tab.active{background:#2563eb!important}.card{border-radius:20px!important;box-shadow:0 8px 24px #0f172a0b!important}.order-card{border:1px solid #dbeafe!important}.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:18px;margin-top:10px}.big{min-height:58px!important}.field{background:#fff!important}.spec{background:#f8fafc!important}@media(max-width:720px){.tabs{gap:8px}.tab{min-width:118px;font-size:17px!important}.specs{grid-template-columns:1fr 1fr!important}.order-card{padding:16px!important}.empty{padding:28px 14px!important}}
+    `;d.head.appendChild(style);
+    const mix=d.getElementById('mixing');
+    if(mix&&!d.getElementById('jmsQuickTools')){
+      const tools=d.createElement('div');tools.id='jmsQuickTools';tools.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><button style="border:0;border-radius:15px;padding:15px;background:#0f172a;color:#fff;font-weight:900;font-size:16px" onclick="parent.openInventory()">مخزون الخامات</button><button style="border:0;border-radius:15px;padding:15px;background:#16a34a;color:#fff;font-weight:900;font-size:16px" onclick="parent.createTestMO()">إنشاء أمر اختبار</button></div>';
+      mix.prepend(tools);
+    }
+  }catch(e){console.warn(e)}
+}
+frame.addEventListener('load',()=>{setTimeout(tuneInner,100);setTimeout(tuneInner,900)});
+async function openInventory(){document.getElementById('inventoryModal').classList.add('show');await loadInventory()}
+function closeInventory(){document.getElementById('inventoryModal').classList.remove('show')}
+async function loadInventory(){try{const j=await api('/api/manufacturing-inventory');const s=j.summary||{};document.getElementById('invKpis').innerHTML=`<div class="kpi"><small>الخامات</small><b>${s.materials||0}</b></div><div class="kpi"><small>عدد اللوتات</small><b>${s.lots||0}</b></div><div class="kpi"><small>الرصيد المتاح</small><b>${Number(s.available_kg||0).toLocaleString('ar-SA')} كجم</b></div>`;const rows=j.lots||[];document.getElementById('lots').innerHTML=rows.length?rows.map(x=>`<div class="lot"><div><b>${x.material_name||x.material_code}</b><span>${x.material_code} · Lot: ${x.lot_no||'-'} · ${x.warehouse||'RAW'}</span></div><div class="qty">${Number(x.qty_kg||0).toLocaleString('ar-SA',{maximumFractionDigits:3})} كجم</div></div>`).join(''):'<div style="padding:24px;text-align:center;color:#64748b">لا يوجد مخزون خام. أضف أول شحنة من النموذج أدناه.</div>'}catch(e){say('تعذر تحميل المخزون: '+e.message)}}
+async function receiveLot(){const material_code=document.getElementById('materialCode').value.trim(),material_name=document.getElementById('materialName').value.trim(),lot_no=document.getElementById('lotNo').value.trim(),qty_kg=Number(document.getElementById('lotQty').value||0);if(!material_code||!lot_no||!(qty_kg>0))return say('أدخل كود الخامة ورقم اللوت والكمية');try{await api('/api/manufacturing-inventory',{method:'POST',body:JSON.stringify({material_code,material_name,lot_no,qty_kg,warehouse:'RAW'})});say('تمت إضافة الشحنة للمخزون');document.getElementById('lotQty').value='';await loadInventory();refreshInner()}catch(e){say('تعذر إضافة الشحنة: '+e.message)}}
+async function createTestMO(){try{const j=await api('/api/manufacturing-test-seed',{method:'POST',body:'{}'});say(j.created?'تم إنشاء MO-TEST-001':'MO-TEST-001 جاهز بالفعل');setTimeout(refreshInner,500)}catch(e){say(e.message==='admin_only'?'إنشاء أمر الاختبار متاح لمدير النظام فقط':'تعذر إنشاء أمر الاختبار: '+e.message)}}
+window.openInventory=openInventory;window.createTestMO=createTestMO;
+</script>
+</body>
+</html>
