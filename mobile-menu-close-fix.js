@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-mobile-menu-close-v1';
+  const VERSION = '2026-08-mobile-menu-close-v2';
 
   function closeMenu() {
     document.body.classList.remove('jms-mobile-menu-open');
@@ -52,4 +52,34 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
   window.JMS_MOBILE_MENU_CLOSE_VERSION = VERSION;
+})();
+
+/* Deterministic Ready Goods loader.
+   The main HTML has existed in multiple cached versions in the field. Loading the
+   module from a script that is always part of the shell guarantees reps receive
+   the current searchable customer picker without relying on an old index.html. */
+(function(){
+  'use strict';
+  const VERSION='20260818-searchable-customer-v2';
+  const scripts=[
+    ['jmsReadyGoodsCoreScript','/ready-goods-notice.js?v='+VERSION],
+    ['jmsReadyGoodsKeyboardScript','/ready-goods-keyboard-fix.js?v='+VERSION],
+    ['jmsReadyGoodsPdfScript','/ready-goods-pdf-fix.js?v='+VERSION],
+    ['jmsReadyGoodsPdfStorageScript','/ready-goods-pdf-storage-fix.js?v='+VERSION],
+    ['jmsReadyGoodsCloudScript','/ready-goods-cloud-sync.js?v='+VERSION],
+    ['jmsReadyGoodsAdminScript','/ready-goods-admin-control.js?v='+VERSION]
+  ];
+  function loadOne(id,src){
+    return new Promise(resolve=>{
+      const old=document.getElementById(id);
+      if(old)return resolve();
+      const s=document.createElement('script');s.id=id;s.src=src;s.async=false;s.onload=resolve;s.onerror=resolve;document.head.appendChild(s);
+    });
+  }
+  async function boot(){
+    for(const [id,src] of scripts) await loadOne(id,src);
+    setTimeout(()=>window.JMSReadyGoods?.ensure?.(),50);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  window.JMS_READY_GOODS_LOADER_VERSION=VERSION;
 })();
