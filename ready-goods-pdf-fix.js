@@ -1,7 +1,7 @@
-/* JMS Ready Goods PDF loader — Official Brand Edition */
+/* JMS Ready Goods PDF loader — Electronic Final */
 (function(){
   'use strict';
-  const VERSION='20260818-official-brand-assets-1';
+  const VERSION='20260818-electronic-final-2';
   function loadOfficial(){
     if(document.querySelector('script[data-jms-ready-official-brand]'))return;
     const o=document.createElement('script');
