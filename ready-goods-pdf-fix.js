@@ -1,12 +1,12 @@
-/* JMS Ready Goods PDF loader — Production v12 direct print */
+/* JMS Ready Goods PDF loader — Production v13 direct print */
 (function(){
   'use strict';
-  const VERSION='20260818-production-v12';
+  const VERSION='20260818-production-v13';
   function load(){
-    if(document.querySelector('script[data-jms-ready-v12]'))return;
+    if(document.querySelector('script[data-jms-ready-v13]'))return;
     const s=document.createElement('script');
     s.src='/ready-goods-pdf-v12.js?v='+VERSION;
-    s.dataset.jmsReadyV12='1';
+    s.dataset.jmsReadyV13='1';
     s.async=false;
     document.head.appendChild(s);
   }
