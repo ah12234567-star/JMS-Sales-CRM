@@ -76,7 +76,9 @@ export function sign(payload){
   return body + '.' + sig;
 }
 
-export function verifyToken(token, maxAgeMs = 12 * 60 * 60 * 1000){
+// Field users commonly keep the PWA/session open across workdays. A signed token
+// remains tamper-proof; allow it for 7 days instead of expiring overnight after 12h.
+export function verifyToken(token, maxAgeMs = 7 * 24 * 60 * 60 * 1000){
   const raw = String(token || '').trim();
   const [body, sig, extra] = raw.split('.');
   if(!body || !sig || extra) return null;
