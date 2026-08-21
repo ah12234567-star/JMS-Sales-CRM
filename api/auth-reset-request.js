@@ -21,8 +21,8 @@ async function findUser(email, phone){
 }
 
 async function sendWhatsappCode(phone, code){
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1252021734662917';
   if(!token || !phoneNumberId) throw new Error('whatsapp_not_configured');
   const template = String(process.env.WHATSAPP_RESET_TEMPLATE || '').trim();
   const body = template ? {
@@ -32,7 +32,7 @@ async function sendWhatsappCode(phone, code){
     messaging_product:'whatsapp', to:phone, type:'text',
     text:{preview_url:false,body:`رمز استعادة كلمة المرور في نظام JMS هو: ${code}\nصالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.`}
   };
-  const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+  const response = await fetch(`https://graph.facebook.com/v23.0/${phoneNumberId}/messages`, {
     method:'POST', headers:{Authorization:'Bearer ' + token,'Content-Type':'application/json'}, body:JSON.stringify(body)
   });
   const result = await response.json().catch(()=>({}));
