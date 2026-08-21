@@ -8,7 +8,12 @@ function sendJson(res, status, body) {
 
 function verifyMetaSignature(req) {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret) return process.env.NODE_ENV !== 'production';
+  if (!appSecret) {
+    // Temporary Cloud API test-number mode. No privileged action is performed
+    // unless a server-side access token is also configured.
+    return req.body?.object === 'whatsapp_business_account'
+      && Boolean(process.env.WHATSAPP_ACCESS_TOKEN);
+  }
 
   const signature = String(req.headers['x-hub-signature-256'] || '');
   if (!signature.startsWith('sha256=')) return false;
@@ -24,6 +29,53 @@ function verifyMetaSignature(req) {
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function incomingMessages(body) {
+  const result = [];
+  for (const entry of body?.entry || []) {
+    for (const change of entry?.changes || []) {
+      const value = change?.value || {};
+      const phoneNumberId = value?.metadata?.phone_number_id;
+      for (const message of value?.messages || []) {
+        if (phoneNumberId && message?.from && message?.id) {
+          result.push({ phoneNumberId, message });
+        }
+      }
+    }
+  }
+  return result;
+}
+
+async function sendText({ phoneNumberId, to, text }) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!token) throw new Error('missing_whatsapp_access_token');
+
+  const response = await fetch(
+    `https://graph.facebook.com/v23.0/${encodeURIComponent(phoneNumberId)}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'text',
+        text: {
+          preview_url: false,
+          body: text,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`whatsapp_send_failed_${response.status}: ${detail.slice(0, 500)}`);
+  }
 }
 
 export default async function handler(req, res) {
@@ -46,11 +98,24 @@ export default async function handler(req, res) {
       return sendJson(res, 401, { ok: false, error: 'invalid_signature' });
     }
 
-    // Acknowledge immediately so Meta does not retry. Message processing and
-    // AI replies will be added only after tokens and human-handoff rules are set.
-    const entries = Array.isArray(req.body?.entry) ? req.body.entry.length : 0;
-    console.info('WhatsApp webhook received', { entries });
-    return sendJson(res, 200, { ok: true });
+    const messages = incomingMessages(req.body);
+    for (const item of messages.slice(0, 3)) {
+      try {
+        await sendText({
+          phoneNumberId: item.phoneNumberId,
+          to: item.message.from,
+          text: 'أهلًا بك في شركة جدة النموذجي للصناعة 👋\nتم استلام رسالتك بنجاح. هذا رد تجريبي من نظام JMS.',
+        });
+      } catch (error) {
+        console.error('WhatsApp reply failed', {
+          messageId: item.message.id,
+          error: error?.message || String(error),
+        });
+      }
+    }
+
+    console.info('WhatsApp webhook processed', { messages: messages.length });
+    return sendJson(res, 200, { ok: true, messages: messages.length });
   }
 
   res.setHeader('Allow', 'GET, POST');
