@@ -20,23 +20,41 @@ async function findUser(email, phone){
   return null;
 }
 
+async function whatsappSend(phoneNumberId, token, body){
+  const response = await fetch(`https://graph.facebook.com/v23.0/${phoneNumberId}/messages`, {
+    method:'POST',
+    headers:{Authorization:'Bearer ' + token,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  const result = await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(result?.error?.message || 'whatsapp_send_failed');
+  return result;
+}
+
 async function sendWhatsappCode(phone, code){
   const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1252021734662917';
   if(!token || !phoneNumberId) throw new Error('whatsapp_not_configured');
   const template = String(process.env.WHATSAPP_RESET_TEMPLATE || '').trim();
-  const body = template ? {
-    messaging_product:'whatsapp', to:phone, type:'template',
-    template:{name:template,language:{code:process.env.WHATSAPP_RESET_LANGUAGE || 'ar'},components:[{type:'body',parameters:[{type:'text',text:code}]}]}
-  } : {
-    messaging_product:'whatsapp', to:phone, type:'text',
-    text:{preview_url:false,body:`رمز استعادة كلمة المرور في نظام JMS هو: ${code}\nصالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.`}
-  };
-  const response = await fetch(`https://graph.facebook.com/v23.0/${phoneNumberId}/messages`, {
-    method:'POST', headers:{Authorization:'Bearer ' + token,'Content-Type':'application/json'}, body:JSON.stringify(body)
+
+  if(template){
+    await whatsappSend(phoneNumberId,token,{
+      messaging_product:'whatsapp',to:phone,type:'template',
+      template:{name:template,language:{code:process.env.WHATSAPP_RESET_LANGUAGE || 'ar'},components:[{type:'body',parameters:[{type:'text',text:code}]}]}
+    });
+    return;
+  }
+
+  // Meta's test number must start business-initiated conversations with its
+  // pre-approved hello_world template. Once open, send the short-lived code.
+  await whatsappSend(phoneNumberId,token,{
+    messaging_product:'whatsapp',to:phone,type:'template',
+    template:{name:'hello_world',language:{code:'en_US'}}
   });
-  const result = await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(result?.error?.message || 'whatsapp_send_failed');
+  await whatsappSend(phoneNumberId,token,{
+    messaging_product:'whatsapp',to:phone,type:'text',
+    text:{preview_url:false,body:`رمز استعادة كلمة المرور في نظام JMS هو: ${code}\nصالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.`}
+  });
 }
 
 export default async function handler(req, res){
