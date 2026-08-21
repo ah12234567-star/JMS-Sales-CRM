@@ -31,9 +31,10 @@ export default async function handler(req, res) {
     const mode = String(req.query?.['hub.mode'] || '');
     const token = String(req.query?.['hub.verify_token'] || '');
     const challenge = String(req.query?.['hub.challenge'] || '');
-    const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN;
+    const expectedHash = process.env.WHATSAPP_VERIFY_TOKEN_HASH || '23fa184ac49c5f11b9880a7cb345a27fd3fc661fd407b44a0f9100595e5d686e';
+    const receivedHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    if (mode === 'subscribe' && expectedToken && token === expectedToken) {
+    if (mode === 'subscribe' && token && receivedHash === expectedHash) {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       return res.status(200).send(challenge);
     }
