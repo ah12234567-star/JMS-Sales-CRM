@@ -18,6 +18,7 @@ window.JMS_CLOUD = {
   function loadUpdates(){
     addScript('jms-update-15-smart-import','smart-import-rep-conflicts.js?v=20260822-1115');
     addScript('jms-update-15b-smart-debt-import','smart-debt-import-rep-conflicts.js?v=20260822-1115');
+    addScript('jms-update-15b-smart-debt-import-v2','smart-debt-import-rep-conflicts-v2.js?v=20260822-1119');
   }
   if(document.readyState==='complete') setTimeout(loadUpdates, 200);
   else window.addEventListener('load', function(){ setTimeout(loadUpdates, 200); });
