@@ -1,28 +1,54 @@
+/* JMS Update 15B HOTFIX: remove old Yaser-only debt importer and delegate to smart representative-aware debt importer. */
 (function(){
-'use strict';
-const VERSION='2026-08-15-debt-aging-import-3';
-let decorating=false,decorateTimer=0;
-const sleep=(ms=0)=>new Promise(r=>setTimeout(r,ms));
-function getStore(){try{return(typeof db!=='undefined'?db:window.db)||{}}catch(_){return window.db||{}}}
-function getUser(){return window.currentUser||(typeof currentUser!=='undefined'?currentUser:null)}
-function canUse(){const u=getUser();return!!u&&['admin','sales'].includes(u.role)}
-function norm(v){return String(v??'').trim().toLowerCase().replace(/[\u064B-\u065F\u0670]/g,'').replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim()}
-function num(v){const n=Number(String(v??0).replace(/,/g,''));return Number.isFinite(n)?n:0}
-function money(v){return Number(v||0).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function injectButton(){if(!canUse()||document.getElementById('jmsDebtAgingImportBtn'))return;const page=document.getElementById('customers');if(!page)return;const head=page.querySelector('.page-head');if(!head)return;let actions=head.querySelector('.head-actions');if(!actions){actions=document.createElement('div');actions.className='head-actions';head.appendChild(actions)}const btn=document.createElement('button');btn.id='jmsDebtAgingImportBtn';btn.type='button';btn.className='primary secondary';btn.textContent='استيراد أعمار الديون';btn.onclick=()=>document.getElementById('jmsDebtAgingFileInput')?.click();actions.appendChild(btn);const input=document.createElement('input');input.id='jmsDebtAgingFileInput';input.type='file';input.accept='.xls,.xlsx';input.style.display='none';input.onchange=async()=>{const file=input.files?.[0];input.value='';if(file)await processFile(file)};document.body.appendChild(input)}
-function findHeader(rows){for(let i=0;i<Math.min(rows.length,20);i++){const r=(rows[i]||[]).map(x=>norm(x));if(r.includes('الرمز')&&r.includes('الاسم')&&r.includes('مندوب الحساب')&&r.includes('الرصيد'))return i}return-1}
-function idx(headers,label){return headers.findIndex(x=>norm(x)===norm(label))}
-function buildPreview(rows){const headerRow=findHeader(rows);if(headerRow<0)throw new Error('لم أجد عناوين أعمار الديون المطلوبة: الرمز، الاسم، مندوب الحساب، الرصيد');const headers=rows[headerRow]||[];const ix={code:idx(headers,'الرمز'),name:idx(headers,'الاسم'),rep:idx(headers,'مندوب الحساب'),d30:idx(headers,'30 يوم'),d60:idx(headers,'60 يوم'),d90:idx(headers,'90 يوم'),d120:idx(headers,'120 يوم'),d150:idx(headers,'150 يوم'),over150:idx(headers,'فوق 150 يوم'),balance:idx(headers,'الرصيد')};const store=getStore(),reps=store.reps||[],customers=store.customers||[];const yaser=reps.find(r=>norm(r.name).includes('ياسر الحسني'))||reps.find(r=>norm(r.name).includes('ياسر'));const yaserId=yaser?.id||'';const pool=yaserId?customers.filter(c=>String(c.rep_id||'')===String(yaserId)):customers;const codeMap=new Map(),nameMap=new Map();for(const c of pool){for(const key of['account_code','customer_code','code','erp_code'])if(c?.[key])codeMap.set(String(c[key]).trim(),c);const n=norm(c.name);if(n){if(!nameMap.has(n))nameMap.set(n,[]);nameMap.get(n).push(c)}}const matched=[],unmatched=[];for(let r=headerRow+1;r<rows.length;r++){const row=rows[r]||[],repName=String(row[ix.rep]??'').trim(),name=String(row[ix.name]??'').trim(),code=String(row[ix.code]??'').trim();if(!name||!norm(repName).includes('ياسر'))continue;const sourceBalance=num(row[ix.balance]);let customer=code?codeMap.get(code):null,matchType=customer?'code':'';if(!customer){const arr=nameMap.get(norm(name))||[];if(arr.length===1){customer=arr[0];matchType='name'}}const item={row:r+1,code,name,repName,sourceBalance,matchType,customer,aging:{d30:num(row[ix.d30]),d60:num(row[ix.d60]),d90:num(row[ix.d90]),d120:num(row[ix.d120]),d150:num(row[ix.d150]),over150:num(row[ix.over150])}};(customer?matched:unmatched).push(item)}return{matched,unmatched,yaserId}}
-function ageMeta(aging){if(num(aging.over150)>0)return{code:'over150',label:'أكثر من 150 يوم',overdue:true};if(num(aging.d150)>0)return{code:'121_150',label:'121–150 يوم',overdue:true};if(num(aging.d120)>0)return{code:'91_120',label:'91–120 يوم',overdue:true};if(num(aging.d90)>0)return{code:'61_90',label:'61–90 يوم',overdue:true};if(num(aging.d60)>0)return{code:'31_60',label:'31–60 يوم',overdue:true};if(num(aging.d30)>0)return{code:'0_30',label:'حتى 30 يوم',overdue:false};return{code:'none',label:'بدون مديونية',overdue:false}}
-function calculate(item){const b=item.sourceBalance;if(b<0)return{debt_balance:b,advance_balance:Math.abs(b),account_balance_type:'advance',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0},age:{code:'advance',label:'دفعة مقدمة',overdue:false}};if(b>0&&b<500)return{debt_balance:0,advance_balance:0,account_balance_type:'zeroed_small',aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0},age:{code:'zero',label:'صفر',overdue:false}};const age=ageMeta(item.aging);return{debt_balance:b,advance_balance:0,account_balance_type:b>0?'debt':'clear',aging:item.aging,age}}
-async function applyPreview(preview,onProgress){let zeroed=0,advances=0,debts=0;const total=preview.matched.length;for(let i=0;i<total;i++){const item=preview.matched[i],c=item.customer,calc=calculate(item);c.account_code=item.code||c.account_code||'';c.debt_balance=calc.debt_balance;c.advance_balance=calc.advance_balance;c.account_balance_type=calc.account_balance_type;c.aging_30=calc.aging.d30;c.aging_60=calc.aging.d60;c.aging_90=calc.aging.d90;c.aging_120=calc.aging.d120;c.aging_150=calc.aging.d150;c.aging_over_150=calc.aging.over150;c.debt_age_bucket=calc.age.code;c.debt_age_label=calc.age.label;c.debt_overdue=!!calc.age.overdue;c.debt_aging_updated_at=new Date().toISOString();c.debt_aging_source='excel';if(calc.account_balance_type==='zeroed_small')zeroed++;else if(calc.account_balance_type==='advance')advances++;else if(calc.account_balance_type==='debt')debts++;if((i+1)%15===0||i===total-1){onProgress?.(i+1,total);await sleep(0)}}await sleep(20);if(typeof save==='function')save();await sleep(30);if(typeof window.pushCloudData==='function')await window.pushCloudData();return{zeroed,advances,debts}}
-function customerForCard(card){const id=card?.dataset?.customerId||'';if(id)return(getStore().customers||[]).find(c=>String(c.id)===String(id));const text=norm(card?.textContent||'');return(getStore().customers||[]).find(c=>c.name&&text.includes(norm(c.name)))}
-function desiredBadge(c){if(!c||!c.debt_age_label)return null;const type=c.account_balance_type==='advance'?'advance':c.debt_overdue?'overdue':'current';let extra='';if(c.account_balance_type==='advance')extra=`رصيد دائن ${money(Math.abs(c.debt_balance||0))} ريال`;else if(Number(c.debt_balance||0)>0)extra=`${money(c.debt_balance)} ريال`;else extra='لا توجد مديونية';return{type,label:c.debt_age_label,extra,key:`${type}|${c.debt_age_label}|${extra}`}}
-function decorateCards(){if(decorating)return;decorating=true;try{document.querySelectorAll('#customersGrid .customer-card').forEach(card=>{const c=customerForCard(card),d=desiredBadge(c),existing=card.querySelector('.jms-debt-age-badge');if(!d){existing?.remove();return}if(existing?.dataset?.badgeKey===d.key)return;let badge=existing;if(!badge){badge=document.createElement('div');badge.className='jms-debt-age-badge';const actions=card.querySelector('.jms-customer-actions-v3');if(actions)card.insertBefore(badge,actions);else card.appendChild(badge)}badge.className=`jms-debt-age-badge ${d.type}`;badge.dataset.badgeKey=d.key;badge.innerHTML=`<b>${d.label}</b><small>${d.extra}</small>`})}finally{decorating=false}}
-function scheduleDecorate(){clearTimeout(decorateTimer);decorateTimer=setTimeout(decorateCards,120)}
-function injectStyle(){if(document.getElementById('jmsDebtAgeStyle'))return;const s=document.createElement('style');s.id='jmsDebtAgeStyle';s.textContent='.jms-debt-age-badge{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px;padding:9px 11px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc}.jms-debt-age-badge b{font-size:12px}.jms-debt-age-badge small{font-size:11px;color:#475569}.jms-debt-age-badge.overdue{background:#fff1f2;border-color:#fecdd3;color:#be123c}.jms-debt-age-badge.current{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.jms-debt-age-badge.advance{background:#ecfdf5;border-color:#a7f3d0;color:#047857}.jms-import-progress{margin-top:12px;padding:12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;font-weight:800;color:#334155}';document.head.appendChild(s)}
-function showPreview(preview){const matched=preview.matched,unmatched=preview.unmatched,zeroed=matched.filter(x=>x.sourceBalance>0&&x.sourceBalance<500),advances=matched.filter(x=>x.sourceBalance<0),debts=matched.filter(x=>x.sourceBalance>=500),totalAdv=advances.reduce((s,x)=>s+Math.abs(x.sourceBalance),0),totalDebt=debts.reduce((s,x)=>s+x.sourceBalance,0);const buckets={d30:0,d60:0,d90:0,d120:0,d150:0,over150:0};debts.forEach(x=>{const m=ageMeta(x.aging);if(m.code==='0_30')buckets.d30++;else if(m.code==='31_60')buckets.d60++;else if(m.code==='61_90')buckets.d90++;else if(m.code==='91_120')buckets.d120++;else if(m.code==='121_150')buckets.d150++;else if(m.code==='over150')buckets.over150++});const html=`<h2>مراجعة استيراد أعمار الديون</h2><div class="panel" style="margin:12px 0"><b>المندوب: ياسر</b><br>مطابق: <b>${matched.length}</b> · غير مطابق: <b>${unmatched.length}</b><br>تصفير أقل من 500: <b>${zeroed.length}</b><br>دفعات مقدمة: <b>${advances.length}</b> بإجمالي ${money(totalAdv)} ريال<br>ديون 500 فأكثر: <b>${debts.length}</b> بإجمالي ${money(totalDebt)} ريال<hr>حتى 30 يوم: <b>${buckets.d30}</b> · 31–60: <b>${buckets.d60}</b> · 61–90: <b>${buckets.d90}</b> · 91–120: <b>${buckets.d120}</b> · 121–150: <b>${buckets.d150}</b> · أكثر من 150: <b>${buckets.over150}</b></div><p class="muted">سيظهر أقدم عمر مديونية على بطاقة كل عميل، وأي عمر فوق 30 يوم سيظهر كمتأخر.</p><div id="jmsImportProgress" class="jms-import-progress" style="display:none"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="jmsApplyDebtAging" class="primary">اعتماد التحديث</button><button onclick="closeModal()">إلغاء</button></div>`;if(window.modalBody&&window.modal){modalBody.innerHTML=html;modal.classList.remove('hidden');setTimeout(()=>{const b=document.getElementById('jmsApplyDebtAging');if(b)b.onclick=()=>applyAndNotify(preview)},0)}else if(confirm(`مطابق ${matched.length}. اعتماد التحديث؟`))applyAndNotify(preview)}
-async function applyAndNotify(preview){const btn=document.getElementById('jmsApplyDebtAging'),progress=document.getElementById('jmsImportProgress');if(btn){btn.disabled=true;btn.textContent='جاري التحديث...'}if(progress){progress.style.display='block';progress.textContent='بدء التحديث...'}try{await sleep(30);const out=await applyPreview(preview,(done,total)=>{if(progress)progress.textContent=`تحديث العملاء: ${done} من ${total}`});if(progress)progress.textContent='تم حفظ البيانات، جاري تحديث الواجهة...';if(typeof closeModal==='function')closeModal();await sleep(50);if(typeof renderCustomers==='function')renderCustomers();else if(typeof renderAll==='function')setTimeout(()=>renderAll(),0);scheduleDecorate();alert(`تم تحديث أعمار الديون بنجاح\nتم تصفير: ${out.zeroed}\nدفعات مقدمة: ${out.advances}\nديون 500 فأكثر: ${out.debts}`)}catch(error){console.error('Debt aging import failed',error);if(progress){progress.style.display='block';progress.textContent='تعذر إكمال الحفظ'}alert('تعذر حفظ تحديث أعمار الديون. لم يكتمل التحديث السحابي.');if(btn){btn.disabled=false;btn.textContent='اعتماد التحديث'}}}
-async function processFile(file){if(!canUse())return alert('هذه الميزة متاحة للمدير فقط');if(!window.XLSX)return alert('مكتبة Excel غير محملة في النظام');try{const buf=await file.arrayBuffer(),book=XLSX.read(buf,{type:'array'}),sheet=book.Sheets[book.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''}),preview=buildPreview(rows);if(!preview.matched.length)return alert('لم أجد عملاء مطابقين لياسر. لم يتم تعديل أي بيانات.');showPreview(preview)}catch(error){console.error(error);alert(error?.message||'تعذر قراءة ملف أعمار الديون')}}
-injectStyle();const root=document.getElementById('appView')||document.body;const observer=new MutationObserver(mutations=>{let relevant=false;for(const m of mutations){if([...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('#customersGrid,.customer-card')||n.querySelector?.('.customer-card')))){relevant=true;break}}injectButton();if(relevant)scheduleDecorate()});observer.observe(root,{childList:true,subtree:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{injectButton();scheduleDecorate()});else{injectButton();scheduleDecorate()}window.jmsDebtAgingImport={version:VERSION,processFile,decorateCards:scheduleDecorate};
+  'use strict';
+  function loadSmartDebtImport(cb){
+    if(window.openSmartDebtImport){ cb && cb(); return; }
+    var existing=document.getElementById('jms-update-15b-smart-debt-import');
+    if(!existing){
+      var s=document.createElement('script');
+      s.id='jms-update-15b-smart-debt-import';
+      s.src='smart-debt-import-rep-conflicts.js?v=20260822-1115';
+      s.defer=true;
+      s.onload=function(){ cb && cb(); };
+      document.body.appendChild(s);
+    }else{
+      setTimeout(function(){ cb && cb(); }, 500);
+    }
+  }
+  function openSmart(){
+    loadSmartDebtImport(function(){
+      if(window.openSmartDebtImport) window.openSmartDebtImport();
+      else alert('جاري تحميل استيراد الديون الذكي. حدث الصفحة ثم جرب مرة أخرى.');
+    });
+  }
+  function fixOldButton(){
+    if(!window.currentUser || window.currentUser.role!=='admin') return;
+    var oldInput=document.getElementById('jmsDebtAgingFileInput');
+    if(oldInput) oldInput.remove();
+    var old=document.getElementById('jmsDebtAgingImportBtn');
+    if(old){
+      old.textContent='استيراد الديون الذكي';
+      old.onclick=openSmart;
+      old.removeAttribute('data-old-yaser-import');
+      return;
+    }
+    var page=document.getElementById('customers');
+    if(!page) return;
+    var head=page.querySelector('.page-head');
+    if(!head) return;
+    var actions=head.querySelector('.head-actions');
+    if(!actions){ actions=document.createElement('div'); actions.className='head-actions'; head.appendChild(actions); }
+    if(document.getElementById('jmsSmartDebtImportBtn')) return;
+    var btn=document.createElement('button');
+    btn.id='jmsSmartDebtImportBtn';
+    btn.type='button';
+    btn.className='primary secondary';
+    btn.textContent='استيراد الديون الذكي';
+    btn.onclick=openSmart;
+    actions.appendChild(btn);
+  }
+  window.openDebtAgingImport=openSmart;
+  window.openSmartDebtImportSafe=openSmart;
+  window.addEventListener('load',function(){ setTimeout(function(){ loadSmartDebtImport(fixOldButton); },300); });
+  setInterval(fixOldButton,1200);
 })();
