@@ -5,27 +5,20 @@ window.JMS_CLOUD = {
   API_SYNC: true
 };
 
-// JMS Update 15 loader: smart import by representative + duplicate/conflict protection.
+// JMS Update 15 + 15B loader: smart customer/debt import by representative + duplicate/conflict protection.
 (function(){
-  function loadUpdate15(){
-    if(!document.getElementById('jms-update-15-smart-import')){
-      var s=document.createElement('script');
-      s.id='jms-update-15-smart-import';
-      s.src='smart-import-rep-conflicts.js?v=20260822-1046';
-      s.defer=true;
-      document.body.appendChild(s);
-    }
-    if(!document.getElementById('jms-update-15b-smart-debt-import')){
-      var d=document.createElement('script');
-      d.id='jms-update-15b-smart-debt-import';
-      d.src='smart-debt-import-rep-conflicts.js?v=20260822-1108';
-      d.defer=true;
-      document.body.appendChild(d);
-    }
+  function addScript(id, src){
+    if(document.getElementById(id)) return;
+    var s=document.createElement('script');
+    s.id=id;
+    s.src=src;
+    s.defer=true;
+    document.body.appendChild(s);
   }
-  if(document.readyState==='complete'){
-    setTimeout(loadUpdate15, 300);
-  }else{
-    window.addEventListener('load', function(){ setTimeout(loadUpdate15, 300); });
+  function loadUpdates(){
+    addScript('jms-update-15-smart-import','smart-import-rep-conflicts.js?v=20260822-1115');
+    addScript('jms-update-15b-smart-debt-import','smart-debt-import-rep-conflicts.js?v=20260822-1115');
   }
+  if(document.readyState==='complete') setTimeout(loadUpdates, 200);
+  else window.addEventListener('load', function(){ setTimeout(loadUpdates, 200); });
 })();
