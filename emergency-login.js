@@ -1,13 +1,10 @@
 (function () {
   'use strict';
 
-  // Keep login fields isolated from legacy document-level handlers that
-  // re-render/translate the app and clear mobile input values.
+  // Core 2.0 secure login bridge. Auth tokens live in sessionStorage only.
   function protectLoginInput(event) {
     var target = event.target;
-    if (target && (target.id === 'loginEmail' || target.id === 'loginPassword')) {
-      event.stopImmediatePropagation();
-    }
+    if (target && (target.id === 'loginEmail' || target.id === 'loginPassword')) event.stopImmediatePropagation();
   }
   ['beforeinput', 'input', 'change', 'keydown', 'keyup'].forEach(function (type) {
     document.addEventListener(type, protectLoginInput, true);
@@ -21,6 +18,13 @@
     hint.style.fontWeight = '700';
   }
 
+  function clearLegacyPersistentTokens(){
+    try{
+      localStorage.removeItem('jms_auth_token');
+      localStorage.removeItem('jms_auth_token_saved_at');
+    }catch(_){ }
+  }
+
   async function emergencyLogin(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -32,15 +36,8 @@
     var email = (emailInput && emailInput.value || '').trim();
     var password = passwordInput && passwordInput.value || '';
 
-    if (!email || !password) {
-      setStatus('اكتب البريد الإلكتروني وكلمة المرور', true);
-      return;
-    }
-
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'جاري التحقق...';
-    }
+    if (!email || !password) { setStatus('اكتب البريد الإلكتروني وكلمة المرور', true); return; }
+    if (button) { button.disabled = true; button.textContent = 'جاري التحقق...'; }
     setStatus('جاري التحقق من الحساب...', false);
 
     try {
@@ -50,52 +47,33 @@
         body: JSON.stringify({email: email, password: password})
       });
       var data = await response.json().catch(function () { return {}; });
+      if (!response.ok || !data.user || !data.token) { setStatus('البريد أو كلمة المرور غير صحيحة', true); return; }
 
-      if (!response.ok || !data.user) {
-        setStatus('البريد أو كلمة المرور غير صحيحة', true);
-        return;
-      }
-
-      var user = {
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-        role: data.user.role
-      };
-      var userJson = JSON.stringify(user);
-      sessionStorage.setItem('jms_current_user', userJson);
-      localStorage.setItem('jms_current_user', userJson);
-      if (data.token) {
-        sessionStorage.setItem('jms_auth_token', data.token);
-        localStorage.setItem('jms_auth_token', data.token);
-        localStorage.setItem('jms_auth_token_saved_at', String(Date.now()));
-      }
+      var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role };
+      sessionStorage.setItem('jms_current_user', JSON.stringify(user));
+      sessionStorage.setItem('jms_auth_token', data.token);
+      // Keep only non-secret display identity persistent for legacy UI compatibility.
+      localStorage.setItem('jms_current_user', JSON.stringify(user));
+      clearLegacyPersistentTokens();
       window.currentUser = user;
       setStatus('تم الدخول بنجاح', false);
-
-      // Reload so app.js initializes its private currentUser state from storage.
       location.replace('/?login-session=' + Date.now());
     } catch (error) {
       setStatus('تعذر الاتصال بخدمة الدخول. حاول مرة أخرى.', true);
     } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'دخول النظام';
-      }
+      if (button) { button.disabled = false; button.textContent = 'دخول النظام'; }
+      if(passwordInput) passwordInput.value='';
     }
   }
 
   function install() {
+    clearLegacyPersistentTokens();
     var form = document.getElementById('loginForm');
     if (!form || form.dataset.emergencyLogin === '1') return;
     form.dataset.emergencyLogin = '1';
     form.addEventListener('submit', emergencyLogin, true);
-    setStatus('خدمة الدخول جاهزة', false);
+    setStatus('خدمة الدخول الآمن جاهزة', false);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', install);
-  } else {
-    install();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install); else install();
 })();
