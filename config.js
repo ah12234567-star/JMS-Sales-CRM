@@ -5,7 +5,7 @@ window.JMS_CLOUD = {
   API_SYNC: true
 };
 
-// JMS Update 15 + 15B + 15C + 16 loader: smart import, debt scope, and route discovery.
+// JMS updates loader.
 (function(){
   function addScript(id, src){
     if(document.getElementById(id)) return;
@@ -16,11 +16,12 @@ window.JMS_CLOUD = {
     document.body.appendChild(s);
   }
   function loadUpdates(){
-    addScript('jms-update-15-smart-import','smart-import-rep-conflicts.js?v=20260823-1206');
-    addScript('jms-update-15b-smart-debt-import','smart-debt-import-rep-conflicts.js?v=20260823-1206');
-    addScript('jms-update-15b-smart-debt-import-v2','smart-debt-import-rep-conflicts-v2.js?v=20260823-1206');
-    addScript('jms-update-15c-customer-phone-update-v2','smart-customer-phone-update-v2.js?v=20260823-1206');
-    addScript('jms-update-16-ai-route-fixes','update-16-ai-route-fixes.js?v=20260823-1206');
+    addScript('jms-update-15-smart-import','smart-import-rep-conflicts.js?v=20260829-0915');
+    addScript('jms-update-15b-smart-debt-import','smart-debt-import-rep-conflicts.js?v=20260829-0915');
+    addScript('jms-update-15b-smart-debt-import-v2','smart-debt-import-rep-conflicts-v2.js?v=20260829-0915');
+    addScript('jms-update-15c-customer-phone-update-v2','smart-customer-phone-update-v2.js?v=20260829-0915');
+    addScript('jms-update-16-ai-route-fixes','update-16-ai-route-fixes.js?v=20260829-0915');
+    addScript('jms-update-17-factory-rep','update-17-factory-rep.js?v=20260829-0915');
   }
   if(document.readyState==='complete') setTimeout(loadUpdates, 200);
   else window.addEventListener('load', function(){ setTimeout(loadUpdates, 200); });
