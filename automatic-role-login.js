@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '2026-08-automatic-role-login-v3';
+  const VERSION = '2026-08-29-automatic-role-login-core2';
   const labels = {
     admin: 'مدير النظام',
     sales: 'مدير المبيعات',
@@ -38,14 +38,14 @@
     document.head.appendChild(script);
   }
 
-  function loadDebtAgingImport() { loadScript('jmsDebtAgingImportScript', '/debt-aging-import.js?v=20260815-3'); }
+  // Debt import is now loaded only by config.js through the Core 2.0 compatibility layer.
+  // This prevents two import engines from being injected at the same time.
   function loadRepLiveLocation() { loadScript('jmsRepLiveLocationScript', '/rep-live-location.js?v=20260815-5'); }
   function loadManagerFieldVisits() { loadScript('jmsManagerFieldVisitsScript', '/manager-field-visits.js?v=20260815-1'); }
 
   function install() {
     injectStyle();
     applyAutomaticRoleUi();
-    loadDebtAgingImport();
     loadRepLiveLocation();
     loadManagerFieldVisits();
     const app=document.getElementById('appView');
@@ -55,8 +55,7 @@
 
   function injectStyle() {
     if (document.getElementById('jmsAutomaticRoleStyle')) return;
-    const style = document.createElement('style');
-    style.id = 'jmsAutomaticRoleStyle';
+    const style = document.createElement('style');style.id = 'jmsAutomaticRoleStyle';
     style.textContent = `
       .role-switch{display:none!important}
       .jms-auto-role-note{display:flex;align-items:center;gap:11px;text-align:right;margin:0 0 18px;padding:12px 13px;border:1px solid #dbe7e3;border-radius:13px;background:#f0fdf4;color:#166534}
