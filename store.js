@@ -17,6 +17,7 @@
   const session=storeSession();
   const customerToken=()=>localStorage.getItem(CUSTOMER_TOKEN_KEY)||'';
   const customerHeaders=()=>({'Content-Type':'application/json',...(customerToken()?{Authorization:`Bearer ${customerToken()}`}:{})});
+  let authReturnToCart=false;
 
   function loadCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||'[]')}catch(_){return[]}}
   function loadCustomer(){try{return JSON.parse(localStorage.getItem(CUSTOMER_KEY)||'{}')}catch(_){return{}}}
@@ -194,7 +195,7 @@
   }
   async function verifyCustomerOtp(form){
     const button=form.querySelector('button[type=submit]'),error=form.querySelector('[data-auth-error]'),values=Object.fromEntries(new FormData(form).entries());button.disabled=true;button.textContent='جارٍ التحقق...';error.textContent='';
-    try{const response=await fetch('/api/customer-otp-verify',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify(values)}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'رمز التحقق غير صحيح');localStorage.setItem(CUSTOMER_TOKEN_KEY,data.token);localStorage.setItem(CUSTOMER_KEY,JSON.stringify(data.customer||{}));syncAccountButton();closeDialog('customerAuthDialog');renderCart();await openCustomerAccount();toast('تم تسجيل الدخول بنجاح')}catch(err){error.textContent=err.message;button.disabled=false;button.textContent='تأكيد ودخول'}
+    try{const response=await fetch('/api/customer-otp-verify',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify(values)}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'رمز التحقق غير صحيح');localStorage.setItem(CUSTOMER_TOKEN_KEY,data.token);localStorage.setItem(CUSTOMER_KEY,JSON.stringify(data.customer||{}));syncAccountButton();closeDialog('customerAuthDialog');renderCart();if(authReturnToCart){authReturnToCart=false;openDialog('cartDialog')}else await openCustomerAccount();toast('تم التحقق من رقم الجوال بنجاح')}catch(err){error.textContent=err.message;button.disabled=false;button.textContent='تأكيد ودخول'}
   }
   async function openCustomerAccount(){
     if(!customerToken())return openCustomerLogin(loadCustomer().phone||'');$('customerAccountBody').innerHTML='<div class="customer-account-content"><h2>حسابي وطلباتي</h2><div class="customer-account-empty">جارٍ تحميل بياناتك...</div></div>';openDialog('customerAccountDialog');
@@ -205,6 +206,7 @@
   }
 
   async function submitOrder(form){
+    if(!customerToken()){const phone=new FormData(form).get('phone')||'';authReturnToCart=true;openCustomerLogin(phone);toast('تحقق من رقم الجوال أولًا لإتمام الطلب');return}
     const button=form.querySelector('button[type=submit]');button.disabled=true;button.textContent='جارٍ إرسال الطلب...';
     const values=Object.fromEntries(new FormData(form).entries());
     if(values.remember)localStorage.setItem(CUSTOMER_KEY,JSON.stringify({name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes}));
@@ -222,7 +224,8 @@
     const close=event.target.closest('[data-close]');if(close){closeDialog(close.dataset.close);return}
     const remove=event.target.closest('[data-remove-index]');if(remove){state.cart.splice(Number(remove.dataset.removeIndex),1);saveCart();renderCart();return}
     const qty=event.target.closest('[data-qty-action]');if(qty){const index=Number(qty.dataset.qtyIndex),current=Number(state.cart[index]?.quantity||1);updateCartQuantity(index,current+(qty.dataset.qtyAction==='plus'?1:-1));return}
-    if(event.target.closest('#customerAccountButton')||event.target.closest('[data-customer-login]')){openCustomerAccount();return}
+    if(event.target.closest('#customerAccountButton')){authReturnToCart=false;openCustomerAccount();return}
+    if(event.target.closest('[data-customer-login]')){authReturnToCart=true;openCustomerAccount();return}
     if(event.target.closest('[data-edit-phone]')){openCustomerLogin(event.target.closest('form')?.phone?.value||'');return}
     if(event.target.closest('[data-customer-logout]')){localStorage.removeItem(CUSTOMER_TOKEN_KEY);syncAccountButton();closeDialog('customerAccountDialog');toast('تم تسجيل الخروج');return}
     const reorder=event.target.closest('[data-reorder]');if(reorder){reorderOrder(reorder.dataset.reorder);return}

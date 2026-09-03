@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v37-customer-otp';
+const CACHE_NAME='jms-crm-app-v38-required-customer-otp';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
