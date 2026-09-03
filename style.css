@@ -935,3 +935,6 @@ body{background:#f3f6fb}
   #dashboard .stats{grid-template-columns:1fr!important}
   #dashboard .stat{min-height:112px}
 }
+/* Customer-facing store entry on the secure login screen. */
+.customer-store-entry{display:flex;align-items:center;justify-content:center;width:100%;margin-top:10px;padding:11px 14px;border:1px solid #0f766e;border-radius:12px;color:#0f766e;text-decoration:none;font-weight:800;background:#ecfdf5}
+.customer-store-entry:hover{background:#d1fae5}

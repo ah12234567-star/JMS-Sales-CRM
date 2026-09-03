@@ -3,6 +3,8 @@
     { "source": "/vendor/xlsx.min.js", "destination": "/api/vendor-xlsx" },
     { "source": "/vendor/html2pdf.bundle.min.js", "destination": "/api/vendor-html2pdf" },
     { "source": "/quote", "destination": "/quote.html" },
+    { "source": "/store", "destination": "/store.html" },
+    { "source": "/store.html", "destination": "/store.html" },
     { "source": "/production", "destination": "/production.html" },
     { "source": "/production.html", "destination": "/production.html" },
     { "source": "/production-preview.html", "destination": "/production-preview.html" },

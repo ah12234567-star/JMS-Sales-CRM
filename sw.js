@@ -1,6 +1,9 @@
-const CACHE_NAME='jms-crm-app-v27-radar-ownership';
+const CACHE_NAME='jms-crm-app-v28-customer-store';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
+  '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
+  '/assets/store/bags.webp','/assets/store/tableware.webp','/assets/store/packaging.webp',
+  '/assets/store/cleaning.webp','/assets/store/general.webp',
   '/offline-sync.js','/authenticated-cloud-sync.js','/radar-lead-ownership.js',
   '/jms-core-v2.js','/jms-core-v2-workflows.js','/quote-manager-approval.js',
   '/quote-product-specs.js','/quote-smart-assistant.js','/automatic-role-login.js',
@@ -37,12 +40,14 @@ self.addEventListener('fetch',event=>{
   if(request.method!=='GET'||url.pathname.startsWith('/api/')) return;
 
   if(request.mode==='navigate'){
+    const storePage=url.pathname==='/store'||url.pathname==='/store.html'||url.pathname.startsWith('/store/');
+    const fallback=storePage?'/store.html':'/index.html';
     event.respondWith(
       fetch(request,{cache:'no-store'}).then(response=>{
         const copy=response.clone();
-        caches.open(CACHE_NAME).then(cache=>cache.put('/index.html',copy));
+        caches.open(CACHE_NAME).then(cache=>cache.put(fallback,copy));
         return response;
-      }).catch(()=>caches.match('/index.html'))
+      }).catch(()=>caches.match(fallback))
     );
     return;
   }

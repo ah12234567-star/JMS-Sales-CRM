@@ -41,6 +41,7 @@ try {
     addScript('jms-update-17-factory-rep','update-17-factory-rep.js?v=20260829-core2-3a');
     addScript('jms-update-19-osama-rep','update-19-osama-rep.js?v=20260903-osama-1');
     addScript('jms-radar-global-ownership','radar-lead-ownership.js?v=20260903-global-ownership-1');
+    addScript('jms-store-admin','store-admin.js?v=20260903-store-1');
   }
   if(document.readyState==='complete') setTimeout(loadUpdates, 120);
   else window.addEventListener('load', function(){ setTimeout(loadUpdates, 120); });

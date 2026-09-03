@@ -1,0 +1,17 @@
+{
+  "name":"متجر شركة جدة النموذجية للصناعة",
+  "short_name":"متجر JMS",
+  "id":"/store",
+  "start_url":"/store",
+  "scope":"/",
+  "display":"standalone",
+  "background_color":"#f4f7f8",
+  "theme_color":"#0b2530",
+  "lang":"ar",
+  "dir":"rtl",
+  "icons":[
+    {"src":"/assets/jms-icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"/assets/jms-icon-512.png","sizes":"512x512","type":"image/png"},
+    {"src":"/assets/jms-icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
