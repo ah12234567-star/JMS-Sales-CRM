@@ -1,9 +1,15 @@
-const CACHE_NAME='jms-crm-app-v28-customer-store';
+const CACHE_NAME='jms-crm-app-v29-store-categories';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
   '/assets/store/bags.webp','/assets/store/tableware.webp','/assets/store/packaging.webp',
   '/assets/store/cleaning.webp','/assets/store/general.webp',
+  '/assets/store/categories/tableware.webp','/assets/store/categories/cups.webp',
+  '/assets/store/categories/paper-bags.webp','/assets/store/categories/safety.webp',
+  '/assets/store/categories/trash-bags.webp','/assets/store/categories/plates.webp',
+  '/assets/store/categories/containers.webp','/assets/store/categories/wrapping.webp',
+  '/assets/store/categories/picnic.webp','/assets/store/categories/cleaning.webp',
+  '/assets/store/categories/tissues.webp','/assets/store/categories/general.webp',
   '/offline-sync.js','/authenticated-cloud-sync.js','/radar-lead-ownership.js',
   '/jms-core-v2.js','/jms-core-v2-workflows.js','/quote-manager-approval.js',
   '/quote-product-specs.js','/quote-smart-assistant.js','/automatic-role-login.js',

@@ -10,11 +10,13 @@ function recordId(sku){return `store-product-${clean(sku).replace(/[^a-zA-Z0-9_-
 function manager(auth){return Boolean(auth&&MANAGER_ROLES.has(auth.role))}
 
 function imageFor(category){
-  if(category==='الأكياس') return '/assets/store/bags.webp';
-  if(['الكاسات والمشروبات','الصحون','علب الطعام','أدوات المائدة'].includes(category)) return '/assets/store/tableware.webp';
-  if(['التغليف','السفر والمفارش','الورق والأكياس'].includes(category)) return '/assets/store/packaging.webp';
-  if(['السلامة والنظافة','مواد النظافة'].includes(category)) return '/assets/store/cleaning.webp';
-  return '/assets/store/general.webp';
+  return ({
+    'أدوات المائدة':'tableware.webp','الكاسات والمشروبات':'cups.webp',
+    'الورق والأكياس':'paper-bags.webp','السلامة والنظافة':'safety.webp',
+    'الأكياس':'trash-bags.webp','الصحون':'plates.webp','علب الطعام':'containers.webp',
+    'التغليف':'wrapping.webp','السفر والمفارش':'picnic.webp','مواد النظافة':'cleaning.webp',
+    'المناديل':'tissues.webp','أصناف أخرى':'general.webp',
+  }[category]||'general.webp').replace(/^/,'/assets/store/categories/');
 }
 
 function normalizeTiers(tiers){

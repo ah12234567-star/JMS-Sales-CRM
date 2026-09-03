@@ -43,13 +43,11 @@
 
   function renderCatalog(){
     const products=visibleProducts();
-    $('catalogTitle').textContent=state.category==='الكل'?'جميع المنتجات':state.category;
-    $('catalogSummary').textContent=`${products.length} منتج رئيسي — اختر المنتج لعرض المقاسات والأسعار`;
-    $('catalogGrid').innerHTML=products.length?products.map(product=>`
+    $('catalogTitle').textContent=state.category==='الكل'?'جميع الأقسام':state.category;
+    $('catalogSummary').textContent=`${products.length} منتج رئيسي — كل قسم معروض بشكل مستقل`;
+    const productCard=product=>`
       <article class="product-card">
-        <img class="product-image" src="${esc(product.image)}" alt="${esc(product.name)}" loading="lazy">
         <div class="product-card-body">
-          <span class="product-category">${esc(product.category)}</span>
           <h3>${esc(product.name)}</h3>
           <span class="product-meta">${product.variants.length} مقاس أو اختيار</span>
           <div class="product-card-footer">
@@ -57,7 +55,19 @@
             <button type="button" class="view-product" data-product-id="${esc(product.id)}">عرض الخيارات</button>
           </div>
         </div>
-      </article>`).join(''):'<div class="store-empty">لا توجد منتجات مطابقة للبحث.</div>';
+      </article>`;
+    const categories=state.category==='الكل'?state.categories:[state.category];
+    $('catalogGrid').innerHTML=products.length?categories.map(category=>{
+      const categoryProducts=products.filter(product=>product.category===category);
+      if(!categoryProducts.length)return '';
+      return `<section class="category-section">
+        <header class="category-section-header">
+          <img src="${esc(categoryProducts[0].image)}" alt="${esc(category)}" loading="lazy">
+          <div><span>قسم المنتجات</span><h3>${esc(category)}</h3><p>${categoryProducts.length} منتجات — اختر الصنف ثم المقاس والتعبئة</p></div>
+        </header>
+        <div class="category-product-grid">${categoryProducts.map(productCard).join('')}</div>
+      </section>`;
+    }).join(''):'<div class="store-empty">لا توجد منتجات مطابقة للبحث.</div>';
   }
 
   function openProduct(productId){
