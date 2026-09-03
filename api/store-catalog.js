@@ -76,6 +76,7 @@ export default async function handler(req,res){
   try{
     if(req.method==='GET'){
       const auth=authFromRequest(req);
+      if(req.query?.admin!=='1'&&auth?.role!=='admin') return json(res,403,{ok:false,error:'store_private'});
       const items=await catalogInternal();
       if(req.query?.admin==='1'){
         if(!manager(auth)) return json(res,403,{ok:false,error:'forbidden'});

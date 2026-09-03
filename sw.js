@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v29-store-categories';
+const CACHE_NAME='jms-crm-app-v30-private-store';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',

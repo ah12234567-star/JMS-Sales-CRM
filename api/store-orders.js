@@ -33,6 +33,8 @@ async function findOrCreateCustomer(input,phone){
 export default async function handler(req,res){
   try{
     if(req.method==='POST'){
+      const auth=authFromRequest(req);
+      if(auth?.role!=='admin')return json(res,403,{ok:false,error:'store_private'});
       const body=await readBody(req);
       if(clean(body.website,50)) return json(res,400,{ok:false,error:'invalid_request'});
       const customerInput=body.customer||{};

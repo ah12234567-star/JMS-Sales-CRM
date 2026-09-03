@@ -1,4 +1,8 @@
 {
+  "headers": [
+    { "source": "/store", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }] },
+    { "source": "/store.html", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }] }
+  ],
   "rewrites": [
     { "source": "/vendor/xlsx.min.js", "destination": "/api/vendor-xlsx" },
     { "source": "/vendor/html2pdf.bundle.min.js", "destination": "/api/vendor-html2pdf" },

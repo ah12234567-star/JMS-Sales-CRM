@@ -5,6 +5,14 @@
   const $=id=>document.getElementById(id);
   const money=value=>Number(value||0).toLocaleString('ar-SA',{minimumFractionDigits:0,maximumFractionDigits:2});
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  function storeSession(){
+    try{
+      const user=JSON.parse(sessionStorage.getItem('jms_current_user')||'null');
+      const token=sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token')||'';
+      return user?.role==='admin'&&token?{user,token}:null;
+    }catch(_){return null}
+  }
+  const session=storeSession();
 
   function loadCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||'[]')}catch(_){return[]}}
   function saveCart(){localStorage.setItem(CART_KEY,JSON.stringify(state.cart));renderCartCount()}
@@ -16,7 +24,7 @@
 
   async function loadCatalog(){
     try{
-      const response=await fetch('/api/store-catalog',{headers:{Accept:'application/json'}});
+      const response=await fetch('/api/store-catalog',{headers:{Accept:'application/json',Authorization:`Bearer ${session.token}`}});
       const data=await response.json();
       if(!response.ok||!data.ok)throw new Error(data.error||'catalog_failed');
       state.products=data.products||[];state.categories=data.categories||[];
@@ -146,7 +154,7 @@
     const button=form.querySelector('button[type=submit]');button.disabled=true;button.textContent='جارٍ إرسال الطلب...';
     const values=Object.fromEntries(new FormData(form).entries());
     try{
-      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer:{name:values.name,phone:values.phone,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
+      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({customer:{name:values.name,phone:values.phone,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
       const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||data.error||'تعذر إرسال الطلب');
       state.cart=[];saveCart();$('cartDialogBody').innerHTML=`<div class="order-success"><span class="check">✓</span><h2>تم استلام طلبك</h2><p>رقم الطلب: <b>${esc(data.order_no)}</b><br>الإجمالي: <b>${money(data.total)} ر.س</b><br>سيتواصل معك فريق المبيعات لتأكيد الطلب والتسليم.</p></div>`;
     }catch(error){toast(error.message);button.disabled=false;button.textContent='إرسال الطلب إلى المصنع'}
@@ -164,6 +172,10 @@
   document.addEventListener('input',event=>{if(event.target.id==='catalogSearch'){state.search=event.target.value;renderCatalog()}if(event.target.id==='variantQuantity')updateDialogPrice()});
   document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}});
   document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+  if(!session){
+    document.body.innerHTML='<main class="private-store"><div class="private-store-card"><img src="/assets/company-logo.svg" alt="شركة جدة النموذجية للصناعة"><span>المتجر تحت التجهيز</span><h1>الدخول خاص بالإدارة حاليًا</h1><p>سيتم فتح المتجر للعملاء بعد اكتمال مراجعة المنتجات والأسعار.</p><a href="/">دخول الإدارة</a></div></main>';
+    return;
+  }
   renderCartCount();loadCatalog();
   if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 })();
