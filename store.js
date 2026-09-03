@@ -19,7 +19,7 @@
   function toast(message){const box=$('storeToast');box.textContent=message;box.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.classList.remove('show'),2200)}
   function openDialog(id){const dialog=$(id);if(dialog&&!dialog.open)dialog.showModal()}
   function closeDialog(id){const dialog=$(id);if(dialog?.open)dialog.close()}
-  function tierPrice(variant,quantity){let price=Number(variant.price||0);for(const tier of [...(variant.tiers||[])].sort((a,b)=>Number(a.min_qty)-Number(b.min_qty))){if(quantity>=Number(tier.min_qty||0))price=Number(tier.price||price)}return price}
+  function tierPrice(variant,quantity){let price=Number(variant.price??variant.base_price??0);for(const tier of [...(variant.tiers||[])].sort((a,b)=>Number(a.min_qty)-Number(b.min_qty))){if(quantity>=Number(tier.min_qty||0))price=Number(tier.price||price)}return price}
   function attrText(attributes){return Object.entries(attributes||{}).map(([key,value])=>`${key}: ${value}`).join(' · ')}
 
   async function loadCatalog(){
@@ -133,7 +133,7 @@
     if(quantity>Number(variant.stock))return toast('الكمية المطلوبة أكبر من المخزون المتوفر');
     const existing=state.cart.find(item=>item.variant_id===variant.id);
     if(existing)existing.quantity=Math.round((Number(existing.quantity)+quantity)*100)/100;
-    else state.cart.push({variant_id:variant.id,product_name:product.name,attributes:variant.attributes,unit:variant.unit,quantity,image:product.image,base_price:variant.price,tiers:variant.tiers||[]});
+    else state.cart.push({variant_id:variant.id,product_name:product.name,attributes:variant.attributes,unit:variant.unit,quantity,image:product.image,price:variant.price,base_price:variant.price,tiers:variant.tiers||[]});
     saveCart();closeDialog('productDialog');toast('تمت إضافة الصنف إلى السلة');
   }
 
