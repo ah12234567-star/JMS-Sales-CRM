@@ -25,7 +25,7 @@ async function findOrCreateCustomer(input,phone){
   if(existing)return existing;
   const now=new Date().toISOString();
   const id=`store-customer-${hash(phone)}`;
-  const customer={id,name:clean(input.name,120),phone,city:clean(input.city,80)||'جدة',district:clean(input.district,120),location:clean(input.address,300),category:'عميل متجر إلكتروني',status:'active',rep_id:'',debt_balance:0,credit_limit:0,notes:'تم إنشاؤه تلقائيًا من متجر العملاء',created_at:now,updated_at:now};
+  const customer={id,name:clean(input.name,120),phone,email:clean(input.email,160),city:clean(input.city,80)||'جدة',district:clean(input.district,120),location:clean(input.address,300),category:'عميل متجر إلكتروني',status:'active',rep_id:'',debt_balance:0,credit_limit:0,notes:'تم إنشاؤه تلقائيًا من متجر العملاء',created_at:now,updated_at:now};
   await supabase('jms_customers?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{id,data:customer,updated_at:now}])});
   return customer;
 }

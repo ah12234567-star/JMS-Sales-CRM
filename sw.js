@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v31-cart-price-fix';
+const CACHE_NAME='jms-crm-app-v32-cart-experience';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',

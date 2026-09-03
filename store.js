@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   const CART_KEY='jms_customer_store_cart_v1';
+  const CUSTOMER_KEY='jms_customer_store_details_v1';
   const state={products:[],categories:[],category:'الكل',availability:'all',search:'',cart:loadCart(),activeProduct:null,activeVariant:null};
   const $=id=>document.getElementById(id);
   const money=value=>Number(value||0).toLocaleString('ar-SA',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -15,6 +16,7 @@
   const session=storeSession();
 
   function loadCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||'[]')}catch(_){return[]}}
+  function loadCustomer(){try{return JSON.parse(localStorage.getItem(CUSTOMER_KEY)||'{}')}catch(_){return{}}}
   function saveCart(){localStorage.setItem(CART_KEY,JSON.stringify(state.cart));renderCartCount()}
   function toast(message){const box=$('storeToast');box.textContent=message;box.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.classList.remove('show'),2200)}
   function openDialog(id){const dialog=$(id);if(dialog&&!dialog.open)dialog.showModal()}
@@ -133,7 +135,7 @@
     if(quantity>Number(variant.stock))return toast('الكمية المطلوبة أكبر من المخزون المتوفر');
     const existing=state.cart.find(item=>item.variant_id===variant.id);
     if(existing)existing.quantity=Math.round((Number(existing.quantity)+quantity)*100)/100;
-    else state.cart.push({variant_id:variant.id,product_name:product.name,attributes:variant.attributes,unit:variant.unit,quantity,image:product.image,price:variant.price,base_price:variant.price,tiers:variant.tiers||[]});
+    else state.cart.push({variant_id:variant.id,product_name:product.name,attributes:variant.attributes,unit:variant.unit,quantity,image:product.image,price:variant.price,base_price:variant.price,stock:variant.stock,tiers:variant.tiers||[]});
     saveCart();closeDialog('productDialog');toast('تمت إضافة الصنف إلى السلة');
   }
 
@@ -144,17 +146,33 @@
   function renderCart(){
     if(!state.cart.length){$('cartDialogBody').innerHTML='<div class="cart-content"><h2>سلة الطلب</h2><div class="store-empty">السلة فارغة. اختر المنتجات والمقاسات أولًا.</div></div>';return}
     const total=state.cart.reduce((sum,item)=>sum+tierPrice(item,Number(item.quantity))*Number(item.quantity),0);
-    $('cartDialogBody').innerHTML=`<div class="cart-content"><h2>سلة الطلب</h2><div class="cart-list">${state.cart.map((item,index)=>`
-      <div class="cart-item"><div><h3>${esc(item.product_name)}</h3><p>${esc(attrText(item.attributes))}</p><p>${money(item.quantity)} ${esc(item.unit)} × ${money(tierPrice(item,Number(item.quantity)))} ر.س</p></div><div class="cart-item-total"><b>${money(tierPrice(item,Number(item.quantity))*Number(item.quantity))} ر.س</b><button class="remove-item" type="button" data-remove-index="${index}">حذف</button></div></div>`).join('')}</div>
+    const customer=loadCustomer();
+    const cities=['جدة','مكة المكرمة','الرياض','المدينة المنورة','الدمام','الخبر','الطائف','تبوك','أبها','خميس مشيط','جازان','ينبع','أخرى'];
+    $('cartDialogBody').innerHTML=`<div class="cart-content"><div class="cart-title"><h2>سلة الطلب</h2><span>${state.cart.length} أصناف</span></div><div class="cart-list">${state.cart.map((item,index)=>{const unitPrice=tierPrice(item,Number(item.quantity));const lineTotal=unitPrice*Number(item.quantity);return `
+      <div class="cart-item">
+        <img class="cart-item-image" src="${esc(item.image)}" alt="${esc(item.product_name)}">
+        <div class="cart-item-info"><h3>${esc(item.product_name)}</h3><p>${esc(attrText(item.attributes))}</p><div class="cart-unit-price">${unitPrice?`السعر: <b>${money(unitPrice)} ر.س</b> / ${esc(item.unit)}`:'<b>السعر عند الطلب</b>'}</div><div class="cart-item-controls"><span>الكمية:</span><div class="quantity-stepper"><button type="button" data-qty-action="minus" data-qty-index="${index}" aria-label="نقص الكمية">−</button><input data-cart-quantity="${index}" type="number" min="1" step="1" value="${Number(item.quantity)}" aria-label="كمية ${esc(item.product_name)}"><button type="button" data-qty-action="plus" data-qty-index="${index}" aria-label="زيادة الكمية">+</button></div></div></div>
+        <div class="cart-item-side"><button class="remove-item" type="button" data-remove-index="${index}" aria-label="حذف ${esc(item.product_name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>حذف</span></button><div class="cart-item-total"><small>المجموع</small><b>${unitPrice?`${money(lineTotal)} ر.س`:'طلب سعر'}</b></div></div>
+      </div>`}).join('')}</div>
       <div class="cart-total"><span>الإجمالي المبدئي</span><b>${money(total)} ر.س</b></div>
-      <form id="checkoutForm" class="checkout-form"><label>الاسم<input name="name" required minlength="2" autocomplete="name"></label><label>رقم الجوال<input name="phone" required inputmode="tel" placeholder="05xxxxxxxx" autocomplete="tel"></label><label>المدينة<input name="city" value="جدة" required></label><label>الحي<input name="district" required></label><label class="wide">العنوان أو رابط الموقع<input name="address" placeholder="اكتب العنوان أو ألصق رابط الموقع"></label><label class="wide">ملاحظات<textarea name="notes" rows="3" placeholder="موعد مناسب، تعليمات التسليم..."></textarea></label><input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true"><button class="checkout-submit" type="submit">إرسال الطلب إلى المصنع</button></form></div>`;
+      <section class="shipping-section"><div class="shipping-heading"><div><span>بيانات الشحن والتوصيل</span><h3>أين نوصّل طلبك؟</h3></div><button type="button" class="customer-login" disabled title="يتطلب تفعيل رمز التحقق">دخول العميل قريبًا</button></div>
+      <form id="checkoutForm" class="checkout-form"><label>الاسم<input name="name" value="${esc(customer.name||'')}" required minlength="2" autocomplete="name"></label><label>رقم الجوال<input name="phone" value="${esc(customer.phone||'')}" required inputmode="tel" placeholder="05xxxxxxxx" autocomplete="tel"></label><label>البريد الإلكتروني <small>(اختياري)</small><input name="email" value="${esc(customer.email||'')}" type="email" placeholder="name@example.com" autocomplete="email"></label><label>المدينة<select name="city" required>${cities.map(city=>`<option value="${city}" ${(customer.city||'جدة')===city?'selected':''}>${city}</option>`).join('')}</select></label><label>الحي<input name="district" value="${esc(customer.district||'')}" required></label><label class="wide">العنوان أو رابط الموقع<input name="address" value="${esc(customer.address||'')}" placeholder="اكتب العنوان أو ألصق رابط الموقع"></label><label class="wide">ملاحظات<textarea name="notes" rows="3" placeholder="موعد مناسب، تعليمات التسليم...">${esc(customer.notes||'')}</textarea></label><label class="remember-details wide"><input type="checkbox" name="remember" ${Object.keys(customer).length?'checked':''}><span>حفظ بياناتي للطلب القادم على هذا الجهاز</span></label><input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true"><div class="checkout-sticky"><div><small>الإجمالي</small><b>${money(total)} ر.س</b></div><button class="checkout-submit" type="submit">إتمام الطلب</button></div></form></section></div>`;
+  }
+
+  function updateCartQuantity(index,value){
+    const item=state.cart[index];if(!item)return;
+    let quantity=Math.max(1,Math.round(Number(value||1)));
+    if(Number(item.stock)>0&&quantity>Number(item.stock)){quantity=Math.floor(Number(item.stock));toast('وصلت إلى الكمية المتوفرة في المخزون')}
+    item.quantity=quantity;saveCart();renderCart();
   }
 
   async function submitOrder(form){
     const button=form.querySelector('button[type=submit]');button.disabled=true;button.textContent='جارٍ إرسال الطلب...';
     const values=Object.fromEntries(new FormData(form).entries());
+    if(values.remember)localStorage.setItem(CUSTOMER_KEY,JSON.stringify({name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes}));
+    else localStorage.removeItem(CUSTOMER_KEY);
     try{
-      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({customer:{name:values.name,phone:values.phone,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
+      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({customer:{name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
       const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||data.error||'تعذر إرسال الطلب');
       state.cart=[];saveCart();$('cartDialogBody').innerHTML=`<div class="order-success"><span class="check">✓</span><h2>تم استلام طلبك</h2><p>رقم الطلب: <b>${esc(data.order_no)}</b><br>الإجمالي: <b>${money(data.total)} ر.س</b><br>سيتواصل معك فريق المبيعات لتأكيد الطلب والتسليم.</p></div>`;
     }catch(error){toast(error.message);button.disabled=false;button.textContent='إرسال الطلب إلى المصنع'}
@@ -165,10 +183,11 @@
     const product=event.target.closest('[data-product-id]');if(product){openProduct(product.dataset.productId);return}
     const close=event.target.closest('[data-close]');if(close){closeDialog(close.dataset.close);return}
     const remove=event.target.closest('[data-remove-index]');if(remove){state.cart.splice(Number(remove.dataset.removeIndex),1);saveCart();renderCart();return}
+    const qty=event.target.closest('[data-qty-action]');if(qty){const index=Number(qty.dataset.qtyIndex),current=Number(state.cart[index]?.quantity||1);updateCartQuantity(index,current+(qty.dataset.qtyAction==='plus'?1:-1));return}
     if(event.target.closest('#cartButton')){renderCart();openDialog('cartDialog');return}
     if(event.target.closest('#addCartButton'))addActiveToCart();
   });
-  document.addEventListener('change',event=>{if(event.target.matches('[data-attribute]'))chooseVariant(event.target.dataset.attribute,event.target.value);if(event.target.id==='availabilityFilter'){state.availability=event.target.value;renderCatalog()}});
+  document.addEventListener('change',event=>{if(event.target.matches('[data-attribute]'))chooseVariant(event.target.dataset.attribute,event.target.value);if(event.target.id==='availabilityFilter'){state.availability=event.target.value;renderCatalog()}if(event.target.matches('[data-cart-quantity]'))updateCartQuantity(Number(event.target.dataset.cartQuantity),event.target.value)});
   document.addEventListener('input',event=>{if(event.target.id==='catalogSearch'){state.search=event.target.value;renderCatalog()}if(event.target.id==='variantQuantity')updateDialogPrice()});
   document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}});
   document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
