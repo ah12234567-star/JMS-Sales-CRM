@@ -1,3 +1,6 @@
+import { json, authFromRequest } from './auth-utils.js';
+import { listGlobalCustomers, listRadarLeads, reserveRadarLead, sameLead } from './radar-lead-store.js';
+
 function sendJson(res, status, data){
   res.statusCode = status;
   res.setHeader('Content-Type','application/json; charset=utf-8');
@@ -22,12 +25,20 @@ function extractJson(text){
 export default async function handler(req,res){
   if(req.method === 'GET') return sendJson(res,200,{ok:true,route:'/api/new-customer-radar',message:'Use POST to search for new customer leads.'});
   if(req.method !== 'POST') return sendJson(res,405,{ok:false,error:'method_not_allowed',message:'Use POST only'});
+  const auth=authFromRequest(req);
+  if(!auth) return json(res,401,{ok:false,error:'unauthorized'});
   try{
-    const {city='جدة',industry='مطاعم وكوفيهات جديدة',keywords='افتتاح جديد opening soon new business',limit=12,existingCustomers=[]}=await readBody(req);
+    const {city='جدة',industry='مطاعم وكوفيهات جديدة',keywords='افتتاح جديد opening soon new business',limit=12,existingCustomers=[],assignedRepId=''}=await readBody(req);
+    const [globalCustomers,globalLeads]=await Promise.all([listGlobalCustomers(),listRadarLeads()]);
     const apiKey=process.env.OPENAI_API_KEY;
     if(!apiKey) return sendJson(res,200,{ok:false,error:'missing_openai_key',answer:'أضف OPENAI_API_KEY في Vercel لتفعيل رادار العملاء الجدد.'});
     const n=Math.max(3,Math.min(20,Number(limit)||12));
-    const prompt=`ابحث في الويب عن عملاء تجاريين جدد أو حديثي الظهور في السعودية يمكن أن يحتاجوا أكياس بلاستيك أو تغليف من مصنع.\nالمدينة/المنطقة: ${city}\nالنشاط المستهدف: ${industry}\nكلمات البحث: ${keywords}\nتجنب تكرار هؤلاء العملاء الموجودين: ${Array.isArray(existingCustomers)?existingCustomers.slice(0,80).join('، '):''}\n\nأعد JSON فقط بدون شرح، بهذا الشكل:\n[\n {"name":"اسم النشاط","business_type":"نوع النشاط","city":"المدينة","area":"الحي إن وجد","phone":"رقم منشور عام إن وجد فقط","website":"رابط الموقع إن وجد","maps_url":"رابط خرائط إن وجد","source_url":"رابط المصدر","evidence":"دليل مختصر أنه جديد/افتتاح/نشاط مناسب","fit_reason":"لماذا مناسب لمصنع أكياس وتغليف","score":80,"suggested_message":"رسالة واتساب عربية قصيرة للتواصل"}\n]\nالشروط: استخدم مصادر عامة فقط. لا تخترع رقم هاتف. إذا لم تجد رقمًا اترك phone فارغ. أعطِ ${n} نتائج كحد أقصى.`;
+    const exclusions=[
+      ...(Array.isArray(existingCustomers)?existingCustomers:[]),
+      ...globalCustomers.map(item=>item.name),
+      ...globalLeads.map(item=>item.name)
+    ].filter(Boolean).slice(0,160);
+    const prompt=`ابحث في الويب عن عملاء تجاريين جدد أو حديثي الظهور في السعودية يمكن أن يحتاجوا أكياس بلاستيك أو تغليف من مصنع.\nالمدينة/المنطقة: ${city}\nالنشاط المستهدف: ${industry}\nكلمات البحث: ${keywords}\nتجنب تكرار هؤلاء العملاء أو الفرص الموجودة: ${exclusions.join('، ')}\n\nأعد JSON فقط بدون شرح، بهذا الشكل:\n[\n {"name":"اسم النشاط","business_type":"نوع النشاط","city":"المدينة","area":"الحي إن وجد","phone":"رقم منشور عام إن وجد فقط","website":"رابط الموقع إن وجد","maps_url":"رابط خرائط إن وجد","source_url":"رابط المصدر","evidence":"دليل مختصر أنه جديد/افتتاح/نشاط مناسب","fit_reason":"لماذا مناسب لمصنع أكياس وتغليف","score":80,"suggested_message":"رسالة واتساب عربية قصيرة للتواصل"}\n]\nالشروط: استخدم مصادر عامة فقط. لا تخترع رقم هاتف. إذا لم تجد رقمًا اترك phone فارغ. أعطِ ${n} نتائج كحد أقصى.`;
     const response=await fetch('https://api.openai.com/v1/responses',{
       method:'POST',
       headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},
@@ -60,7 +71,16 @@ export default async function handler(req,res){
       score:Number(l.score || 60),
       suggested_message:l.suggested_message || `السلام عليكم، معكم شركة جدة النموذجية للصناعة. نقدر نخدمكم في الأكياس والتغليف حسب احتياجكم. هل مناسب نرسل لكم عرض تعريفي؟`
     }));
-    return sendJson(res,200,{ok:true,mode:'web_search',leads,raw:text});
+    const reserved=[];
+    let skipped=0;
+    const seen=[...globalCustomers,...globalLeads];
+    for(const lead of leads){
+      if(seen.some(item=>sameLead(item,lead))){skipped++;continue;}
+      const result=await reserveRadarLead(lead,auth,assignedRepId);
+      if(result.created){reserved.push(result.lead);seen.push(result.lead);}
+      else skipped++;
+    }
+    return sendJson(res,200,{ok:true,mode:'web_search',leads:reserved,discovered:leads.length,skipped,raw:text});
   }catch(err){
     return sendJson(res,500,{ok:false,error:err.message||String(err)});
   }
