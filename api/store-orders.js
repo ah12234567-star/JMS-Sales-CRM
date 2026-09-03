@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { json, readBody, authFromRequest, supabase } from './auth-utils.js';
 import { catalogInternal } from './store-catalog.js';
+import { storePrivate } from './customer-auth-utils.js';
 
 function clean(value,max=200){return String(value??'').trim().slice(0,max)}
 function normalizePhone(value){
@@ -22,7 +23,11 @@ function tierPrice(product,quantity){
 async function findOrCreateCustomer(input,phone){
   const rows=await supabase('jms_customers?select=id,data,updated_at&order=updated_at.desc');
   const existing=(rows||[]).map(row=>({...row.data,id:row.data?.id||row.id})).find(customer=>normalizePhone(customer.phone||customer.mobile)===phone);
-  if(existing)return existing;
+  if(existing){
+    const now=new Date().toISOString(),updated={...existing,name:clean(input.name,120)||existing.name||'',phone,email:clean(input.email,160)||existing.email||'',city:clean(input.city,80)||existing.city||'جدة',district:clean(input.district,120)||existing.district||'',location:clean(input.address,300)||existing.location||existing.address||'',updated_at:now};
+    await supabase('jms_customers?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{id:existing.id,data:updated,updated_at:now}])});
+    return updated;
+  }
   const now=new Date().toISOString();
   const id=`store-customer-${hash(phone)}`;
   const customer={id,name:clean(input.name,120),phone,email:clean(input.email,160),city:clean(input.city,80)||'جدة',district:clean(input.district,120),location:clean(input.address,300),category:'عميل متجر إلكتروني',status:'active',rep_id:'',debt_balance:0,credit_limit:0,notes:'تم إنشاؤه تلقائيًا من متجر العملاء',created_at:now,updated_at:now};
@@ -34,12 +39,13 @@ export default async function handler(req,res){
   try{
     if(req.method==='POST'){
       const auth=authFromRequest(req);
-      if(auth?.role!=='admin')return json(res,403,{ok:false,error:'store_private'});
+      if(storePrivate()&&!['admin','customer'].includes(auth?.role))return json(res,403,{ok:false,error:'store_private'});
+      if(!storePrivate()&&!['admin','customer'].includes(auth?.role))return json(res,401,{ok:false,error:'customer_login_required'});
       const body=await readBody(req);
       if(clean(body.website,50)) return json(res,400,{ok:false,error:'invalid_request'});
       const customerInput=body.customer||{};
       const name=clean(customerInput.name,120);
-      const phone=normalizePhone(customerInput.phone);
+      const phone=normalizePhone(auth?.role==='customer'?auth.phone:customerInput.phone);
       if(name.length<2||phone.length<9) return json(res,400,{ok:false,error:'customer_details_required',message:'اكتب الاسم ورقم الجوال بشكل صحيح.'});
       const requested=Array.isArray(body.items)?body.items.slice(0,40):[];
       if(!requested.length)return json(res,400,{ok:false,error:'empty_cart',message:'السلة فارغة.'});

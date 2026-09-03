@@ -23,9 +23,7 @@
       <img src="/assets/company-logo.svg" alt="شعار شركة جدة النموذجية للصناعة">
       <span><b>شركة جدة النموذجية للصناعة</b><small>منتجات التعبئة والتغليف</small></span>
     </a>
-    <button id="cartButton" class="cart-button" type="button" aria-label="فتح سلة الطلب">
-      <span>سلة الطلب</span><b id="cartCount">0</b>
-    </button>
+    <div class="store-header-actions"><button id="customerAccountButton" class="account-button" type="button">دخول العميل</button><button id="cartButton" class="cart-button" type="button" aria-label="فتح سلة الطلب"><span>سلة الطلب</span><b id="cartCount">0</b></button></div>
   </header>
 
   <main>
@@ -79,7 +77,17 @@
     <div id="cartDialogBody"></div>
   </dialog>
 
+  <dialog id="customerAuthDialog" class="store-dialog customer-auth-dialog">
+    <button class="dialog-close" type="button" data-close="customerAuthDialog" aria-label="إغلاق">×</button>
+    <div id="customerAuthBody"></div>
+  </dialog>
+
+  <dialog id="customerAccountDialog" class="store-dialog customer-account-dialog">
+    <button class="dialog-close" type="button" data-close="customerAccountDialog" aria-label="إغلاق">×</button>
+    <div id="customerAccountBody"></div>
+  </dialog>
+
   <div id="storeToast" class="store-toast" role="status" aria-live="polite"></div>
-  <script src="/store.js?v=20260903-store-9" defer></script>
+  <script src="/store.js?v=20260903-store-11" defer></script>
 </body>
 </html>

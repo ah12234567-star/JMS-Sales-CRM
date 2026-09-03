@@ -3,7 +3,7 @@
   'use strict';
   if(window.__JMS_STORE_ADMIN__)return;
   window.__JMS_STORE_ADMIN__='2026-09-03-store-1';
-  const state={items:[],search:'',status:'all',page:1,pageSize:25,loading:false};
+  const state={items:[],orders:[],search:'',status:'all',page:1,pageSize:25,loading:false};
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const money=value=>Number(value||0).toLocaleString('ar-SA',{maximumFractionDigits:2});
   const token=()=>sessionStorage.getItem('jms_auth_token')||'';
@@ -15,6 +15,7 @@
     if(document.getElementById('jmsStoreAdminStyle'))return;
     const style=document.createElement('style');style.id='jmsStoreAdminStyle';style.textContent=`
       .store-admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}.store-admin-stat{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:15px}.store-admin-stat b{display:block;font-size:25px;color:#0f766e}.store-admin-stat span{color:#64748b;font-size:13px}.store-admin-tools{display:grid;grid-template-columns:2fr 1fr auto;gap:10px;margin-bottom:14px}.store-admin-tools input,.store-admin-tools select{border:1px solid #dbe3e8;border-radius:12px;padding:10px;background:#fff}.store-admin-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:10px 15px;background:#0f172a;color:#fff;font-weight:800}.store-admin-list{display:grid;gap:10px}.store-admin-row{display:grid;grid-template-columns:minmax(220px,2.2fr) 95px 95px 105px 105px 65px 75px;gap:10px;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:13px}.store-admin-name{align-self:center}.store-admin-name b,.store-admin-name small{display:block}.store-admin-name small{color:#64748b}.store-admin-row label{display:grid;gap:4px;color:#64748b;font-size:12px}.store-admin-row input{width:100%;border:1px solid #dbe3e8;border-radius:10px;padding:8px}.store-admin-row button{border:0;border-radius:11px;background:#0f766e;color:#fff;padding:9px;font-weight:800}.store-admin-row button:disabled{background:#94a3b8}.store-admin-visible{display:flex!important;align-items:center;gap:6px}.store-admin-visible input{width:auto}.store-admin-pages{display:flex;justify-content:center;gap:10px;align-items:center;margin-top:14px}.store-admin-pages button{border:1px solid #dbe3e8;background:#fff;border-radius:10px;padding:8px 13px}.store-admin-empty{text-align:center;padding:35px;color:#64748b;background:#fff;border-radius:16px}@media(max-width:900px){.store-admin-stats{grid-template-columns:repeat(2,1fr)}.store-admin-tools{grid-template-columns:1fr}.store-admin-row{grid-template-columns:repeat(2,1fr)}.store-admin-name{grid-column:1/-1}.store-admin-row button{grid-column:1/-1}}`;
+    style.textContent+=`.store-admin-orders{display:grid;gap:10px;margin:14px 0 22px}.store-admin-orders h2{margin:0}.store-order-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:14px}.store-order-row b,.store-order-row small{display:block}.store-order-row small{color:#64748b}.store-order-status{color:#0f766e;font-weight:800}@media(max-width:700px){.store-order-row{grid-template-columns:1fr 1fr}}`;
     document.head.appendChild(style);
   }
 
@@ -24,7 +25,7 @@
     const button=document.createElement('button');button.id='storeAdminNav';button.className='nav manager-only';button.dataset.page='storeAdmin';button.textContent='متجر العملاء';button.style.display=isManager()?'':'none';nav.appendChild(button);
     const page=document.createElement('section');page.id='storeAdmin';page.className='page';page.innerHTML=`
       <div class="page-head with-action"><div><h1>متجر العملاء</h1><p>إدارة أسعار ومخزون المنتجات المرتبطة بالـSKU.</p></div><div class="head-actions"><a class="store-admin-link" href="/store" target="_blank" rel="noopener">فتح متجر العملاء</a><button class="primary" type="button" onclick="JMSStoreAdmin.load()">تحديث البيانات</button></div></div>
-      <div id="storeAdminStats" class="store-admin-stats"></div>
+      <div id="storeAdminOrders" class="store-admin-orders"></div><div id="storeAdminStats" class="store-admin-stats"></div>
       <div class="store-admin-tools"><input id="storeAdminSearch" placeholder="ابحث باسم الصنف أو SKU"><select id="storeAdminStatus"><option value="all">كل الأصناف</option><option value="available">المتوفر</option><option value="unavailable">غير المتوفر</option><option value="missing_price">بدون سعر</option><option value="hidden">مخفي</option></select><span id="storeAdminResult"></span></div>
       <div id="storeAdminList" class="store-admin-list"><div class="store-admin-empty">جارٍ تحميل المنتجات...</div></div><div id="storeAdminPages" class="store-admin-pages"></div>`;
     main.appendChild(page);
@@ -36,7 +37,7 @@
 
   async function load(){
     if(!isManager()||state.loading)return;state.loading=true;
-    try{const response=await fetch('/api/store-catalog?admin=1',{headers:headers()});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'load_failed');state.items=data.items||[];render()}
+    try{const [response,ordersResponse]=await Promise.all([fetch('/api/store-catalog?admin=1',{headers:headers()}),fetch('/api/store-orders',{headers:headers()})]);const [data,ordersData]=await Promise.all([response.json(),ordersResponse.json()]);if(!response.ok||!data.ok)throw new Error(data.error||'load_failed');state.items=data.items||[];state.orders=ordersResponse.ok&&ordersData.ok?ordersData.orders||[]:[];render()}
     catch(error){console.warn(error);const box=document.getElementById('storeAdminList');if(box)box.innerHTML='<div class="store-admin-empty">تعذر تحميل منتجات المتجر.</div>'}
     finally{state.loading=false}
   }
@@ -55,6 +56,7 @@
   function tierValue(item,min){return (item.tiers||[]).find(tier=>Number(tier.min_qty)===min)?.price||''}
   function render(){
     const stats=document.getElementById('storeAdminStats'),list=document.getElementById('storeAdminList'),pages=document.getElementById('storeAdminPages');if(!stats||!list||!pages)return;
+    const orders=document.getElementById('storeAdminOrders');if(orders)orders.innerHTML=`<h2>طلبات المتجر الجديدة</h2>${state.orders.length?state.orders.slice(0,20).map(order=>`<article class="store-order-row"><div><b>طلب ${esc(String(order.id||'').slice(-8).toUpperCase())}</b><small>${esc(order.date||order.created_at||'')}</small></div><div><b>${esc(order.customer_name||'عميل المتجر')}</b><small>${esc(order.customer_phone||'')}</small></div><span class="store-order-status">${esc(order.status||'جديد')}</span><b>${money(order.total||order.amount_value)} ر.س</b></article>`).join(''):'<div class="store-admin-empty">لا توجد طلبات متجر حتى الآن.</div>'}`;
     stats.innerHTML=`<div class="store-admin-stat"><b>${money(state.items.length)}</b><span>إجمالي SKU</span></div><div class="store-admin-stat"><b>${money(state.items.filter(item=>item.available).length)}</b><span>متوفر للطلب</span></div><div class="store-admin-stat"><b>${money(state.items.filter(item=>Number(item.price)<=0).length)}</b><span>بدون سعر</span></div><div class="store-admin-stat"><b>${money(state.items.filter(item=>!item.visible).length)}</b><span>مخفي من المتجر</span></div>`;
     const items=filtered(),pageCount=Math.max(1,Math.ceil(items.length/state.pageSize));state.page=Math.min(state.page,pageCount);const slice=items.slice((state.page-1)*state.pageSize,state.page*state.pageSize);
     document.getElementById('storeAdminResult').textContent=`${items.length} صنف`;

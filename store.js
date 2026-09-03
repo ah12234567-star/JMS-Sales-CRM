@@ -2,6 +2,7 @@
   'use strict';
   const CART_KEY='jms_customer_store_cart_v1';
   const CUSTOMER_KEY='jms_customer_store_details_v1';
+  const CUSTOMER_TOKEN_KEY='jms_customer_store_token_v1';
   const state={products:[],categories:[],category:'الكل',availability:'all',search:'',cart:loadCart(),activeProduct:null,activeVariant:null};
   const $=id=>document.getElementById(id);
   const money=value=>Number(value||0).toLocaleString('ar-SA',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -14,6 +15,8 @@
     }catch(_){return null}
   }
   const session=storeSession();
+  const customerToken=()=>localStorage.getItem(CUSTOMER_TOKEN_KEY)||'';
+  const customerHeaders=()=>({'Content-Type':'application/json',...(customerToken()?{Authorization:`Bearer ${customerToken()}`}:{})});
 
   function loadCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||'[]')}catch(_){return[]}}
   function loadCustomer(){try{return JSON.parse(localStorage.getItem(CUSTOMER_KEY)||'{}')}catch(_){return{}}}
@@ -170,7 +173,7 @@
         <div class="cart-item-side"><button class="remove-item" type="button" data-remove-index="${index}" aria-label="حذف ${esc(item.product_name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>حذف</span></button><div class="cart-item-total"><small>المجموع</small><b>${unitPrice?`${money(lineTotal)} ر.س`:'طلب سعر'}</b></div></div>
       </div>`}).join('')}</div>
       <div class="cart-total"><span>الإجمالي المبدئي</span><b>${money(total)} ر.س</b></div>
-      <section class="shipping-section"><div class="shipping-heading"><div><span>بيانات الشحن والتوصيل</span><h3>أين نوصّل طلبك؟</h3></div><button type="button" class="customer-login" disabled title="يتطلب تفعيل رمز التحقق">دخول العميل قريبًا</button></div>
+      <section class="shipping-section"><div class="shipping-heading"><div><span>بيانات الشحن والتوصيل</span><h3>أين نوصّل طلبك؟</h3></div><button type="button" class="customer-login" data-customer-login>${customerToken()?'حسابي وطلباتي':'دخول برقم الجوال'}</button></div>
       <form id="checkoutForm" class="checkout-form"><label>الاسم<input name="name" value="${esc(customer.name||'')}" required minlength="2" autocomplete="name"></label><label>رقم الجوال<input name="phone" value="${esc(customer.phone||'')}" required inputmode="tel" placeholder="05xxxxxxxx" autocomplete="tel"></label><label>البريد الإلكتروني <small>(اختياري)</small><input name="email" value="${esc(customer.email||'')}" type="email" placeholder="name@example.com" autocomplete="email"></label><label>المدينة<select name="city" required>${cities.map(city=>`<option value="${city}" ${(customer.city||'جدة')===city?'selected':''}>${city}</option>`).join('')}</select></label><label>الحي<input name="district" value="${esc(customer.district||'')}" required></label><label class="wide">العنوان أو رابط الموقع<input name="address" value="${esc(customer.address||'')}" placeholder="اكتب العنوان أو ألصق رابط الموقع"></label><label class="wide">ملاحظات<textarea name="notes" rows="3" placeholder="موعد مناسب، تعليمات التسليم...">${esc(customer.notes||'')}</textarea></label><label class="remember-details wide"><input type="checkbox" name="remember" ${Object.keys(customer).length?'checked':''}><span>حفظ بياناتي للطلب القادم على هذا الجهاز</span></label><input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true"><div class="checkout-sticky"><div><small>الإجمالي</small><b>${money(total)} ر.س</b></div><button class="checkout-submit" type="submit">إتمام الطلب</button></div></form></section></div>`;
   }
 
@@ -181,13 +184,33 @@
     item.quantity=quantity;saveCart();renderCart();
   }
 
+  function syncAccountButton(){const button=$('customerAccountButton');if(button)button.textContent=customerToken()?'حسابي وطلباتي':'دخول العميل'}
+  function openCustomerLogin(phone=''){
+    $('customerAuthBody').innerHTML=`<div class="customer-auth-content"><span>دخول سريع وآمن</span><h2>أدخل رقم جوالك</h2><p>سنرسل لك رمز تحقق من 6 أرقام، بدون كلمة مرور.</p><form id="customerOtpPhoneForm" class="customer-auth-form"><label>رقم الجوال<input name="phone" inputmode="tel" autocomplete="tel" placeholder="05xxxxxxxx" value="${esc(phone)}" required></label><div class="customer-auth-error" data-auth-error></div><button type="submit">إرسال رمز التحقق</button></form></div>`;openDialog('customerAuthDialog')
+  }
+  async function sendCustomerOtp(form){
+    const button=form.querySelector('button'),error=form.querySelector('[data-auth-error]'),phone=new FormData(form).get('phone');button.disabled=true;button.textContent='جارٍ إرسال الرمز...';error.textContent='';
+    try{const response=await fetch('/api/customer-otp-send',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({phone})}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'تعذر إرسال رمز التحقق');$('customerAuthBody').innerHTML=`<div class="customer-auth-content"><span>تم إرسال الرمز</span><h2>أدخل رمز التحقق</h2><p>أرسلنا الرمز إلى الرقم ${esc(phone)}. الرمز صالح لمدة 5 دقائق.</p><form id="customerOtpCodeForm" class="customer-auth-form"><input name="phone" type="hidden" value="${esc(phone)}"><label>رمز التحقق<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="••••••" required autofocus></label><div class="customer-auth-error" data-auth-error></div><button type="submit">تأكيد ودخول</button><button type="button" class="otp-secondary" data-edit-phone>تعديل رقم الجوال</button></form></div>`}catch(err){error.textContent=err.message;button.disabled=false;button.textContent='إرسال رمز التحقق'}
+  }
+  async function verifyCustomerOtp(form){
+    const button=form.querySelector('button[type=submit]'),error=form.querySelector('[data-auth-error]'),values=Object.fromEntries(new FormData(form).entries());button.disabled=true;button.textContent='جارٍ التحقق...';error.textContent='';
+    try{const response=await fetch('/api/customer-otp-verify',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify(values)}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'رمز التحقق غير صحيح');localStorage.setItem(CUSTOMER_TOKEN_KEY,data.token);localStorage.setItem(CUSTOMER_KEY,JSON.stringify(data.customer||{}));syncAccountButton();closeDialog('customerAuthDialog');renderCart();await openCustomerAccount();toast('تم تسجيل الدخول بنجاح')}catch(err){error.textContent=err.message;button.disabled=false;button.textContent='تأكيد ودخول'}
+  }
+  async function openCustomerAccount(){
+    if(!customerToken())return openCustomerLogin(loadCustomer().phone||'');$('customerAccountBody').innerHTML='<div class="customer-account-content"><h2>حسابي وطلباتي</h2><div class="customer-account-empty">جارٍ تحميل بياناتك...</div></div>';openDialog('customerAccountDialog');
+    try{const response=await fetch('/api/customer-portal',{headers:customerHeaders()}),data=await response.json();if(!response.ok||!data.ok)throw new Error('تعذر تحميل الحساب');localStorage.setItem(CUSTOMER_KEY,JSON.stringify(data.customer||{}));$('customerAccountBody').innerHTML=`<div class="customer-account-content"><span>حساب العميل</span><h2>حسابي وطلباتي</h2><div class="customer-profile-card"><div><b>${esc(data.customer.name||'عميل المتجر')}</b><span>${esc(data.customer.phone)}</span><span>${esc([data.customer.city,data.customer.district].filter(Boolean).join('، '))}</span></div><button type="button" class="customer-logout" data-customer-logout>تسجيل الخروج</button></div><div class="customer-orders">${data.orders?.length?data.orders.map((order,index)=>`<article class="customer-order"><div class="customer-order-head"><div><b>طلب ${esc(order.order_no)}</b><span>${esc(order.date||'')}</span></div><div><b>${money(order.total)} ر.س</b><span class="customer-order-status">${esc(order.status)}</span></div></div><p class="customer-order-items">${order.items.map(item=>`${esc(item.product_name)} × ${money(item.quantity)}`).join(' · ')}</p><button type="button" class="reorder-button" data-reorder="${index}">إعادة الطلب</button></article>`).join(''):'<div class="customer-account-empty">لا توجد طلبات سابقة حتى الآن.</div>'}</div></div>`;$('customerAccountDialog').dataset.orders=JSON.stringify(data.orders||[])}catch(err){localStorage.removeItem(CUSTOMER_TOKEN_KEY);syncAccountButton();closeDialog('customerAccountDialog');openCustomerLogin(loadCustomer().phone||'');toast(err.message)}
+  }
+  function reorderOrder(index){
+    const orders=JSON.parse($('customerAccountDialog').dataset.orders||'[]'),order=orders[Number(index)];if(!order)return;let added=0;for(const old of order.items||[]){const product=state.products.find(item=>item.variants.some(variant=>String(variant.id)===`variant-${old.sku}`)),variant=product?.variants.find(item=>String(item.id)===`variant-${old.sku}`);if(!product||!variant?.available)continue;const quantity=Math.max(1,Math.min(Number(old.quantity||1),Number(variant.stock||1))),existing=state.cart.find(item=>item.variant_id===variant.id);if(existing)existing.quantity=Math.min(Number(variant.stock),Number(existing.quantity)+quantity);else state.cart.push({variant_id:variant.id,product_name:product.name,attributes:variant.attributes,unit:variant.unit,quantity,image:product.image,price:variant.price,base_price:variant.price,stock:variant.stock,tiers:variant.tiers||[]});added++}if(!added)return toast('أصناف هذا الطلب غير متوفرة حاليًا');saveCart();closeDialog('customerAccountDialog');renderCart();openDialog('cartDialog');toast('تمت إضافة الأصناف المتوفرة إلى السلة')
+  }
+
   async function submitOrder(form){
     const button=form.querySelector('button[type=submit]');button.disabled=true;button.textContent='جارٍ إرسال الطلب...';
     const values=Object.fromEntries(new FormData(form).entries());
     if(values.remember)localStorage.setItem(CUSTOMER_KEY,JSON.stringify({name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes}));
     else localStorage.removeItem(CUSTOMER_KEY);
     try{
-      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({customer:{name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
+      const response=await fetch('/api/store-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${customerToken()||session.token}`},body:JSON.stringify({customer:{name:values.name,phone:values.phone,email:values.email,city:values.city,district:values.district,address:values.address,notes:values.notes},website:values.website,items:state.cart.map(item=>({variant_id:item.variant_id,quantity:item.quantity}))})});
       const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||data.error||'تعذر إرسال الطلب');
       state.cart=[];saveCart();$('cartDialogBody').innerHTML=`<div class="order-success"><span class="check">✓</span><h2>تم استلام طلبك</h2><p>رقم الطلب: <b>${esc(data.order_no)}</b><br>الإجمالي: <b>${money(data.total)} ر.س</b><br>سيتواصل معك فريق المبيعات لتأكيد الطلب والتسليم.</p></div>`;
     }catch(error){toast(error.message);button.disabled=false;button.textContent='إرسال الطلب إلى المصنع'}
@@ -199,12 +222,16 @@
     const close=event.target.closest('[data-close]');if(close){closeDialog(close.dataset.close);return}
     const remove=event.target.closest('[data-remove-index]');if(remove){state.cart.splice(Number(remove.dataset.removeIndex),1);saveCart();renderCart();return}
     const qty=event.target.closest('[data-qty-action]');if(qty){const index=Number(qty.dataset.qtyIndex),current=Number(state.cart[index]?.quantity||1);updateCartQuantity(index,current+(qty.dataset.qtyAction==='plus'?1:-1));return}
+    if(event.target.closest('#customerAccountButton')||event.target.closest('[data-customer-login]')){openCustomerAccount();return}
+    if(event.target.closest('[data-edit-phone]')){openCustomerLogin(event.target.closest('form')?.phone?.value||'');return}
+    if(event.target.closest('[data-customer-logout]')){localStorage.removeItem(CUSTOMER_TOKEN_KEY);syncAccountButton();closeDialog('customerAccountDialog');toast('تم تسجيل الخروج');return}
+    const reorder=event.target.closest('[data-reorder]');if(reorder){reorderOrder(reorder.dataset.reorder);return}
     if(event.target.closest('#cartButton')){renderCart();openDialog('cartDialog');return}
     if(event.target.closest('#addCartButton'))addActiveToCart();
   });
   document.addEventListener('change',event=>{if(event.target.matches('[data-attribute]'))chooseVariant(event.target.dataset.attribute,event.target.value);if(event.target.id==='availabilityFilter'){state.availability=event.target.value;renderCatalog()}if(event.target.matches('[data-cart-quantity]'))updateCartQuantity(Number(event.target.dataset.cartQuantity),event.target.value)});
   document.addEventListener('input',event=>{if(event.target.id==='catalogSearch'){state.search=event.target.value;renderCatalog()}if(event.target.id==='variantQuantity')updateDialogPrice()});
-  document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}});
+  document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}if(event.target.id==='customerOtpPhoneForm'){event.preventDefault();sendCustomerOtp(event.target)}if(event.target.id==='customerOtpCodeForm'){event.preventDefault();verifyCustomerOtp(event.target)}});
   window.addEventListener('popstate',()=>{
     if(!cartHistoryAdded&&!$('cartDialog')?.open)return;
     closingFromHistory=true;cartHistoryAdded=false;closeDialog('cartDialog');closingFromHistory=false;
@@ -232,6 +259,6 @@
     });
     return;
   }
-  renderCartCount();loadCatalog();
+  syncAccountButton();renderCartCount();loadCatalog();
   if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 })();

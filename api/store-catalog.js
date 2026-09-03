@@ -1,5 +1,6 @@
 import { json, readBody, authFromRequest, supabase } from './auth-utils.js';
 import { STORE_CATALOG_SEED } from './store-catalog-seed.js';
+import { storePrivate } from './customer-auth-utils.js';
 
 const RECORD_TYPE = 'store_product';
 const MANAGER_ROLES = new Set(['admin','sales']);
@@ -76,7 +77,7 @@ export default async function handler(req,res){
   try{
     if(req.method==='GET'){
       const auth=authFromRequest(req);
-      if(req.query?.admin!=='1'&&auth?.role!=='admin') return json(res,403,{ok:false,error:'store_private'});
+      if(req.query?.admin!=='1'&&storePrivate()&&auth?.role!=='admin') return json(res,403,{ok:false,error:'store_private'});
       const items=await catalogInternal();
       if(req.query?.admin==='1'){
         if(!manager(auth)) return json(res,403,{ok:false,error:'forbidden'});

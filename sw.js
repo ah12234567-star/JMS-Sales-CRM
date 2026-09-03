@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v36-modal-lifecycle';
+const CACHE_NAME='jms-crm-app-v37-customer-otp';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
