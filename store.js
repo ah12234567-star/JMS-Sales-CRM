@@ -192,7 +192,16 @@
   document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}});
   document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
   if(!session){
-    document.body.innerHTML='<main class="private-store"><div class="private-store-card"><img src="/assets/company-logo.svg" alt="شركة جدة النموذجية للصناعة"><span>المتجر تحت التجهيز</span><h1>الدخول خاص بالإدارة حاليًا</h1><p>سيتم فتح المتجر للعملاء بعد اكتمال مراجعة المنتجات والأسعار.</p><a href="/">دخول الإدارة</a></div></main>';
+    document.body.innerHTML='<main class="private-store"><div class="private-store-card"><img src="/assets/company-logo.svg" alt="شركة جدة النموذجية للصناعة"><span>معاينة خاصة</span><h1>دخول مدير النظام</h1><p>استخدم نفس بريد وكلمة مرور برنامج JMS لمراجعة المتجر.</p><form id="storeAdminLogin" class="store-admin-login"><label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required></label><label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required></label><div id="storeLoginError" class="store-login-error"></div><button type="submit">فتح المتجر</button></form><small>المتجر ما زال مخفيًا عن العملاء ومحركات البحث.</small></div></main>';
+    document.getElementById('storeAdminLogin').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),error=document.getElementById('storeLoginError');button.disabled=true;button.textContent='جارٍ التحقق...';error.textContent='';
+      try{
+        const values=Object.fromEntries(new FormData(form).entries());
+        const response=await fetch('/api/auth-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:values.email,password:values.password,role:'admin'})});
+        const data=await response.json();if(!response.ok||!data.ok||data.user?.role!=='admin')throw new Error('invalid_login');
+        sessionStorage.setItem('jms_current_user',JSON.stringify(data.user));sessionStorage.setItem('jms_auth_token',data.token);localStorage.setItem('jms_auth_token',data.token);location.reload();
+      }catch(_){error.textContent='البريد أو كلمة المرور غير صحيحة، أو الحساب ليس مدير النظام.';button.disabled=false;button.textContent='فتح المتجر'}
+    });
     return;
   }
   renderCartCount();loadCatalog();
