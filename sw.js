@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v33-store-admin-login';
+const CACHE_NAME='jms-crm-app-v34-dialog-scroll-reset';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',

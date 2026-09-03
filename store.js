@@ -19,7 +19,13 @@
   function loadCustomer(){try{return JSON.parse(localStorage.getItem(CUSTOMER_KEY)||'{}')}catch(_){return{}}}
   function saveCart(){localStorage.setItem(CART_KEY,JSON.stringify(state.cart));renderCartCount()}
   function toast(message){const box=$('storeToast');box.textContent=message;box.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.classList.remove('show'),2200)}
-  function openDialog(id){const dialog=$(id);if(dialog&&!dialog.open)dialog.showModal()}
+  function openDialog(id){
+    const dialog=$(id);if(!dialog)return;
+    dialog.scrollTop=0;
+    if(!dialog.open)dialog.showModal();
+    const reset=()=>{dialog.scrollTop=0;const content=dialog.firstElementChild;const body=id==='cartDialog'?$('cartDialogBody'):null;if(content)content.scrollTop=0;if(body)body.scrollTop=0};
+    reset();requestAnimationFrame(()=>{reset();requestAnimationFrame(reset)});setTimeout(reset,80);
+  }
   function closeDialog(id){const dialog=$(id);if(dialog?.open)dialog.close()}
   function tierPrice(variant,quantity){let price=Number(variant.price??variant.base_price??0);for(const tier of [...(variant.tiers||[])].sort((a,b)=>Number(a.min_qty)-Number(b.min_qty))){if(quantity>=Number(tier.min_qty||0))price=Number(tier.price||price)}return price}
   function attrText(attributes){return Object.entries(attributes||{}).map(([key,value])=>`${key}: ${value}`).join(' · ')}
