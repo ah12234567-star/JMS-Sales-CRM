@@ -39,6 +39,7 @@ try {
     addScript('jms-update-15c-customer-phone-update-v2','smart-customer-phone-update-v2.js?v=20260829-core2-3a');
     addScript('jms-update-16-ai-route-fixes','update-16-ai-route-fixes.js?v=20260829-core2-3a');
     addScript('jms-update-17-factory-rep','update-17-factory-rep.js?v=20260829-core2-3a');
+    addScript('jms-update-19-osama-rep','update-19-osama-rep.js?v=20260903-osama-1');
   }
   if(document.readyState==='complete') setTimeout(loadUpdates, 120);
   else window.addEventListener('load', function(){ setTimeout(loadUpdates, 120); });
