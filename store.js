@@ -19,14 +19,23 @@
   function loadCustomer(){try{return JSON.parse(localStorage.getItem(CUSTOMER_KEY)||'{}')}catch(_){return{}}}
   function saveCart(){localStorage.setItem(CART_KEY,JSON.stringify(state.cart));renderCartCount()}
   function toast(message){const box=$('storeToast');box.textContent=message;box.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.classList.remove('show'),2200)}
+  let cartHistoryAdded=false;
+  let closingFromHistory=false;
   function openDialog(id){
     const dialog=$(id);if(!dialog)return;
+    document.querySelectorAll('dialog[open]').forEach(open=>{if(open!==dialog)open.close()});
     dialog.scrollTop=0;
     if(!dialog.open)dialog.showModal();
+    document.body.classList.add('modal-open');
+    if(id==='cartDialog'&&!cartHistoryAdded){history.pushState({...history.state,jmsCartOpen:true},'');cartHistoryAdded=true}
     const reset=()=>{dialog.scrollTop=0;const content=dialog.firstElementChild;const body=id==='cartDialog'?$('cartDialogBody'):null;if(content)content.scrollTop=0;if(body)body.scrollTop=0};
     reset();requestAnimationFrame(()=>{reset();requestAnimationFrame(reset)});setTimeout(reset,80);
   }
-  function closeDialog(id){const dialog=$(id);if(dialog?.open)dialog.close()}
+  function closeDialog(id){
+    const dialog=$(id);if(dialog?.open)dialog.close();
+    if(!document.querySelector('dialog[open]'))document.body.classList.remove('modal-open');
+    if(id==='cartDialog'&&cartHistoryAdded&&!closingFromHistory){cartHistoryAdded=false;history.back()}
+  }
   function tierPrice(variant,quantity){let price=Number(variant.price??variant.base_price??0);for(const tier of [...(variant.tiers||[])].sort((a,b)=>Number(a.min_qty)-Number(b.min_qty))){if(quantity>=Number(tier.min_qty||0))price=Number(tier.price||price)}return price}
   function attrText(attributes){return Object.entries(attributes||{}).map(([key,value])=>`${key}: ${value}`).join(' · ')}
 
@@ -196,7 +205,20 @@
   document.addEventListener('change',event=>{if(event.target.matches('[data-attribute]'))chooseVariant(event.target.dataset.attribute,event.target.value);if(event.target.id==='availabilityFilter'){state.availability=event.target.value;renderCatalog()}if(event.target.matches('[data-cart-quantity]'))updateCartQuantity(Number(event.target.dataset.cartQuantity),event.target.value)});
   document.addEventListener('input',event=>{if(event.target.id==='catalogSearch'){state.search=event.target.value;renderCatalog()}if(event.target.id==='variantQuantity')updateDialogPrice()});
   document.addEventListener('submit',event=>{if(event.target.id==='checkoutForm'){event.preventDefault();submitOrder(event.target)}});
-  document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+  window.addEventListener('popstate',()=>{
+    if(!cartHistoryAdded&&!$('cartDialog')?.open)return;
+    closingFromHistory=true;cartHistoryAdded=false;closeDialog('cartDialog');closingFromHistory=false;
+  });
+  document.querySelectorAll('dialog').forEach(dialog=>{
+    dialog.addEventListener('click',event=>{
+      if(event.target!==dialog)return;
+      const rect=dialog.getBoundingClientRect();
+      const inside=event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom;
+      if(!inside)closeDialog(dialog.id);
+    });
+    dialog.addEventListener('cancel',event=>{event.preventDefault();closeDialog(dialog.id)});
+    dialog.addEventListener('close',()=>{if(!document.querySelector('dialog[open]'))document.body.classList.remove('modal-open')});
+  });
   if(!session){
     document.body.innerHTML='<main class="private-store"><div class="private-store-card"><img src="/assets/company-logo.svg" alt="شركة جدة النموذجية للصناعة"><span>معاينة خاصة</span><h1>دخول مدير النظام</h1><p>استخدم نفس بريد وكلمة مرور برنامج JMS لمراجعة المتجر.</p><form id="storeAdminLogin" class="store-admin-login"><label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required></label><label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required></label><div id="storeLoginError" class="store-login-error"></div><button type="submit">فتح المتجر</button></form><small>المتجر ما زال مخفيًا عن العملاء ومحركات البحث.</small></div></main>';
     document.getElementById('storeAdminLogin').addEventListener('submit',async event=>{
