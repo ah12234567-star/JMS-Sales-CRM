@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const VERSION='2026-08-14-offline-sync-1';
+const VERSION='2026-09-04-offline-sync-ai-overlay-fix';
 const STORE_KEY='jms_factory_crm_pro_v4';
 const DB_NAME='jms_crm_offline';
 const DB_VERSION=1;
@@ -83,7 +83,22 @@ function updateBadge(){
 function installStyle(){
  if(document.getElementById('jmsOfflineStyle'))return;
  const style=document.createElement('style');style.id='jmsOfflineStyle';
- style.textContent='#jmsOfflineBadge{position:fixed;z-index:99999;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900;box-shadow:0 8px 24px #0002;pointer-events:none;transition:.2s}#jmsOfflineBadge.online{background:#dcfce7;color:#166534}#jmsOfflineBadge.pending{background:#fef3c7;color:#92400e}#jmsOfflineBadge.offline{background:#fee2e2;color:#991b1b}@media(max-width:620px){#jmsOfflineBadge{left:8px;bottom:calc(76px + env(safe-area-inset-bottom));font-size:10px}}';
+ style.textContent=`
+ #jmsOfflineBadge{position:fixed;z-index:70;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900;box-shadow:0 8px 24px #0002;pointer-events:none!important;transition:.2s}
+ #jmsOfflineBadge.online{background:#dcfce7;color:#166534}
+ #jmsOfflineBadge.pending{background:#fef3c7;color:#92400e}
+ #jmsOfflineBadge.offline{background:#fee2e2;color:#991b1b}
+ .jms-connection{pointer-events:none!important}
+ #jmsAI .jms-ai-chat{position:relative;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+ #jmsAI .jms-ai-input{position:sticky;bottom:calc(88px + env(safe-area-inset-bottom));z-index:100500!important;background:#fff;padding:10px 12px;border-radius:18px;box-shadow:0 -8px 24px rgba(15,23,42,.08)}
+ #jmsAI .jms-ai-input input{position:relative;z-index:100501!important}
+ #jmsAI .jms-ai-input button{position:relative;z-index:100502!important;pointer-events:auto!important;touch-action:manipulation}
+ @media(max-width:620px){
+   #jmsOfflineBadge{left:8px;bottom:calc(152px + env(safe-area-inset-bottom));font-size:10px}
+   #jmsAI .jms-ai-chat{padding-bottom:calc(145px + env(safe-area-inset-bottom))}
+   #jmsAI .jms-ai-input{bottom:calc(96px + env(safe-area-inset-bottom));margin-bottom:8px}
+ }
+ `;
  document.head.appendChild(style);
 }
 
