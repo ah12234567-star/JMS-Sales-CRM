@@ -3,16 +3,34 @@ import { json, readBody } from './auth-utils.js';
 import { clean, normalizePhone, validSaudiMobile, otpHash, getOtpRecord, saveOtpRecord, storePrivate, setupAdmin } from './customer-auth-utils.js';
 
 async function sendMetaWhatsAppOtp(phone,code){
-  const accessToken=clean(process.env.META_WHATSAPP_ACCESS_TOKEN,1000);
-  const phoneNumberId=clean(process.env.META_WHATSAPP_PHONE_NUMBER_ID,100);
-  const templateName=clean(process.env.META_WHATSAPP_OTP_TEMPLATE,120);
-  if(!accessToken||!phoneNumberId||!templateName)return false;
-  const language=clean(process.env.META_WHATSAPP_OTP_LANGUAGE,20)||'ar';
-  const response=await fetch(`https://graph.facebook.com/${encodeURIComponent(phoneNumberId)}/messages`,{
-    method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
-    body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',to:phone,type:'template',template:{name:templateName,language:{code:language},components:[{type:'body',parameters:[{type:'text',text:code}]}]}})
-  });
-  if(!response.ok){console.error('Meta WhatsApp OTP send failed',response.status);throw new Error('meta_otp_send_failed')}
+  // Reuse the WhatsApp Cloud credentials already configured for JMS password
+  // recovery, while keeping support for the newer customer-OTP variable names.
+  const accessToken=clean(process.env.META_WHATSAPP_ACCESS_TOKEN||process.env.WHATSAPP_ACCESS_TOKEN||process.env.WHATSAPP_TOKEN,1000);
+  const phoneNumberId=clean(process.env.META_WHATSAPP_PHONE_NUMBER_ID||process.env.WHATSAPP_PHONE_NUMBER_ID||'1252021734662917',100);
+  const templateName=clean(process.env.META_WHATSAPP_OTP_TEMPLATE||process.env.WHATSAPP_OTP_TEMPLATE||process.env.WHATSAPP_RESET_TEMPLATE,120);
+  if(!accessToken||!phoneNumberId)return false;
+  const language=clean(process.env.META_WHATSAPP_OTP_LANGUAGE||process.env.WHATSAPP_OTP_LANGUAGE||process.env.WHATSAPP_RESET_LANGUAGE,20)||'ar';
+
+  const send=async payload=>{
+    const response=await fetch(`https://graph.facebook.com/v23.0/${encodeURIComponent(phoneNumberId)}/messages`,{
+      method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},body:JSON.stringify(payload)
+    });
+    if(!response.ok){
+      const result=await response.json().catch(()=>({}));
+      console.error('Meta WhatsApp OTP send failed',response.status,result?.error?.code||'',result?.error?.message||'');
+      throw new Error('meta_otp_send_failed');
+    }
+  };
+
+  if(templateName){
+    await send({messaging_product:'whatsapp',recipient_type:'individual',to:phone,type:'template',template:{name:templateName,language:{code:language},components:[{type:'body',parameters:[{type:'text',text:code}]}]}});
+    return true;
+  }
+
+  // The existing JMS connection uses Meta's test number. Open its permitted
+  // test conversation first, then send the short-lived verification code.
+  await send({messaging_product:'whatsapp',to:phone,type:'template',template:{name:'hello_world',language:{code:'en_US'}}});
+  await send({messaging_product:'whatsapp',to:phone,type:'text',text:{preview_url:false,body:`رمز التحقق لمتجر شركة جدة النموذجية هو: ${code}\nصالح لمدة 5 دقائق. لا تشارك الرمز مع أي شخص.`}});
   return true;
 }
 
