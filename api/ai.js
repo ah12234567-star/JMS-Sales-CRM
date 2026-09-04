@@ -1,14 +1,19 @@
 
 import { sendJson, allowMethods, readBody, compactCrmData } from "./_helpers.js";
+import { deterministicAiAnswer } from "./ai-deterministic.js";
 export default async function handler(req, res) {
   if (req.method === "GET") return sendJson(res, 200, { ok: true, route: "/api/ai", message: "JMS AI backend is running. Use POST." });
   if (!allowMethods(req, res, ["POST"])) return;
   try {
     const { question, data, allowWeb = false } = await readBody(req);
     if (!question || typeof question !== "string") return sendJson(res, 400, { ok: false, error: "question is required" });
+    const deterministic = deterministicAiAnswer(question, data || {});
+    if (deterministic) {
+      return sendJson(res, 200, { ok: true, mode: "deterministic", ...deterministic });
+    }
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return sendJson(res, 200, { ok: false, mode: "missing_key", answer: "لم يتم ضبط OPENAI_API_KEY في Vercel. أضف المفتاح ثم أعد نشر المشروع." });
     const crmData = compactCrmData(data || {});
+    if (!apiKey) return sendJson(res, 200, { ok: false, mode: "missing_key", answer: "لم يتم ضبط OPENAI_API_KEY في Vercel. أضف المفتاح ثم أعد نشر المشروع." });
     const tools = allowWeb ? [{ type: "web_search_preview" }] : [];
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -17,7 +22,7 @@ export default async function handler(req, res) {
         model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
         tools,
         input: [
-          { role: "system", content: "أنت JMS AI داخل نظام CRM/ERP لمصنع منتجات بلاستيكية. أجب بالعربية فقط. حلل بيانات CRM ولا تخترع أرقامًا. عند البحث الخارجي اذكر أن النتيجة من بحث خارجي وتحتاج تحقق من المورد." },
+          { role: "system", content: "أنت JMS AI داخل نظام CRM/ERP لمصنع منتجات بلاستيكية. أجب بالعربية فقط. حلل بيانات CRM ولا تخترع أرقامًا. لا تقلب معنى الأعلى والأقل: الأعلى ترتيب تنازلي والأقل ترتيب تصاعدي. اذكر معيار الترتيب بوضوح في أي قائمة رقمية. عند البحث الخارجي اذكر أن النتيجة من بحث خارجي وتحتاج تحقق من المورد." },
           { role: "user", content: JSON.stringify({ question, crm_data: crmData }) }
         ]
       })
