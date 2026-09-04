@@ -20,7 +20,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.jmsShowInstallInstructions=show;
 })();
 
-/* JMS AI: authoritative cloud balances + authoritative app ownership + responsive composer */
+/* JMS AI: authoritative cloud data + deterministic representative debt totals + responsive composer */
 (function(){
 'use strict';
 const history=[];let busy=false;
@@ -38,16 +38,6 @@ function setCloudBadge(ok,text){
   const badge=el('cloudSyncStatus');if(!badge)return;
   badge.textContent=text;badge.dataset.jmsBackend=ok?'ok':'error';
 }
-function mergeCustomerOwnership(remoteCustomers,localCustomers){
-  const localById=new Map((localCustomers||[]).map(c=>[String(c.id),c]));
-  return (remoteCustomers||[]).map(remote=>{
-    const local=localById.get(String(remote.id));
-    if(!local)return remote;
-    const localRep=local.sales_rep_id||local.representative_id||local.agent_id||local.salesman_id||local.repId||local.rep_id||'';
-    if(!localRep)return remote;
-    return {...remote,rep_id:localRep,_jms_owner_source:'local-crm'};
-  });
-}
 async function freshCloudData(){
   if(!navigator.onLine)throw new Error('OFFLINE');
   const token=sessionStorage.getItem('jms_auth_token')||'';if(!token)throw new Error('AUTH');
@@ -58,12 +48,12 @@ async function freshCloudData(){
     const result=await response.json();if(!result?.ok||!result.data)throw new Error('SYNC');
     const local=localScoped(),remote=result.data;
     const cloud={
-      customers:mergeCustomerOwnership(Array.isArray(remote.customers)?remote.customers:[],local.customers),
+      customers:Array.isArray(remote.customers)?remote.customers:[],
       visits:Array.isArray(remote.visits)?remote.visits:[],
       quotes:Array.isArray(remote.quotes)?remote.quotes:[],
       orders:Array.isArray(remote.orders)?remote.orders:[],
       collections:Array.isArray(remote.collections)?remote.collections:[],
-      reps:local.reps
+      reps:Array.isArray(remote.reps)&&remote.reps.length?remote.reps:local.reps
     };
     if(cloud.customers.length===0&&local.customers.length>0)throw new Error('INCOMPLETE');
     setCloudBadge(true,'متصل · البيانات السحابية محدثة');
@@ -73,7 +63,26 @@ async function freshCloudData(){
 function addMessage(role,text){const body=el('jmsAiBody');if(!body)return;const node=document.createElement('div');node.className='jms-ai-msg '+(role==='user'?'user':'bot');node.textContent=String(text||'');body.appendChild(node);body.scrollTop=body.scrollHeight}
 function setBusy(on){busy=on;const input=el('jmsAiInput'),button=input?.parentElement?.querySelector('button');if(input)input.disabled=on;if(button){button.disabled=on;button.textContent=on?'جاري جلب البيانات...':'إرسال'}}
 function isDebtQuestion(q){return /(دين|ديون|مديوني|مديونيات|مستحق)/.test(String(q||''))}
+function isRepDebtQuestion(q){const s=String(q||'');return isDebtQuestion(s)&&/(مندوب|مناديب|كل\s*مندوب|ياسر|عثمان|اسامه|أسامة)/.test(s)}
 function debtTotal(data){return (data?.customers||[]).reduce((s,c)=>s+Number(c.debt_balance||0),0)}
+function money(v){return Number(v||0).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function repDebtAnswer(data){
+  const totals=new Map();
+  for(const c of data?.customers||[]){
+    const id=String(c?.rep_id||'').trim()||'unmapped';
+    totals.set(id,(totals.get(id)||0)+Number(c?.debt_balance||0));
+  }
+  const reps=new Map((data?.reps||[]).map(r=>[String(r.id),r.name||r.email||r.id]));
+  const rows=[];
+  for(const [id,total] of totals){
+    if(id==='unmapped'&&Math.abs(total)<0.005)continue;
+    rows.push({id,name:id==='unmapped'?'بدون مندوب':(reps.get(id)||id),total});
+  }
+  rows.sort((a,b)=>b.total-a.total);
+  const grand=rows.reduce((s,r)=>s+r.total,0);
+  if(!rows.length)return 'لا توجد مديونيات مسجلة حالياً.';
+  return 'مديونيات كل مندوب:\n'+rows.map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join('\n')+`\nالإجمالي: ${money(grand)} ريال`;
+}
 window.renderJmsAI=function(){const counter=el('jmsAiCustomers');if(counter)counter.textContent=localScoped().customers.length};
 window.askJmsAI=async function(raw){
   const question=String(raw??el('jmsAiInput')?.value??'').trim();if(!question||busy)return;
@@ -87,6 +96,11 @@ window.askJmsAI=async function(raw){
     }
     const local=localScoped();
     if(isDebtQuestion(question)&&debtTotal(data)===0&&debtTotal(local)>0){addMessage('assistant','توقفت عن الإجابة لأن المديونيات في السحابة تظهر صفراً بينما توجد مديونيات محلية. يلزم اكتمال المزامنة أولاً حتى لا أعطيك رقماً خاطئاً.');setCloudBadge(false,'اختلاف بين المحلي والسحابي');return;}
+    if(isRepDebtQuestion(question)){
+      const answer=repDebtAnswer(data);
+      history.push({role:'user',content:question},{role:'assistant',content:answer});if(history.length>16)history.splice(0,history.length-16);
+      addMessage('assistant',answer);return;
+    }
     const token=sessionStorage.getItem('jms_auth_token')||'';
     const response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({question,data,conversation:history.slice(-8),allowWeb:false})});
     const result=await response.json().catch(()=>({ok:false,error:'bad_response'}));
