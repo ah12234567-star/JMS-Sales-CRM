@@ -43,7 +43,10 @@
       const token=sessionStorage.getItem('jms_auth_token')||'';
       const response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({question,data:scopedData(),conversation:history.slice(-8),allowWeb:false})});
       const result=await response.json().catch(()=>({ok:false,error:'bad_response'}));
-      if(!response.ok||result.ok===false)throw new Error(result.error||result.answer||'تعذر الحصول على رد من JMS AI');
+      if(!response.ok||result.ok===false){
+        const serviceMessage=String(result.answer||result.error||'تعذر الحصول على رد من JMS AI');
+        addMessage('assistant',serviceMessage);return;
+      }
       const answer=String(result.answer||'لم يصل رد واضح من الذكاء الاصطناعي.');
       history.push({role:'user',content:question},{role:'assistant',content:answer});
       if(history.length>16)history.splice(0,history.length-16);
