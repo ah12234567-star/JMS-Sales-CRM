@@ -20,7 +20,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 window.jmsShowInstallInstructions=show;
 })();
 
-/* JMS AI: authoritative cloud data + responsive composer */
+/* JMS AI: authoritative cloud balances + authoritative app ownership + responsive composer */
 (function(){
 'use strict';
 const history=[];let busy=false;
@@ -38,6 +38,16 @@ function setCloudBadge(ok,text){
   const badge=el('cloudSyncStatus');if(!badge)return;
   badge.textContent=text;badge.dataset.jmsBackend=ok?'ok':'error';
 }
+function mergeCustomerOwnership(remoteCustomers,localCustomers){
+  const localById=new Map((localCustomers||[]).map(c=>[String(c.id),c]));
+  return (remoteCustomers||[]).map(remote=>{
+    const local=localById.get(String(remote.id));
+    if(!local)return remote;
+    const localRep=local.sales_rep_id||local.representative_id||local.agent_id||local.salesman_id||local.repId||local.rep_id||'';
+    if(!localRep)return remote;
+    return {...remote,rep_id:localRep,_jms_owner_source:'local-crm'};
+  });
+}
 async function freshCloudData(){
   if(!navigator.onLine)throw new Error('OFFLINE');
   const token=sessionStorage.getItem('jms_auth_token')||'';if(!token)throw new Error('AUTH');
@@ -47,7 +57,14 @@ async function freshCloudData(){
     if(!response.ok)throw new Error(response.status===401?'AUTH':'SYNC');
     const result=await response.json();if(!result?.ok||!result.data)throw new Error('SYNC');
     const local=localScoped(),remote=result.data;
-    const cloud={customers:Array.isArray(remote.customers)?remote.customers:[],visits:Array.isArray(remote.visits)?remote.visits:[],quotes:Array.isArray(remote.quotes)?remote.quotes:[],orders:Array.isArray(remote.orders)?remote.orders:[],collections:Array.isArray(remote.collections)?remote.collections:[],reps:local.reps};
+    const cloud={
+      customers:mergeCustomerOwnership(Array.isArray(remote.customers)?remote.customers:[],local.customers),
+      visits:Array.isArray(remote.visits)?remote.visits:[],
+      quotes:Array.isArray(remote.quotes)?remote.quotes:[],
+      orders:Array.isArray(remote.orders)?remote.orders:[],
+      collections:Array.isArray(remote.collections)?remote.collections:[],
+      reps:local.reps
+    };
     if(cloud.customers.length===0&&local.customers.length>0)throw new Error('INCOMPLETE');
     setCloudBadge(true,'متصل · البيانات السحابية محدثة');
     return cloud;
