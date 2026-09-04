@@ -1,79 +1,32 @@
 import { sendJson, allowMethods, readBody, compactCrmData } from "./_helpers.js";
 
-const JMS_AI_SYSTEM = `
-أنت JMS AI، مساعد ذكي داخل CRM/ERP لمصنع منتجات بلاستيكية.
-افهم العربية الطبيعية واللهجات الخليجية/السعودية والأخطاء الإملائية البسيطة. بيانات CRM هي المصدر الأساسي للحقيقة. لا تخترع أرقاماً أو أسماء. اربط العملاء بالمناديب عبر المعرفات، واحسب الإجماليات رقمياً. لا تعرض للمندوب بيانات مندوب آخر. أجب بالعربية مباشرة وباختصار مفيد.
-`;
-
-function norm(v=""){
-  return String(v).toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/[^\p{L}\p{N}\s]/gu," ").replace(/\s+/g," ").trim();
-}
+const JMS_AI_SYSTEM=`أنت JMS AI، مساعد داخل CRM لمصنع منتجات بلاستيكية. افهم العربية واللهجة السعودية والأخطاء البسيطة. بيانات CRM هي المصدر الوحيد للحقيقة. اربط كل عميل بمندوبه عبر rep_id بعد التطبيع، واجمع كل أرصدة العملاء لكل مندوب بشكل مستقل. لا تخترع أرقاماً ولا تحصر الإجمالي في مندوب واحد. يجب أن يساوي مجموع المندوبين إجمالي المديونية، وأظهر أي مديونية غير مربوطة بمندوب كصف مستقل. لا تعرض للمندوب بيانات غيره. أجب بالعربية مباشرة.`;
+function norm(v=""){return String(v).toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/[^\p{L}\p{N}\s]/gu," ").replace(/\s+/g," ").trim();}
 function money(n){return Number(n||0).toLocaleString("ar-SA",{maximumFractionDigits:2});}
+function repIdOf(row={}){for(const k of ["sales_rep_id","representative_id","agent_id","salesman_id","repId","rep_id"]){const v=String(row?.[k]??"").trim();if(v)return v;}return "";}
 function repName(data,id){return data.reps.find(r=>String(r.id)===String(id))?.name||"بدون مندوب";}
-function findNamedRep(q,data){
-  const nq=norm(q);return data.reps.find(r=>{const n=norm(r.name);return n&&n.split(" ").some(w=>w.length>=3&&nq.includes(w))||nq.includes(n);});
+function findNamedRep(q,data){const nq=norm(q);return data.reps.find(r=>{const n=norm(r.name);return n&&(nq.includes(n)||n.split(" ").some(w=>w.length>=3&&nq.includes(w)));});}
+function debtAggregation(data){
+ const totals=new Map((data.reps||[]).map(r=>[String(r.id),0]));let unmapped=0;
+ for(const c of data.customers||[]){const amount=Number(c.debt_balance||0);const id=repIdOf(c);if(id&&totals.has(String(id)))totals.set(String(id),Number(totals.get(String(id))||0)+amount);else unmapped+=amount;}
+ const rows=(data.reps||[]).map(r=>({id:String(r.id),name:r.name||"مندوب",total:Number(totals.get(String(r.id))||0)})).sort((a,b)=>b.total-a.total);
+ const overall=(data.customers||[]).reduce((s,c)=>s+Number(c.debt_balance||0),0);const grouped=rows.reduce((s,r)=>s+r.total,0)+unmapped;
+ return {rows,unmapped,overall,grouped,ok:Math.abs(overall-grouped)<0.01};
 }
 function localAnswer(question,data){
-  const q=norm(question), debt=/(دين|ديون|مديوني|مديونيات|مستحق)/.test(q), collection=/(تحصيل|سداد|دفعات)/.test(q), sales=/(مبيعات|بيع|مباع)/.test(q), visits=/(زيارات|زياره|زيارة)/.test(q);
-  const allReps=/(كل مندوب|كل المناديب|مندوب لوحده|مندوب لحاله|حسب المندوب)/.test(q);
-  const high=/(اعلي|اعلى|اكبر|اكثر|الأعلى|الاعلى)/.test(q);
-  const namedRep=findNamedRep(question,data);
-  if(debt&&allReps){
-    const totals=new Map(data.reps.map(r=>[String(r.id),0]));
-    data.customers.forEach(c=>totals.set(String(c.rep_id),Number(totals.get(String(c.rep_id))||0)+Number(c.debt_balance||0)));
-    const rows=[...totals.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total);
-    return "مجموع ديون كل مندوب:\n"+rows.map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n")+`\nالإجمالي: ${money(rows.reduce((s,r)=>s+r.total,0))} ريال`;
-  }
-  if(debt&&high){
-    let rows=data.customers.filter(c=>Number(c.debt_balance||0)>0);
-    if(namedRep)rows=rows.filter(c=>String(c.rep_id)===String(namedRep.id));
-    rows.sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0));
-    if(!rows.length)return namedRep?`لا توجد مديونيات مسجلة لعملاء ${namedRep.name}.`:"لا توجد مديونيات مسجلة.";
-    return `${namedRep?`أعلى مديونيات عملاء ${namedRep.name}`:"أعلى المديونيات"}:\n`+rows.slice(0,10).map((c,i)=>`${i+1}. ${c.name}: ${money(c.debt_balance)} ريال`).join("\n");
-  }
-  if(debt){
-    const total=data.customers.reduce((s,c)=>s+Number(c.debt_balance||0),0);
-    return `إجمالي المديونيات الحالية: ${money(total)} ريال.`;
-  }
-  if(collection&&allReps){
-    const totals=new Map(data.reps.map(r=>[String(r.id),0]));data.collections.forEach(c=>totals.set(String(c.rep_id),Number(totals.get(String(c.rep_id))||0)+Number(c.amount||0)));
-    return "التحصيل حسب المندوب:\n"+[...totals.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total).map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n");
-  }
-  if(sales&&allReps){
-    const totals=new Map(data.reps.map(r=>[String(r.id),0]));data.orders.forEach(o=>totals.set(String(o.rep_id),Number(totals.get(String(o.rep_id))||0)+Number(o.total||0)));
-    return "المبيعات حسب المندوب:\n"+[...totals.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total).map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n");
-  }
-  if(visits&&allReps){
-    const totals=new Map(data.reps.map(r=>[String(r.id),0]));data.visits.forEach(v=>totals.set(String(v.rep_id),Number(totals.get(String(v.rep_id))||0)+1));
-    return "عدد الزيارات حسب المندوب:\n"+[...totals.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total).map((r,i)=>`${i+1}. ${r.name}: ${r.total} زيارة`).join("\n");
-  }
-  if(/(عروض).*(معلق|انتظار)|معلق.*عرض/.test(q)){
-    const rows=data.quotes.filter(x=>["pending","sent"].includes(String(x.status||"").toLowerCase()));
-    return rows.length?`عروض الأسعار المعلقة: ${rows.length}\n`+rows.slice(0,10).map((x,i)=>`${i+1}. ${x.quote_no||x.id} — ${money(x.total)} ريال`).join("\n"):"لا توجد عروض أسعار معلقة حالياً.";
-  }
-  return null;
+ const q=norm(question),debt=/(دين|ديون|مديوني|مديونيات|مستحق)/.test(q),collection=/(تحصيل|سداد|دفعات)/.test(q),sales=/(مبيعات|بيع|مباع)/.test(q),visits=/(زيارات|زياره|زيارة)/.test(q);
+ const allReps=/(كل مندوب|كل المناديب|مندوب لوحده|مندوب لحاله|حسب المندوب|مديونيات كل مندوب)/.test(q),high=/(اعلي|اعلى|اكبر|اكثر|الأعلى|الاعلى)/.test(q),namedRep=findNamedRep(question,data);
+ if(debt&&allReps){const a=debtAggregation(data);let lines=a.rows.map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`);if(Math.abs(a.unmapped)>0.009)lines.push(`${lines.length+1}. بدون مندوب: ${money(a.unmapped)} ريال`);if(!a.ok)return `تعذر اعتماد النتيجة لأن التجميع لا يطابق الإجمالي. إجمالي العملاء: ${money(a.overall)} ريال، مجموع التجميع: ${money(a.grouped)} ريال.`;return `مجموع ديون كل مندوب:\n${lines.join("\n")}\nالإجمالي: ${money(a.overall)} ريال`;}
+ if(debt&&high){let rows=(data.customers||[]).filter(c=>Number(c.debt_balance||0)>0);if(namedRep)rows=rows.filter(c=>String(repIdOf(c))===String(namedRep.id));rows.sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0));if(!rows.length)return namedRep?`لا توجد مديونيات مسجلة لعملاء ${namedRep.name}.`:"لا توجد مديونيات مسجلة.";return `${namedRep?`أعلى مديونيات عملاء ${namedRep.name}`:"أعلى المديونيات"}:\n`+rows.slice(0,10).map((c,i)=>`${i+1}. ${c.name}: ${money(c.debt_balance)} ريال`).join("\n");}
+ if(debt){const a=debtAggregation(data);return `إجمالي المديونيات الحالية: ${money(a.overall)} ريال.`;}
+ const aggregate=(items,value)=>{const m=new Map((data.reps||[]).map(r=>[String(r.id),0]));for(const x of items||[]){const id=repIdOf(x);if(m.has(id))m.set(id,Number(m.get(id)||0)+Number(value(x)||0));}return [...m.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total);};
+ if(collection&&allReps)return "التحصيل حسب المندوب:\n"+aggregate(data.collections,x=>x.amount).map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n");
+ if(sales&&allReps)return "المبيعات حسب المندوب:\n"+aggregate(data.orders,x=>x.total).map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n");
+ if(visits&&allReps)return "عدد الزيارات حسب المندوب:\n"+aggregate(data.visits,()=>1).map((r,i)=>`${i+1}. ${r.name}: ${r.total} زيارة`).join("\n");
+ if(/(عروض).*(معلق|انتظار)|معلق.*عرض/.test(q)){const rows=(data.quotes||[]).filter(x=>["pending","sent"].includes(String(x.status||"").toLowerCase()));return rows.length?`عروض الأسعار المعلقة: ${rows.length}\n`+rows.slice(0,10).map((x,i)=>`${i+1}. ${x.quote_no||x.id} — ${money(x.total)} ريال`).join("\n"):"لا توجد عروض أسعار معلقة حالياً.";}
+ return null;
 }
-
 export default async function handler(req,res){
-  if(req.method==="GET")return sendJson(res,200,{ok:true,route:"/api/ai",message:"JMS AI backend is running. Use POST."});
-  if(!allowMethods(req,res,["POST"]))return;
-  try{
-    const {question,data,allowWeb=false,conversation=[]}=await readBody(req);
-    if(!question||typeof question!=="string")return sendJson(res,400,{ok:false,error:"question is required"});
-    const crmData=compactCrmData(data||{});
-    const deterministic=localAnswer(question,crmData);
-    if(deterministic)return sendJson(res,200,{ok:true,mode:"crm_local",answer:deterministic});
-    const apiKey=process.env.OPENAI_API_KEY;
-    if(!apiKey)return sendJson(res,200,{ok:false,mode:"missing_key",answer:"مفتاح OpenAI API غير مضبوط."});
-    const recentConversation=Array.isArray(conversation)?conversation.slice(-8).filter(x=>x&&["user","assistant"].includes(x.role)&&typeof x.content==="string"):[];
-    const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-4.1-mini",tools:allowWeb?[{type:"web_search_preview"}]:[],input:[{role:"system",content:JMS_AI_SYSTEM},...recentConversation,{role:"user",content:JSON.stringify({question:question.trim(),crm_data:crmData})}]})});
-    const result=await response.json();
-    if(!response.ok){
-      const msg=result.error?.message||"OpenAI API error";
-      if(response.status===429&&/credit|quota|billing/i.test(msg))return sendJson(res,200,{ok:false,mode:"billing_required",answer:"رصيد OpenAI API غير متوفر حالياً. أسئلة CRM الأساسية تعمل محلياً، أما الأسئلة الحرة فتحتاج رصيد API."});
-      return sendJson(res,500,{ok:false,mode:"openai_error",error:msg});
-    }
-    const answer=result.output_text||(result.output||[]).map(item=>(item.content||[]).map(c=>c.text||"").join("\n")).join("\n")||"لم يصل رد واضح من الذكاء الاصطناعي.";
-    return sendJson(res,200,{ok:true,mode:allowWeb?"openai_web_search":"openai",answer});
-  }catch(err){return sendJson(res,500,{ok:false,mode:"server_error",error:err.message||String(err)});}
+ if(req.method==="GET")return sendJson(res,200,{ok:true,route:"/api/ai",message:"JMS AI backend is running. Use POST."});if(!allowMethods(req,res,["POST"]))return;
+ try{const {question,data,allowWeb=false,conversation=[]}=await readBody(req);if(!question||typeof question!=="string")return sendJson(res,400,{ok:false,error:"question is required"});const crmData=compactCrmData(data||{});const deterministic=localAnswer(question,crmData);if(deterministic)return sendJson(res,200,{ok:true,mode:"crm_local",answer:deterministic});const apiKey=process.env.OPENAI_API_KEY;if(!apiKey)return sendJson(res,200,{ok:false,mode:"missing_key",answer:"مفتاح OpenAI API غير مضبوط."});const recent=Array.isArray(conversation)?conversation.slice(-8).filter(x=>x&&["user","assistant"].includes(x.role)&&typeof x.content==="string"):[];const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-4.1-mini",tools:allowWeb?[{type:"web_search_preview"}]:[],input:[{role:"system",content:JMS_AI_SYSTEM},...recent,{role:"user",content:JSON.stringify({question:question.trim(),crm_data:crmData})}]})});const result=await response.json();if(!response.ok){const msg=result.error?.message||"OpenAI API error";if(response.status===429&&/credit|quota|billing/i.test(msg))return sendJson(res,200,{ok:false,mode:"billing_required",answer:"رصيد OpenAI API غير متوفر حالياً. أسئلة CRM الأساسية تعمل محلياً، أما الأسئلة الحرة فتحتاج رصيد API."});return sendJson(res,500,{ok:false,mode:"openai_error",error:msg});}const answer=result.output_text||(result.output||[]).map(item=>(item.content||[]).map(c=>c.text||"").join("\n")).join("\n")||"لم يصل رد واضح من الذكاء الاصطناعي.";return sendJson(res,200,{ok:true,mode:allowWeb?"openai_web_search":"openai",answer});}catch(err){return sendJson(res,500,{ok:false,mode:"server_error",error:err.message||String(err)});}
 }
