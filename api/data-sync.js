@@ -24,8 +24,15 @@ function ownedBy(auth,item){return auth.role!=='rep'||String(item?.rep_id||'')==
 export default async function handler(req,res){
   const auth=authFromRequest(req);if(!auth)return json(res,401,{ok:false,error:'unauthorized'});
   try{
-    const users=await supabase('jms_users?select=id,name,email,role,status&role=eq.rep&order=name.asc');
-    let reps=(users||[]).map(u=>({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status}));
+    // jms_users stores display name/role/status inside the JSON `data` column.
+    const users=await supabase('jms_users?select=id,email,data,updated_at&order=updated_at.desc');
+    let reps=(users||[]).map(u=>({
+      id:u.id,
+      name:u.data?.name||u.email||u.id,
+      email:u.email||'',
+      role:u.data?.role||'',
+      status:u.data?.status||'active'
+    })).filter(u=>u.role==='rep');
     if(auth.role==='rep')reps=reps.filter(r=>String(r.id)===String(auth.id));
     const resolve=repResolver(reps);
 
