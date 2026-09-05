@@ -13,11 +13,20 @@ function debtAggregation(data){
  const overall=(data.customers||[]).reduce((s,c)=>s+Number(c.debt_balance||0),0);const grouped=rows.reduce((s,r)=>s+r.total,0)+unmapped;
  return {rows,unmapped,overall,grouped,ok:Math.abs(overall-grouped)<0.01};
 }
+function highestCustomerDebts(data,namedRep=null,limit=10){
+ let rows=(data.customers||[]).filter(c=>Number(c.debt_balance||0)>0);
+ if(namedRep)rows=rows.filter(c=>String(repIdOf(c))===String(namedRep.id));
+ rows.sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0));
+ if(!rows.length)return namedRep?`لا توجد مديونيات مسجلة لعملاء ${namedRep.name}.`:"لا توجد مديونيات مسجلة.";
+ return `${namedRep?`أعلى مديونيات عملاء ${namedRep.name}`:"أعلى مديونيات العملاء"}:\n`+rows.slice(0,limit).map((c,i)=>`${i+1}. ${c.name||"عميل بدون اسم"}: ${money(c.debt_balance)} ريال`).join("\n");
+}
 function localAnswer(question,data){
  const q=norm(question),debt=/(دين|ديون|مديوني|مديونيات|مستحق)/.test(q),collection=/(تحصيل|سداد|دفعات)/.test(q),sales=/(مبيعات|بيع|مباع)/.test(q),visits=/(زيارات|زياره|زيارة)/.test(q);
- const allReps=/(كل مندوب|كل المناديب|مندوب لوحده|مندوب لحاله|حسب المندوب|مديونيات كل مندوب)/.test(q),high=/(اعلي|اعلى|اكبر|اكثر|الأعلى|الاعلى)/.test(q),namedRep=findNamedRep(question,data);
+ const allReps=/(كل مندوب|كل المناديب|مندوب لوحده|مندوب لحاله|حسب المندوب|مديونيات كل مندوب)/.test(q),high=/(اعلي|اعلى|اكبر|اكثر|الاعلي|الاعلى)/.test(q),namedRep=findNamedRep(question,data);
+ const customerHighDebt=debt&&high&&/(عميل|عملاء|العملاء|مين)/.test(q);
+ if(customerHighDebt)return highestCustomerDebts(data,namedRep,10);
  if(debt&&allReps){const a=debtAggregation(data);let lines=a.rows.map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`);if(Math.abs(a.unmapped)>0.009)lines.push(`${lines.length+1}. بدون مندوب: ${money(a.unmapped)} ريال`);if(!a.ok)return `تعذر اعتماد النتيجة لأن التجميع لا يطابق الإجمالي. إجمالي العملاء: ${money(a.overall)} ريال، مجموع التجميع: ${money(a.grouped)} ريال.`;return `مجموع ديون كل مندوب:\n${lines.join("\n")}\nالإجمالي: ${money(a.overall)} ريال`;}
- if(debt&&high){let rows=(data.customers||[]).filter(c=>Number(c.debt_balance||0)>0);if(namedRep)rows=rows.filter(c=>String(repIdOf(c))===String(namedRep.id));rows.sort((a,b)=>Number(b.debt_balance||0)-Number(a.debt_balance||0));if(!rows.length)return namedRep?`لا توجد مديونيات مسجلة لعملاء ${namedRep.name}.`:"لا توجد مديونيات مسجلة.";return `${namedRep?`أعلى مديونيات عملاء ${namedRep.name}`:"أعلى المديونيات"}:\n`+rows.slice(0,10).map((c,i)=>`${i+1}. ${c.name}: ${money(c.debt_balance)} ريال`).join("\n");}
+ if(debt&&high)return highestCustomerDebts(data,namedRep,10);
  if(debt){const a=debtAggregation(data);return `إجمالي المديونيات الحالية: ${money(a.overall)} ريال.`;}
  const aggregate=(items,value)=>{const m=new Map((data.reps||[]).map(r=>[String(r.id),0]));for(const x of items||[]){const id=repIdOf(x);if(m.has(id))m.set(id,Number(m.get(id)||0)+Number(value(x)||0));}return [...m.entries()].map(([id,total])=>({name:repName(data,id),total})).sort((a,b)=>b.total-a.total);};
  if(collection&&allReps)return "التحصيل حسب المندوب:\n"+aggregate(data.collections,x=>x.amount).map((r,i)=>`${i+1}. ${r.name}: ${money(r.total)} ريال`).join("\n");
