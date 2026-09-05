@@ -5,6 +5,28 @@ const STRONG_REP_KEYS=['sales_rep_id','representative_id','agent_id','salesman_i
 const ALL_REP_KEYS=[...STRONG_REP_KEYS,'rep_id'];
 function clean(v){return String(v??'').trim();}
 function norm(v){return clean(v).toLowerCase().replace(/[\u064B-\u065F\u0670]/g,'').replace(/[إأآا]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/ـ/g,'').replace(/[^\p{L}\p{N}]+/gu,'');}
+function zeroSmallCustomerDebt(item){
+  if(!item)return item;
+  const balance=Number(item.debt_balance||0);
+  if(balance>0&&balance<500){
+    return {
+      ...item,
+      debt_zeroed_under_500_original: item.debt_zeroed_under_500_original??balance,
+      debt_balance:0,
+      account_balance_type:'clear',
+      debt_age_bucket:'zeroed_small',
+      debt_age_label:'أقل من 500 ريال — محسوب صفر',
+      debt_overdue:false,
+      aging_30:0,
+      aging_60:0,
+      aging_90:0,
+      aging_120:0,
+      aging_150:0,
+      aging_over_150:0
+    };
+  }
+  return item;
+}
 function repResolver(reps){
   const byId=new Map(reps.map(r=>[clean(r.id),r.id]));
   const byEmail=new Map(reps.filter(r=>r.email).map(r=>[clean(r.email).toLowerCase(),r.id]));
@@ -31,7 +53,6 @@ function activityRepByCustomer(rawTables,resolve){
   for(const key of ['quotes','orders','visits','collections']){
     for(const item of rawTables[key]||[]){
       const rep=repFromKeys(item,resolve);if(!rep)continue;
-      // Orders/quotes are stronger ownership signals than a visit/collection.
       add(item.customer_id,rep,key==='quotes'||key==='orders'?3:1);
     }
   }
@@ -67,15 +88,12 @@ export default async function handler(req,res){
       const out={reps};let unmappedCustomers=0,unmappedDebt=0,inferredCustomers=0;
 
       out.customers=(rawTables.customers||[]).map(raw=>{
-        // Prefer a dedicated representative field. If only rep_id exists, cross-check it
-        // against the customer's actual CRM activity so a stale bulk assignment cannot
-        // incorrectly move all debt to one representative.
         const strong=repFromKeys(raw,resolve,STRONG_REP_KEYS);
         const activity=activityMap.get(clean(raw.id))||'';
         const fallback=resolve(raw.rep_id);
         const rep_id=strong||activity||fallback||'';
         if(activity&&activity!==fallback)inferredCustomers++;
-        const item={...raw,rep_id};
+        const item=zeroSmallCustomerDebt({...raw,rep_id});
         if(!rep_id){unmappedCustomers++;unmappedDebt+=Number(item.debt_balance||0);}
         return item;
       }).filter(x=>ownedBy(auth,x));
@@ -96,7 +114,10 @@ export default async function handler(req,res){
       const body=await readBody(req),data=body?.data||{},result={};
       for(const [key,table] of Object.entries(TABLES)){
         const source=Array.isArray(data[key])?data[key]:[];
-        const normalized=source.map(x=>({...x,rep_id:repFromKeys(x,resolve)||clean(x?.rep_id)}));
+        const normalized=source.map(x=>{
+          const mapped={...x,rep_id:repFromKeys(x,resolve)||clean(x?.rep_id)};
+          return key==='customers'?zeroSmallCustomerDebt(mapped):mapped;
+        });
         const allowed=normalized.filter(x=>x&&x.id&&ownedBy(auth,x)).slice(0,1000);
         if(!allowed.length){result[key]=0;continue;}
         const now=new Date().toISOString();
