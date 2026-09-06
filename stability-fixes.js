@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='2026-08-13-full-audit-1';
+  const VERSION='2026-09-06-store-orders-link-1';
   const number=v=>Number(String(v??'').replace(/[^\d.-]/g,''))||0;
   const text=v=>String(v??'').trim();
   const isRealCustomer=id=>{
@@ -121,11 +121,21 @@
     });
   }
 
+  function loadStoreAdmin(){
+    if(window.__JMS_STORE_ADMIN__ || document.querySelector('script[data-jms-store-admin]'))return;
+    const script=document.createElement('script');
+    script.src='/store-admin.js?v=20260906-orders-link-1';
+    script.async=true;
+    script.dataset.jmsStoreAdmin='1';
+    script.onerror=()=>console.error('Failed to load JMS store admin');
+    document.head.appendChild(script);
+  }
+
   document.addEventListener('submit',validateOrderForm,true);
   document.addEventListener('DOMContentLoaded',()=>{
-    installGuards();cleanupUi();
+    installGuards();cleanupUi();loadStoreAdmin();
     document.addEventListener('click',()=>setTimeout(()=>{cleanupUi();installGuards()},40),true);
   });
-  setTimeout(()=>{installGuards();cleanupUi()},800);
+  setTimeout(()=>{installGuards();cleanupUi();loadStoreAdmin()},800);
   window.JMS_STABILITY_FIXES_VERSION=VERSION;
 })();
