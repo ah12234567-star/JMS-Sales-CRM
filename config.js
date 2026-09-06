@@ -5,9 +5,6 @@ window.JMS_CLOUD = {
   API_SYNC: true
 };
 
-// Compatibility handoff for separate same-origin production pages.
-// If the current app already has a valid session token, mirror it so production.html
-// opened in another tab/PWA context can authenticate without forcing a new login.
 try {
   var __jmsSessionToken = sessionStorage.getItem('jms_auth_token') || '';
   if (__jmsSessionToken) {
@@ -16,7 +13,6 @@ try {
   }
 } catch (_) {}
 
-// JMS Core 2.0 + temporary compatibility layer.
 (function(){
   function addScript(id, src){
     if(document.getElementById(id)) return;
@@ -27,13 +23,10 @@ try {
     document.body.appendChild(s);
   }
   function loadUpdates(){
-    // Core services first.
     addScript('jms-authenticated-cloud-sync','authenticated-cloud-sync.js?v=20260829-core2-3a');
     addScript('jms-routes-cloud-sync','routes-cloud-sync.js?v=20260829-core2-3a');
     addScript('jms-core-v2','jms-core-v2.js?v=20260829-core2-3a');
     addScript('jms-core-v2-workflows','jms-core-v2-workflows.js?v=20260829-core2-3a');
-
-    // Compatibility tools retained until their UI is fully absorbed by Core 2.0.
     addScript('jms-update-15-smart-import','smart-import-rep-conflicts.js?v=20260829-core2-3a');
     addScript('jms-update-15b-smart-debt-import-v2','smart-debt-import-rep-conflicts-v2.js?v=20260829-core2-3a');
     addScript('jms-update-15c-customer-phone-update-v2','smart-customer-phone-update-v2.js?v=20260829-core2-3a');
@@ -41,7 +34,8 @@ try {
     addScript('jms-update-17-factory-rep','update-17-factory-rep.js?v=20260829-core2-3a');
     addScript('jms-update-19-osama-rep','update-19-osama-rep.js?v=20260903-osama-1');
     addScript('jms-radar-global-ownership','radar-lead-ownership.js?v=20260903-global-ownership-1');
-    addScript('jms-store-admin','store-admin.js?v=20260903-store-1');
+    addScript('jms-store-admin','store-admin.js?v=20260906-oms-2');
+    addScript('jms-store-warehouse','store-warehouse.js?v=20260906-oms-1');
   }
   if(document.readyState==='complete') setTimeout(loadUpdates, 120);
   else window.addEventListener('load', function(){ setTimeout(loadUpdates, 120); });
