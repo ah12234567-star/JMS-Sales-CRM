@@ -1,7 +1,18 @@
 import { json, readBody, supabase } from './auth-utils.js';
 import { clean, normalizePhone, customerAuth, customerRowByPhone, safeCustomer } from './customer-auth-utils.js';
 
-function safeOrder(row){const order=row?.data||{};return {id:order.id||row.id,order_no:String(order.id||row.id).slice(-8).toUpperCase(),date:order.date||String(order.created_at||'').slice(0,10),status:clean(order.status,80),total:Number(order.total||order.amount_value||0),items:Array.isArray(order.items)?order.items.map(item=>({sku:clean(item.sku,100),product_name:clean(item.product_name,160),attributes:item.attributes||{},unit:clean(item.unit,40),quantity:Number(item.quantity||0),unit_price:Number(item.unit_price||0),total:Number(item.total||0)})):[]}}
+function safeOrder(row){
+  const order=row?.data||{};
+  return {
+    id:order.id||row.id,
+    order_no:clean(order.order_no,80)||String(order.id||row.id).slice(-8).toUpperCase(),
+    date:order.date||String(order.created_at||'').slice(0,10),
+    status:clean(order.status,80),workflow_status:clean(order.workflow_status,40)||'new',
+    total:Number(order.total||order.amount_value||0),
+    items:Array.isArray(order.items)?order.items.map(item=>({sku:clean(item.sku,100),product_name:clean(item.product_name,160),attributes:item.attributes||{},unit:clean(item.unit,40),quantity:Number(item.quantity||0),unit_price:Number(item.unit_price||0),total:Number(item.total||0)})):[],
+    status_history:Array.isArray(order.status_history)?order.status_history.map(h=>({status:clean(h.status,40),label:clean(h.label,80),at:clean(h.at,60)})):[]
+  }
+}
 
 export default async function handler(req,res){
   const auth=customerAuth(req);if(!auth)return json(res,401,{ok:false,error:'unauthorized'});
