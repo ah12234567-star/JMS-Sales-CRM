@@ -67,19 +67,27 @@ create table if not exists store_order_realtime (
   changed_at timestamptz not null default now()
 );
 
-create or replace function touch_store_order_realtime() returns trigger
-language plpgsql security definer as $$
+create or replace function public.touch_store_order_realtime() returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
-  insert into store_order_realtime(order_id,version,changed_at)
+  insert into public.store_order_realtime(order_id,version,changed_at)
   values(new.id,1,now())
-  on conflict(order_id) do update set version=store_order_realtime.version+1, changed_at=now();
+  on conflict(order_id) do update set version=public.store_order_realtime.version+1, changed_at=now();
   return new;
 end $$;
+
+revoke all on function public.touch_store_order_realtime() from public;
+revoke all on function public.touch_store_order_realtime() from anon;
+revoke all on function public.touch_store_order_realtime() from authenticated;
+grant execute on function public.touch_store_order_realtime() to service_role;
 
 drop trigger if exists trg_store_order_realtime on store_orders;
 create trigger trg_store_order_realtime
 after insert or update on store_orders
-for each row execute function touch_store_order_realtime();
+for each row execute function public.touch_store_order_realtime();
 
 create index if not exists idx_store_orders_status on store_orders(status);
 create index if not exists idx_store_orders_phone on store_orders(customer_phone);
