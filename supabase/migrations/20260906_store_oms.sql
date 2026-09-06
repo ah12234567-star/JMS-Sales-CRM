@@ -51,18 +51,54 @@ create table if not exists store_order_history (
   created_at timestamptz not null default now()
 );
 
+-- Operational inventory ledger. available_stock is derived, never written by clients.
+create table if not exists store_inventory (
+  sku text primary key,
+  total_stock numeric(14,3) not null default 0 check (total_stock >= 0),
+  reserved_stock numeric(14,3) not null default 0 check (reserved_stock >= 0),
+  updated_at timestamptz not null default now(),
+  constraint store_inventory_reserved_lte_total check (reserved_stock <= total_stock)
+);
+
+-- Realtime invalidation only: deliberately contains no customer/order payload.
+create table if not exists store_order_realtime (
+  order_id uuid primary key references store_orders(id) on delete cascade,
+  version bigint not null default 1,
+  changed_at timestamptz not null default now()
+);
+
+create or replace function touch_store_order_realtime() returns trigger
+language plpgsql security definer as $$
+begin
+  insert into store_order_realtime(order_id,version,changed_at)
+  values(new.id,1,now())
+  on conflict(order_id) do update set version=store_order_realtime.version+1, changed_at=now();
+  return new;
+end $$;
+
+drop trigger if exists trg_store_order_realtime on store_orders;
+create trigger trg_store_order_realtime
+after insert or update on store_orders
+for each row execute function touch_store_order_realtime();
+
 create index if not exists idx_store_orders_status on store_orders(status);
 create index if not exists idx_store_orders_phone on store_orders(customer_phone);
 create index if not exists idx_store_orders_created_at on store_orders(created_at desc);
 create index if not exists idx_store_order_items_order on store_order_items(order_id);
-create index if not exists idx_store_order_history_order on store_order_history(order_id, created_at desc);
+create index if not exists idx_store_order_history_order on store_order_history(order_id, created_at asc);
 
 alter table store_orders enable row level security;
 alter table store_order_items enable row level security;
 alter table store_order_history enable row level security;
+alter table store_inventory enable row level security;
+alter table store_order_realtime enable row level security;
 
--- Server-side API uses the service key. Realtime reads are allowed only to authenticated CRM sessions
--- when Supabase Auth is introduced. Existing JMS custom auth continues through API endpoints.
+-- JMS custom auth keeps business data behind server-side API/service key.
+-- Only the payload-free invalidation table is readable by the browser for Realtime refresh.
+drop policy if exists "store realtime read" on store_order_realtime;
+create policy "store realtime read" on store_order_realtime for select using (true);
 
-alter publication supabase_realtime add table store_orders;
-alter publication supabase_realtime add table store_order_history;
+do $$ begin
+  alter publication supabase_realtime add table store_order_realtime;
+exception when duplicate_object then null;
+end $$;
