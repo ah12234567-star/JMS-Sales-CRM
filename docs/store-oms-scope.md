@@ -1,0 +1,1 @@
+Final scope source of truth: user-specified Store OMS module requirements including independent order item/history persistence, workflow validation, inventory reservation/consumption, sales and warehouse views, A4 printing, realtime updates, and full pre-merge testing.

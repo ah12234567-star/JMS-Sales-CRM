@@ -1,0 +1,24 @@
+name: Store OMS Tests
+
+on:
+  push:
+    branches:
+      - feature/store-oms
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'api/store-oms-workflow.js'
+      - 'api/store-orders.js'
+      - 'store-admin.js'
+      - 'store-warehouse.js'
+      - 'tests/store-oms-workflow.test.js'
+      - 'supabase/migrations/20260906_store_oms.sql'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Store OMS tests
+        run: node --test tests/store-oms-workflow.test.js

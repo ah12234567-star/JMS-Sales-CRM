@@ -1,0 +1,1 @@
+This branch contains the preliminary OMS work. The final implementation will continue on `feature/store-oms` and will not merge to main until end-to-end tests pass.

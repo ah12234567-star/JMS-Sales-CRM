@@ -1,7 +1,9 @@
 {
   "type": "module",
   "scripts": {
-    "start": "vercel dev"
+    "start": "vercel dev",
+    "test": "node --test tests/*.test.js",
+    "test:store-oms": "node --test tests/store-oms-workflow.test.js"
   },
   "dependencies": {
     "@fontsource/noto-sans-arabic": "^5.3.0",
