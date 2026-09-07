@@ -1,2 +1,5 @@
 node_modules
 .vercel/
+
+# Private account recovery credentials; never commit these files.
+jms-password-rotation-*.json
