@@ -77,3 +77,10 @@ test('new deployment invalidates legacy sessions and limits tokens to 12 hours',
   assert.match(source,/payload\.sv\s*!==\s*2/);
   assert.match(source,/12\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
 });
+
+test('store customer login never prefills a stale saved phone',()=>{
+  const source=read('store.js');
+  assert.doesNotMatch(source,/openCustomerLogin\(loadCustomer\(\)\.phone\|\|''\)/);
+  assert.match(source,/openCustomerLogin\(''\)/);
+  assert.match(source,/removeItem\(CUSTOMER_KEY\)/);
+});

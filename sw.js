@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v38-required-customer-otp';
+const CACHE_NAME='jms-crm-app-v39-clear-stale-customer-phone';
 const SHELL=[
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
