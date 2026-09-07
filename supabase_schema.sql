@@ -57,18 +57,6 @@ drop policy if exists "public write collections" on jms_collections;
 drop policy if exists "public read routes" on jms_routes;
 drop policy if exists "public write routes" on jms_routes;
 
-create policy "public read customers" on jms_customers for select using (true);
-create policy "public write customers" on jms_customers for all using (true) with check (true);
-create policy "public read quotes" on jms_quotes for select using (true);
-create policy "public write quotes" on jms_quotes for all using (true) with check (true);
-create policy "public read visits" on jms_visits for select using (true);
-create policy "public write visits" on jms_visits for all using (true) with check (true);
-create policy "public read orders" on jms_orders for select using (true);
-create policy "public write orders" on jms_orders for all using (true) with check (true);
-create policy "public read collections" on jms_collections for select using (true);
-create policy "public write collections" on jms_collections for all using (true) with check (true);
-create policy "public read routes" on jms_routes for select using (true);
-create policy "public write routes" on jms_routes for all using (true) with check (true);
 
 -- CRM 3.0 Representatives Phase 1 optional cloud tables
 create table if not exists jms_rep_attendance (
@@ -100,12 +88,6 @@ drop policy if exists "public write rep locations" on jms_rep_locations;
 drop policy if exists "public read rep targets" on jms_rep_targets;
 drop policy if exists "public write rep targets" on jms_rep_targets;
 
-create policy "public read rep attendance" on jms_rep_attendance for select using (true);
-create policy "public write rep attendance" on jms_rep_attendance for all using (true) with check (true);
-create policy "public read rep locations" on jms_rep_locations for select using (true);
-create policy "public write rep locations" on jms_rep_locations for all using (true) with check (true);
-create policy "public read rep targets" on jms_rep_targets for select using (true);
-create policy "public write rep targets" on jms_rep_targets for all using (true) with check (true);
 
 -- CRM 3.0 Smart Visits Phase 2 optional cloud table
 create table if not exists jms_smart_visits (
@@ -119,8 +101,6 @@ alter table jms_smart_visits enable row level security;
 drop policy if exists "public read smart visits" on jms_smart_visits;
 drop policy if exists "public write smart visits" on jms_smart_visits;
 
-create policy "public read smart visits" on jms_smart_visits for select using (true);
-create policy "public write smart visits" on jms_smart_visits for all using (true) with check (true);
 
 -- JMS secure authentication tables
 create table if not exists jms_users (
@@ -149,3 +129,10 @@ alter table jms_users enable row level security;
 alter table jms_password_resets enable row level security;
 
 -- No public policies for auth tables. Access only from Vercel API using SUPABASE_SERVICE_ROLE_KEY.
+
+-- Production security invariant: the browser has no direct table privileges.
+-- The server-side service_role used by the Vercel API bypasses RLS.
+revoke all on table jms_customers, jms_quotes, jms_visits, jms_orders,
+  jms_collections, jms_routes, jms_rep_attendance, jms_rep_locations,
+  jms_rep_targets, jms_smart_visits, jms_users, jms_password_resets
+from anon, authenticated;

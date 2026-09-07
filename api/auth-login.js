@@ -1,36 +1,4 @@
-import { json, pbkdf2, getUserByEmail, upsertUser, sign } from './auth-utils.js';
-
-const OTHMAN_BOOTSTRAP = {
-  id: 'rep-othman',
-  name: 'عثمان',
-  email: 'othman@jms.local',
-  salt: '3daa9b059d3801c90b3dab8a147dd7aa',
-  hash: '528b27ba0024c3e39b8b724839edda94504c4863ed5ee55a4b82371a3ada6813'
-};
-
-async function createOthmanOnFirstLogin(email, password){
-  if(email !== OTHMAN_BOOTSTRAP.email) return null;
-  if(pbkdf2(password, OTHMAN_BOOTSTRAP.salt) !== OTHMAN_BOOTSTRAP.hash) return null;
-  const data = {
-    name: OTHMAN_BOOTSTRAP.name,
-    role: 'rep',
-    status: 'active',
-    permissions: {
-      create_customers: true, edit_customers: true, reassign_customers: false,
-      delete_customers: false, view_all_customers: false, view_reports: false,
-      use_ai: true, manage_quotes: true, manage_orders: true,
-      manage_users: false, manage_permissions: false, manage_ink: false
-    },
-    password_salt: OTHMAN_BOOTSTRAP.salt,
-    password_hash: OTHMAN_BOOTSTRAP.hash
-  };
-  await upsertUser({
-    id: OTHMAN_BOOTSTRAP.id,
-    email: OTHMAN_BOOTSTRAP.email,
-    phone: '', data, updated_at: new Date().toISOString()
-  });
-  return await getUserByEmail(email);
-}
+import { json, pbkdf2, getUserByEmail, sign } from './auth-utils.js';
 
 export default async function handler(req, res){
   if(req.method !== 'POST') return json(res, 405, { ok:false, error:'method_not_allowed' });
@@ -42,9 +10,7 @@ export default async function handler(req, res){
     const requestedRole=String(body.role||'').trim();
     if(!email||!password) return json(res,400,{ok:false,error:'missing_credentials'});
 
-    // No admin bootstrap/default-password path is allowed in production.
-    let row=await getUserByEmail(email);
-    if(!row) row=await createOthmanOnFirstLogin(email,password);
+    const row=await getUserByEmail(email);
     if(!row||!row.data) return json(res,401,{ok:false,error:'invalid_login'});
 
     const data=row.data||{};

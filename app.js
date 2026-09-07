@@ -4317,21 +4317,11 @@ function jmsAiExportData(){
 }
 
 async function jmsAiAskBackend(question, allowWeb=false){
-  const res = await fetch('/api/ai', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ question, allowWeb, data: jmsAiExportData() })
-  });
-  return await res.json();
+  return await jmsPostJson('/api/ai', { question, allowWeb, data: jmsAiExportData() });
 }
 
 async function jmsAiSendWhatsAppBackend(phone, message){
-  const res = await fetch('/api/whatsapp-send', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ phone, message })
-  });
-  return await res.json();
+  return await jmsPostJson('/api/whatsapp-send', { phone, message });
 }
 
 const oldAskJmsAIBackendBase = (typeof askJmsAI === 'function') ? askJmsAI : null;
@@ -5500,8 +5490,7 @@ askJmsAI = async function(q){
     db.whatsappCampaigns.unshift(campaign); save();
     try{
       const payload={campaign_id:campaign.id,previewOnly:false,messages:rows.map(r=>({customer_id:r.customer.id,name:r.customer.name,phone:r.phone,message:r.message}))};
-      const res=await fetch('/api/whatsapp-campaign-send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const data=await res.json().catch(()=>({ok:false,error:'bad_response'}));
+      const data=await jmsPostJson('/api/whatsapp-campaign-send',payload);
       const results=data.results||[];
       results.forEach((x,i)=>{
         const r=rows[i]; db.whatsappMessageLog.unshift({id:uid(),campaign_id:campaign.id,customer_id:r.customer.id,customer_name:r.customer.name,phone:r.phone,message:r.message,status:x.ok?'sent':(x.mode==='fallback_link'?'fallback_link':'failed'),error:x.error||'',url:x.url||'',at:nowIso(),by:currentUser?.name||''});

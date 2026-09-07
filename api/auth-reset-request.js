@@ -32,28 +32,18 @@ async function whatsappSend(phoneNumberId, token, body){
 }
 
 async function sendWhatsappCode(phone, code){
-  const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1252021734662917';
-  if(!token || !phoneNumberId) throw new Error('whatsapp_not_configured');
-  const template = String(process.env.WHATSAPP_RESET_TEMPLATE || '').trim();
-
-  if(template){
-    await whatsappSend(phoneNumberId,token,{
-      messaging_product:'whatsapp',to:phone,type:'template',
-      template:{name:template,language:{code:process.env.WHATSAPP_RESET_LANGUAGE || 'ar'},components:[{type:'body',parameters:[{type:'text',text:code}]}]}
-    });
-    return;
-  }
-
-  // Meta's test number must start business-initiated conversations with its
-  // pre-approved hello_world template. Once open, send the short-lived code.
+  const token = String(process.env.META_WHATSAPP_ACCESS_TOKEN || '').trim();
+  const phoneNumberId = String(process.env.META_WHATSAPP_PHONE_NUMBER_ID || '').trim();
+  const template = String(process.env.META_WHATSAPP_RESET_TEMPLATE || '').trim();
+  const language = String(process.env.META_WHATSAPP_RESET_LANGUAGE || 'ar').trim();
+  if(!token || !phoneNumberId || !template) throw new Error('whatsapp_reset_not_configured');
   await whatsappSend(phoneNumberId,token,{
     messaging_product:'whatsapp',to:phone,type:'template',
-    template:{name:'hello_world',language:{code:'en_US'}}
-  });
-  await whatsappSend(phoneNumberId,token,{
-    messaging_product:'whatsapp',to:phone,type:'text',
-    text:{preview_url:false,body:`رمز استعادة كلمة المرور في نظام JMS هو: ${code}\nصالح لمدة 10 دقائق. لا تشارك الرمز مع أي شخص.`}
+    template:{
+      name:template,
+      language:{code:language},
+      components:[{type:'body',parameters:[{type:'text',text:code}]}]
+    }
   });
 }
 

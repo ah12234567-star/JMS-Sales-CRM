@@ -1,7 +1,5 @@
 import crypto from 'node:crypto';
-
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jvwjwakkimnveveglxwa.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_jN3PnVaj7uarVnJRvBmx-g_zIKhl1UP';
+import { supabase } from './auth-utils.js';
 
 function safeEqual(left, right) {
   const a = Buffer.from(String(left || ''));
@@ -47,10 +45,7 @@ export default async function handler(req, res) {
   const token = String(req.query.token || '').trim();
   if (!id || !token || id.length > 160 || token.length > 160) return res.status(400).json({error:'invalid_request'});
   try {
-    const url = SUPABASE_URL + '/rest/v1/jms_quotes?id=eq.' + encodeURIComponent(id) + '&select=id,data&limit=1';
-    const response = await fetch(url, {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
-    if (!response.ok) return res.status(503).json({error:'quote_service_unavailable'});
-    const rows = await response.json();
+    const rows = await supabase('jms_quotes?id=eq.' + encodeURIComponent(id) + '&select=id,data&limit=1');
     const row = rows && rows[0];
     if (!row || !safeEqual(row.data && row.data.public_token, token)) return res.status(404).json({error:'quote_not_found'});
     return res.status(200).json({quote:publicQuote({...row.data,id:row.data.id||row.id})});

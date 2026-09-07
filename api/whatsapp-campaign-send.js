@@ -1,4 +1,5 @@
 import { sendJson, allowMethods, readBody } from './_helpers.js';
+import { requireRole } from './auth-utils.js';
 
 function normalizePhone(phone){
   const digits = String(phone || '').replace(/\D/g, '');
@@ -32,6 +33,7 @@ async function sendWhatsAppText({to, message, token, phoneNumberId}){
 export default async function handler(req, res){
   if(req.method === 'GET') return sendJson(res, 200, {ok:true, route:'/api/whatsapp-campaign-send', message:'Use POST with messages[]'});
   if(!allowMethods(req, res, ['POST'])) return;
+  if(!requireRole(req, ['admin','sales'])) return sendJson(res, 401, {ok:false,error:'unauthorized'});
   try{
     const body = await readBody(req);
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
@@ -44,8 +46,8 @@ export default async function handler(req, res){
 
     if(!messages.length) return sendJson(res, 400, {ok:false, error:'no_valid_messages'});
 
-    const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const token = process.env.META_WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 
     if(body.previewOnly || !token || !phoneNumberId){
       return sendJson(res, 200, {

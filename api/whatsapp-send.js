@@ -1,5 +1,6 @@
 
 import { sendJson, allowMethods, readBody } from "./_helpers.js";
+import { requireRole } from "./auth-utils.js";
 function normalizeSaudiPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -9,14 +10,15 @@ function normalizeSaudiPhone(phone) {
 export default async function handler(req, res) {
   if (req.method === "GET") return sendJson(res, 200, { ok: true, route: "/api/whatsapp-send", message: "JMS WhatsApp backend is running. Use POST." });
   if (!allowMethods(req, res, ["POST"])) return;
+  if (!requireRole(req, ["admin", "sales", "rep"])) return sendJson(res, 401, { ok: false, error: "unauthorized" });
   try {
     const { phone, message, previewOnly = false } = await readBody(req);
     const to = normalizeSaudiPhone(phone);
     if (!to) return sendJson(res, 400, { ok: false, error: "phone is required" });
     if (!message) return sendJson(res, 400, { ok: false, error: "message is required" });
     if (previewOnly) return sendJson(res, 200, { ok: true, previewOnly: true, to, url: `https://wa.me/${to}?text=${encodeURIComponent(message)}` });
-    const token = process.env.WHATSAPP_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const token = process.env.META_WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
     if (!token || !phoneNumberId) return sendJson(res, 200, { ok: false, mode: "fallback_link", error: "WhatsApp Cloud API variables are not configured", url: `https://wa.me/${to}?text=${encodeURIComponent(message)}` });
     const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
       method: "POST",

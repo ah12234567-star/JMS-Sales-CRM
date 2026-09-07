@@ -14,8 +14,8 @@
   function loadPdfEngine(){
     if(pdfEnginePromise)return pdfEnginePromise;
     pdfEnginePromise=Promise.all([
-      loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',function(){return typeof window.html2canvas==='function'}),
-      loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',function(){return !!window.jspdf?.jsPDF})
+      loadScriptOnce('/vendor/html2canvas.min.js',function(){return typeof window.html2canvas==='function'}),
+      loadScriptOnce('/vendor/jspdf.umd.min.js',function(){return !!window.jspdf?.jsPDF})
     ]);
     return pdfEnginePromise;
   }

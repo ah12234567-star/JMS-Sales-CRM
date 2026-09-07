@@ -3,8 +3,8 @@ import { json, readBody } from './auth-utils.js';
 import { clean, normalizePhone, validSaudiMobile, otpHash, getOtpRecord, saveOtpRecord, storePrivate, setupAdmin } from './customer-auth-utils.js';
 
 async function sendMetaWhatsAppOtp(phone,code){
-  const accessToken=clean(process.env.META_WHATSAPP_ACCESS_TOKEN||process.env.WHATSAPP_ACCESS_TOKEN||process.env.WHATSAPP_TOKEN,1000);
-  const phoneNumberId=clean(process.env.META_WHATSAPP_PHONE_NUMBER_ID||process.env.WHATSAPP_PHONE_NUMBER_ID,100);
+  const accessToken=clean(process.env.META_WHATSAPP_ACCESS_TOKEN,1000);
+  const phoneNumberId=clean(process.env.META_WHATSAPP_PHONE_NUMBER_ID,100);
   const templateName=clean(process.env.META_WHATSAPP_OTP_TEMPLATE,120);
   const language=clean(process.env.META_WHATSAPP_OTP_LANGUAGE,20)||'ar';
 

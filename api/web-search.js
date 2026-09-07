@@ -1,8 +1,10 @@
 
 import { sendJson, allowMethods, readBody } from "./_helpers.js";
+import { requireRole } from "./auth-utils.js";
 export default async function handler(req, res) {
   if (req.method === "GET") return sendJson(res, 200, { ok: true, route: "/api/web-search", message: "JMS web search backend is running. Use POST." });
   if (!allowMethods(req, res, ["POST"])) return;
+  if (!requireRole(req, ["admin", "sales", "rep"])) return sendJson(res, 401, { ok: false, error: "unauthorized" });
   try {
     const { query } = await readBody(req);
     if (!query) return sendJson(res, 400, { ok: false, error: "query is required" });

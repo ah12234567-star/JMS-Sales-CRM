@@ -7,13 +7,8 @@ function sendJson(res, status, body) {
 }
 
 function verifyMetaSignature(req) {
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret) {
-    // Temporary Cloud API test-number mode. No privileged action is performed
-    // unless a server-side access token is also configured.
-    return req.body?.object === 'whatsapp_business_account'
-      && Boolean(process.env.WHATSAPP_ACCESS_TOKEN);
-  }
+  const appSecret = String(process.env.META_WHATSAPP_APP_SECRET || '').trim();
+  if (!appSecret) return false;
 
   const signature = String(req.headers['x-hub-signature-256'] || '');
   if (!signature.startsWith('sha256=')) return false;
@@ -48,7 +43,7 @@ function incomingMessages(body) {
 }
 
 async function sendText({ phoneNumberId, to, text }) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const token = process.env.META_WHATSAPP_ACCESS_TOKEN;
   if (!token) throw new Error('missing_whatsapp_access_token');
 
   const response = await fetch(
@@ -83,7 +78,10 @@ export default async function handler(req, res) {
     const mode = String(req.query?.['hub.mode'] || '');
     const token = String(req.query?.['hub.verify_token'] || '');
     const challenge = String(req.query?.['hub.challenge'] || '');
-    const expectedHash = process.env.WHATSAPP_VERIFY_TOKEN_HASH || '23fa184ac49c5f11b9880a7cb345a27fd3fc661fd407b44a0f9100595e5d686e';
+    const expectedHash = String(process.env.META_WHATSAPP_VERIFY_TOKEN_HASH || '').trim();
+    if (!expectedHash) {
+      return sendJson(res, 503, { ok: false, error: 'webhook_verification_not_configured' });
+    }
     const receivedHash = crypto.createHash('sha256').update(token).digest('hex');
 
     if (mode === 'subscribe' && token && receivedHash === expectedHash) {
