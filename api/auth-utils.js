@@ -71,14 +71,12 @@ function authSecret(){
 
 export function sign(payload){
   const secret = authSecret();
-  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, sv: 2, iat: Date.now() })).toString('base64url');
   const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
   return body + '.' + sig;
 }
 
-// Field users commonly keep the PWA/session open across workdays. A signed token
-// remains tamper-proof; allow it for 7 days instead of expiring overnight after 12h.
-export function verifyToken(token, maxAgeMs = 7 * 24 * 60 * 60 * 1000){
+export function verifyToken(token, maxAgeMs = 12 * 60 * 60 * 1000){
   const raw = String(token || '').trim();
   const [body, sig, extra] = raw.split('.');
   if(!body || !sig || extra) return null;
@@ -87,7 +85,7 @@ export function verifyToken(token, maxAgeMs = 7 * 24 * 60 * 60 * 1000){
     const a = Buffer.from(sig), b = Buffer.from(expected);
     if(a.length !== b.length || !crypto.timingSafeEqual(a,b)) return null;
     const payload = JSON.parse(Buffer.from(body,'base64url').toString('utf8'));
-    if(!payload?.id || !payload?.role || !payload?.iat) return null;
+    if(!payload?.id || !payload?.role || !payload?.iat || payload.sv !== 2) return null;
     if(Date.now() - Number(payload.iat) > maxAgeMs) return null;
     return payload;
   }catch(_){ return null; }

@@ -70,3 +70,10 @@ test('customer OTP uses only canonical Meta environment variables',()=>{
   assert.match(source,/META_WHATSAPP_PHONE_NUMBER_ID/);
   assert.doesNotMatch(source,/process\.env\.WHATSAPP_(?:TOKEN|ACCESS_TOKEN|PHONE_NUMBER_ID)/);
 });
+
+test('new deployment invalidates legacy sessions and limits tokens to 12 hours',()=>{
+  const source=read('api/auth-utils.js');
+  assert.match(source,/sv:\s*2/);
+  assert.match(source,/payload\.sv\s*!==\s*2/);
+  assert.match(source,/12\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
+});
