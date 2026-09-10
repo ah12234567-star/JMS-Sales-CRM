@@ -121,14 +121,26 @@
       root.appendChild(row);
     });
     document.getElementById('jmsClicheNotes').value=q.notes||'';
-    document.getElementById('jmsClicheSave').onclick=()=>{
+    document.getElementById('jmsClicheSave').onclick=async()=>{
       let next;try{next=clicheItemsFromRows([...root.children].map((row,index)=>({original:items[index],description:row.querySelector('[data-description]').value,quantity:row.querySelector('[data-quantity]').value,price:row.querySelector('[data-price]').value})));}catch(e){return alert(e.message)}
       const subtotal=Math.round(next.reduce((sum,i)=>sum+i.total_amount,0)*100)/100;
       const vat=Math.round((subtotal*.15+Number.EPSILON)*100)/100;
-      Object.assign(q,{items:next,items_count:next.length,total_kg:next.reduce((sum,i)=>sum+i.quantity,0),total_amount:subtotal,vat_amount:vat,grand_total:Math.round((subtotal+vat)*100)/100,notes:document.getElementById('jmsClicheNotes').value,status:'pending',updated_at:new Date().toISOString(),edited_at:new Date().toISOString()});
-      saveDb();window.closeModal?.();window.renderAll?.();
-      document.dispatchEvent(new Event('jms:data-changed'));
-      alert('تم حفظ التعديلات وإرجاع العرض للاعتماد');
+      const changed={...q,items:next,items_count:next.length,total_kg:next.reduce((sum,i)=>sum+i.quantity,0),total_amount:subtotal,vat_amount:vat,grand_total:Math.round((subtotal+vat)*100)/100,notes:document.getElementById('jmsClicheNotes').value,status:'pending',updated_at:new Date().toISOString(),edited_at:new Date().toISOString()};
+      const button=document.getElementById('jmsClicheSave');
+      button.disabled=true;button.textContent='جاري الحفظ…';
+      try{
+        const token=sessionStorage.getItem('jms_auth_token');
+        if(!token)throw new Error('سجّل الدخول مرة أخرى');
+        const response=await fetch('/api/data-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({data:{quotes:[changed]}})});
+        const result=await response.json();
+        if(!response.ok||!result.ok||result.count?.quotes!==1)throw new Error('تعذر حفظ العرض في السيرفر');
+        const data=database(),index=(data.quotes||[]).findIndex(x=>x.id===changed.id);
+        if(index>=0)data.quotes[index]=changed;else(data.quotes||=[]).push(changed);
+        saveDb();window.closeModal?.();window.renderAll?.();
+        alert('تم حفظ التعديلات وإرجاع العرض للاعتماد');
+      }catch(e){
+        alert((e.message||'تعذر الحفظ')+' — التعديلات ما زالت في النافذة، حاول الحفظ مرة أخرى.');
+      }finally{button.disabled=false;button.textContent='حفظ التعديلات';}
     };
     document.getElementById('modal').classList.remove('hidden');
   }
