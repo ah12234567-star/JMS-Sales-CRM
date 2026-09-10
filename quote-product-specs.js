@@ -129,7 +129,7 @@
     doc.querySelector('.jms-smart-specs')?.remove();
     doc.querySelector('.jms-bank-details')?.remove();
     const items=Array.isArray(q.items)&&q.items.length?q.items:[q];
-    const cliches=items.length>0&&items.every(item=>String(item.product||'').includes('كليش'));
+    const cliches=items.length>0&&items.every(item=>/كلايش|كليش/.test(String(item.product||'')));
     const definitions=cliches?[
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
       ['description',lang==='ar'?'وصف الصنف':'Description',item=>item.description||item.size||'',true],
