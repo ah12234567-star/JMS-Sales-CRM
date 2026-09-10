@@ -8,7 +8,7 @@
   const saveDb = () => { try { if (typeof save === 'function') save(); } catch (_) { localStorage.setItem('jms_factory_crm_pro_v4', JSON.stringify(database())); } };
 
   const productOptions = [
-    ['أكياس بلاستيك','أكياس بلاستيك'],['رول بلاستيك','رول بلاستيك']
+    ['أكياس بلاستيك','أكياس بلاستيك'],['رول بلاستيك','رول بلاستيك'],['كلايش','كلايش']
   ];
   const specFields = [
     ['product','نوع الكيس','Bag type'],['material','نوع المادة','Material'],['color','اللون','Color'],
@@ -140,8 +140,9 @@
       ['thickness',lang==='ar'?'السماكة':'Thickness',item=>item.thickness?`${item.thickness} ${item.thickness_unit||'micron'}`:'',true],
       ['handle',lang==='ar'?'نوع اليد':'Handle type',item=>displayHandle(item),false],
       ['print',lang==='ar'?'الطباعة':'Printing',item=>{const p=translatePrint(item.print||'',lang);return [p,item.print_colors?`${item.print_colors} ${lang==='ar'?'ألوان':'colors'}`:''].filter(Boolean).join(' - ')},false],
-      ['total_kg',lang==='ar'?'الكمية':'Qty',item=>item.total_kg?`${item.total_kg} ${lang==='ar'?'كجم':'kg'}`:'',true],
-      ['price_kg',lang==='ar'?'سعر الكيلو':'Price/kg',item=>item.price_kg?`${item.price_kg} ${lang==='ar'?'ريال':'SAR'}`:'',true],
+      ['description',lang==='ar'?'الوصف':'Description',item=>item.description||'',false],
+      ['total_kg',lang==='ar'?'الكمية':'Qty',item=>item.total_kg?`${item.total_kg} ${item.unit|| (lang==='ar'?'كجم':'kg')}`:'',true],
+      ['price_kg',lang==='ar'?'سعر الوحدة':'Unit price',item=>item.price_kg?`${item.price_kg} ${lang==='ar'?'ريال':'SAR'}`:'',true],
       ['total_amount',lang==='ar'?'الإجمالي':'Total',item=>item.total_amount?`${Number(item.total_amount).toLocaleString('en-US')} ${lang==='ar'?'ريال':'SAR'}`:'',true]
     ];
     const columns=definitions.filter(([, ,getter,required])=>required||items.some(item=>String(getter(item)||'').trim()));
