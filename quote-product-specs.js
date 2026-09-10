@@ -97,12 +97,48 @@
   function applyItems(q,current){if(!q)return;const items=[...draftItems,current].filter(validItem).slice(0,10);if(!items.length)return;q.items=items;Object.assign(q,items[0]);q.total_kg=items.reduce((sum,item)=>sum+Number(item.total_kg||0),0);q.total_amount=items.reduce((sum,item)=>sum+Number(item.total_amount||0),0).toFixed(2);q.items_count=items.length;saveDb();draftItems=[];}
   function applySpecs(q, specs) { if (!q) return; Object.assign(q, specs); saveDb(); }
 
+
+  function isClicheQuote(q){
+    return !!q&&(q.items?.length?q.items:[q]).every(i=>/كلايش|كليش/.test(String(i.product||'')));
+  }
+  function clicheItemsFromRows(rows){
+    return rows.map(row=>{
+      const quantity=Number(row.quantity),price=Number(row.price);
+      if(!Number.isInteger(quantity)||quantity<=0||!Number.isFinite(price)||price<=0)throw new Error('أدخل عدد قطع صحيحًا وسعرًا أكبر من صفر');
+      return {...row.original,quantity,total_kg:quantity,unit:'كليشة',unit_price:price,price_kg:price,description:row.description,total_amount:Math.round((quantity*price+Number.EPSILON)*100)/100,price_including_vat:Math.round((price*1.15+Number.EPSILON)*100)/100};
+    });
+  }
+  function openClicheEditor(q){
+    const items=q.items?.length?q.items:[q],body=document.getElementById('modalBody');
+    body.innerHTML='<h2>تعديل سعر الكلايش</h2><p>سعر الكليشة قبل الضريبة؛ تُضاف ضريبة 15% إلى الإجمالي.</p><div id="jmsClicheRows"></div><label>الملاحظات<textarea id="jmsClicheNotes" rows="5"></textarea></label><button type="button" id="jmsClicheSave" class="primary">حفظ التعديلات</button>';
+    const root=document.getElementById('jmsClicheRows');
+    items.forEach((item,index)=>{
+      const row=document.createElement('div');row.className='form-grid';
+      row.innerHTML='<label>الصنف<input value="كلايش" readonly></label><label>وصف الصنف<input data-description></label><label>عدد القطع<input data-quantity type="number" min="1" step="1"></label><label>سعر الكليشة<input data-price type="number" min="0.01" step="0.01"></label>';
+      row.querySelector('[data-description]').value=item.description||item.size||'';
+      row.querySelector('[data-quantity]').value=item.quantity??item.total_kg??1;
+      row.querySelector('[data-price]').value=item.unit_price??item.price_kg??0;
+      root.appendChild(row);
+    });
+    document.getElementById('jmsClicheNotes').value=q.notes||'';
+    document.getElementById('jmsClicheSave').onclick=()=>{
+      let next;try{next=clicheItemsFromRows([...root.children].map((row,index)=>({original:items[index],description:row.querySelector('[data-description]').value,quantity:row.querySelector('[data-quantity]').value,price:row.querySelector('[data-price]').value})));}catch(e){return alert(e.message)}
+      const subtotal=Math.round(next.reduce((sum,i)=>sum+i.total_amount,0)*100)/100;
+      const vat=Math.round((subtotal*.15+Number.EPSILON)*100)/100;
+      Object.assign(q,{items:next,items_count:next.length,total_kg:next.reduce((sum,i)=>sum+i.quantity,0),total_amount:subtotal,vat_amount:vat,grand_total:Math.round((subtotal+vat)*100)/100,notes:document.getElementById('jmsClicheNotes').value,status:'pending',updated_at:new Date().toISOString(),edited_at:new Date().toISOString()});
+      saveDb();window.closeModal?.();window.renderAll?.();
+      document.dispatchEvent(new Event('jms:data-changed'));
+      alert('تم حفظ التعديلات وإرجاع العرض للاعتماد');
+    };
+    document.getElementById('modal').classList.remove('hidden');
+  }
+
   const oldForceForm = window.forceQuoteForm;
-  if (typeof oldForceForm === 'function') window.forceQuoteForm = function(q){ const result=oldForceForm.apply(this,arguments); enhanceForm(q); return result; };
+  if (typeof oldForceForm === 'function') window.forceQuoteForm = function(q){ if(isClicheQuote(q))return openClicheEditor(q); const result=oldForceForm.apply(this,arguments); enhanceForm(q); return result; };
   const oldOpen = window.openQuoteForm;
   if (typeof oldOpen === 'function') window.openQuoteForm = function(){ const result=oldOpen.apply(this,arguments); enhanceForm(null); return result; };
   const oldEdit = window.editQuote;
-  if (typeof oldEdit === 'function') window.editQuote = function(qid){ const result=oldEdit.apply(this,arguments); enhanceForm((database().quotes||[]).find(q=>q.id===qid)); return result; };
+  if (typeof oldEdit === 'function') window.editQuote = function(qid){ const target=(database().quotes||[]).find(q=>q.id===qid);if(isClicheQuote(target))return openClicheEditor(target); const result=oldEdit.apply(this,arguments); enhanceForm((database().quotes||[]).find(q=>q.id===qid)); return result; };
   const oldSave = window.forceSaveQuote;
   if (typeof oldSave === 'function') window.forceSaveQuote = function(){ const specs=readSpecs(),item=currentItem();if(!validItem(item))return alert('اختر نوع اليد عند اختيار أكياس بلاستيك، وأكمل بيانات الصنف الأساسية.'); const before=new Set((database().quotes||[]).map(q=>q.id)); const result=oldSave.apply(this,arguments); const created=(database().quotes||[]).find(q=>!before.has(q.id)); applySpecs(created,specs); applyItems(created,item); return result; };
   const oldUpdate = window.forceUpdateQuote;
