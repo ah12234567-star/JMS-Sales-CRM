@@ -129,7 +129,14 @@
     doc.querySelector('.jms-smart-specs')?.remove();
     doc.querySelector('.jms-bank-details')?.remove();
     const items=Array.isArray(q.items)&&q.items.length?q.items:[q];
-    const definitions=[
+    const cliches=items.length>0&&items.every(item=>String(item.product||'').includes('كليش'));
+    const definitions=cliches?[
+      ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
+      ['description',lang==='ar'?'وصف الصنف':'Description',item=>item.description||item.size||'',true],
+      ['quantity',lang==='ar'?'عدد القطع':'Pieces',item=>String(item.quantity??item.total_kg??1),true],
+      ['price',lang==='ar'?'سعر الكليشة':'Plate price',item=>Number(item.unit_price??item.price_kg??0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),true],
+      ['total',lang==='ar'?'الإجمالي':'Total',item=>Number(item.total_amount||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),true]
+    ]:[
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
       ['material',lang==='ar'?'الخامة':'Material',item=>displayMaterial(item.material),true],
       ['color',lang==='ar'?'اللون':'Color',item=>item.color,false],
@@ -147,9 +154,18 @@
     ];
     const columns=definitions.filter(([, ,getter,required])=>required||items.some(item=>String(getter(item)||'').trim()));
     const section=document.createElement('section'); section.className='jms-smart-specs';
-    section.innerHTML=`<div class="jms-smart-spec-title"><div><b>${lang==='ar'?'أصناف عرض السعر':'Quotation Items'}</b><span>${lang==='ar'?'كل صنف في سطر واحد':'One line per item'}</span></div><i>${items.length}</i></div><div class="jms-spec-table-wrap"><table class="jms-smart-spec-table"><thead><tr>${columns.map(([,label])=>`<th>${esc(label)}</th>`).join('')}</tr></thead><tbody>${items.map(item=>`<tr>${columns.map(([, ,getter])=>`<td>${esc(getter(item)||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    section.innerHTML=`<div class="jms-smart-spec-title"><div><b>${cliches?(lang==='ar'?'أصناف الكلايش':'Printing plates'):(lang==='ar'?'أصناف عرض السعر':'Quotation Items')}</b><span>${lang==='ar'?'كل صنف في سطر واحد':'One line per item'}</span></div><i>${items.length}</i></div><div class="jms-spec-table-wrap"><table class="jms-smart-spec-table"><thead><tr>${columns.map(([,label])=>`<th>${esc(label)}</th>`).join('')}</tr></thead><tbody>${items.map(item=>`<tr>${columns.map(([, ,getter])=>`<td>${esc(getter(item)||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     const table=doc.querySelector('.quote-a4-table'); if(table){table.hidden=true;table.insertAdjacentElement('afterend',section);} else doc.querySelector('.quote-a4-grid')?.insertAdjacentElement('afterend',section);
-    const title=doc.querySelector('.quote-a4-title h2'); if(title) title.textContent=lang==='ar'?'عرض سعر':'QUOTATION';
+    const title=doc.querySelector('.quote-a4-title h2'); if(title) title.textContent=cliches?(lang==='ar'?'سعر الكلايش':'PRINTING PLATE PRICES'):(lang==='ar'?'عرض سعر':'QUOTATION');
+    if(cliches){
+      const subtitle=doc.querySelector('.quote-a4-company p:last-child');
+      if(subtitle)subtitle.textContent=lang==='ar'?'أسعار كلايش الطباعة':'Printing plate prices';
+      const tax=q.customer_tax_number||(database().customers||[]).find(x=>x.id===q.customer_id)?.tax_number;
+      if(tax&&!doc.querySelector('.jms-customer-tax')){
+        const card=doc.querySelector('.quote-a4-grid .quote-a4-card');
+        if(card){const line=document.createElement('p');line.className='jms-customer-tax';line.textContent=(lang==='ar'?'الرقم الضريبي للعميل: ':'Customer VAT number: ')+tax;card.appendChild(line);}
+      }
+    }
     if(lang==='en') {
       const paymentLabel=[...doc.querySelectorAll('b')].find(el=>el.textContent.trim()==='شروط الدفع:');
       if(paymentLabel&&paymentLabel.nextSibling?.nodeType===3) paymentLabel.nextSibling.nodeValue=` ${translatePayment(q.payment_terms||'',lang)}`;
