@@ -105,7 +105,16 @@
     return {code:balance>0?'debt':'clear',label:balance>0?'مديونية بدون عمر':'لا توجد مديونية',overdue:false};
   }
   function applyDebt(customer,row,moveRep){
-    const age=ageMeta(row.aging,row.balance);
+    const originalBalance=Number(row.balance);
+    const zeroSmall=originalBalance>0 && originalBalance<500;
+    const age=ageMeta(row.aging,originalBalance);
+    if(zeroSmall){
+      customer.debt_zeroed_under_500_original=originalBalance;
+      age.label='أقل من 500 ريال — محسوب صفر';
+      row={...row,balance:0,aging:{d30:0,d60:0,d90:0,d120:0,d150:0,over150:0}};
+    }else{
+      delete customer.debt_zeroed_under_500_original;
+    }
     customer.account_code=row.code || customer.account_code || customer.customer_code || '';
     customer.phone=customer.phone || row.phone || '';
     customer.city=customer.city || row.city || 'جدة';
