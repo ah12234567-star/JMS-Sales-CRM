@@ -1,7 +1,7 @@
 /* JMS authenticated core cloud sync: no browser Supabase credentials. */
 (function(){
   'use strict';
-  const VERSION='20260816-auth-cloud-1';
+  const VERSION='20260910-auth-cloud-users-2';
   const STORE='jms_factory_crm_pro_v4';
   const KEYS=['customers','quotes','visits','orders','collections'];
   let busy=false,timer=null;
@@ -13,7 +13,7 @@
   function merge(key,remote){const d=getDb();if(!d)return;d[key] ||= [];const map=new Map(d[key].filter(Boolean).map(x=>[String(x.id),x]));for(const r of remote||[]){if(!r?.id)continue;const old=map.get(String(r.id));if(!old||stamp(r)>=stamp(old))map.set(String(r.id),{...(old||{}),...r})}d[key]=[...map.values()]}
   async function pull(){
     if(busy||!navigator.onLine||!token())return false;busy=true;
-    try{const r=await fetch('/api/data-sync',{headers:headers()});if(!r.ok)throw new Error(await r.text());const out=await r.json();for(const k of KEYS)merge(k,out.data?.[k]||[]);saveLocal();try{window.renderAll?.()}catch(_){}return true}catch(e){console.warn('JMS authenticated cloud pull failed',e);return false}finally{busy=false}
+    try{const r=await fetch('/api/data-sync',{headers:headers()});if(!r.ok)throw new Error(await r.text());const out=await r.json();for(const k of KEYS)merge(k,out.data?.[k]||[]);const d=getDb();if(d&&Array.isArray(out.data?.reps)){for(const rep of out.data.reps){if(!rep?.id)continue;for(const key of ['users','reps']){d[key] ||= [];const i=d[key].findIndex(u=>String(u.id)===String(rep.id));if(i<0)d[key].push({...rep});else d[key][i]={...d[key][i],...rep};}}}saveLocal();try{window.renderAll?.()}catch(_){}return true}catch(e){console.warn('JMS authenticated cloud pull failed',e);return false}finally{busy=false}
   }
   async function push(){
     if(busy||!navigator.onLine||!token())return false;const d=getDb();if(!d)return false;busy=true;
