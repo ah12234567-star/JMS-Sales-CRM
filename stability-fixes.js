@@ -10,9 +10,19 @@
   const validOrder=o=>!!o && isRealCustomer(o.customer_id) && text(o.product) &&
     number(o.width)>0 && number(o.length)>0 && number(o.thickness)>0 &&
     number(o.total_kg)>0 && number(o.amount_value)>0;
-  const validQuote=q=>!!q && isRealCustomer(q.customer_id) && text(q.product) &&
-    number(q.width)>0 && number(q.length)>0 && number(q.thickness)>0 &&
-    number(q.total_kg)>0 && number(q.price_kg)>0 && number(q.total_amount)>0;
+  const validQuote=q=>{
+    if(!q||!isRealCustomer(q.customer_id)||!text(q.product)||number(q.total_amount)<=0)return false;
+    const items=Array.isArray(q.items)&&q.items.length?q.items:[q];
+    return items.every(item=>{
+      if(/كلايش|كليش/.test(text(item.product))){
+        const qty=number(item.quantity??item.total_kg);
+        const price=number(item.unit_price??item.price_kg);
+        return Number.isInteger(qty)&&qty>0&&price>0&&number(item.total_amount)>0;
+      }
+      return text(item.product)&&number(item.width)>0&&number(item.length)>0&&
+        number(item.thickness)>0&&number(item.total_kg)>0&&number(item.price_kg)>0&&number(item.total_amount)>0;
+    });
+  };
   const invalidMessage='البيانات ناقصة. أكمل العميل والمنتج والمقاس والسماكة والكمية والسعر قبل المتابعة.';
 
   function markInvalidRecords(){
