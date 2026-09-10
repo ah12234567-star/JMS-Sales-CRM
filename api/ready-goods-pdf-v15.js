@@ -1,4 +1,6 @@
 import fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+const renderedPdfs=new Map();
 import path from 'node:path';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
@@ -76,7 +78,15 @@ export default async function handler(req,res){
     if(auth.role==='rep'&&String(n.rep_id||'')!==String(auth.id)){res.statusCode=403;return res.end('forbidden')}
     const sr=await supabase(`jms_ready_goods?select=data&id=eq.${encodeURIComponent(SETTINGS_ID)}&limit=1`);const settings=sr?.[0]?.data?.settings||sr?.[0]?.data||{};
     const [packs,font,repoLogo]=await Promise.all([resolvePackaging(n),fontCss(),defaultLogo()]);const logo=safeDataImage(body.logoData)||repoLogo;
+    const html=documentHtml(n,settings,packs,logo,font);
+    const cacheKey=createHash('sha256').update(html).digest('hex');
+    const cached=renderedPdfs.get(cacheKey);
+    if(cached && Date.now()-cached.time<60000){
+      res.statusCode=200;res.setHeader('Content-Type','application/pdf');
+      res.setHeader('Content-Disposition',`attachment; filename="${String(n.number||'ready-goods').replace(/[^A-Za-z0-9_-]/g,'_')}.pdf"`);
+      res.setHeader('Cache-Control','no-store');return res.end(cached.pdf);
+    }
     const browser=await puppeteer.launch({args:chromium.args,executablePath:await chromium.executablePath(),headless:chromium.headless,defaultViewport:{width:794,height:1123}});
-    try{const page=await browser.newPage();await page.setContent(documentHtml(n,settings,packs,logo,font),{waitUntil:'domcontentloaded'});await page.evaluate(async()=>{if(document.fonts?.ready)await document.fonts.ready;await Promise.all([...document.images].map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=r;i.onerror=r}))) });const pdf=await page.pdf({format:'A4',printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false,margin:{top:'0',right:'0',bottom:'0',left:'0'}});res.statusCode=200;res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="${String(n.number||'ready-goods').replace(/[^A-Za-z0-9_-]/g,'_')}.pdf"`);res.setHeader('Cache-Control','no-store');return res.end(Buffer.from(pdf))}finally{await browser.close()}
+    try{const page=await browser.newPage();await page.setContent(html,{waitUntil:'domcontentloaded'});await page.evaluate(async()=>{if(document.fonts?.ready)await document.fonts.ready;await Promise.all([...document.images].map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=r;i.onerror=r}))) });const pdf=await page.pdf({format:'A4',printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false,margin:{top:'0',right:'0',bottom:'0',left:'0'}});const buffer=Buffer.from(pdf);renderedPdfs.set(cacheKey,{time:Date.now(),pdf:buffer});while(renderedPdfs.size>4)renderedPdfs.delete(renderedPdfs.keys().next().value);res.statusCode=200;res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="${String(n.number||'ready-goods').replace(/[^A-Za-z0-9_-]/g,'_')}.pdf"`);res.setHeader('Cache-Control','no-store');return res.end(Buffer.from(pdf))}finally{await browser.close()}
   }catch(e){console.error('ready-goods-pdf-v15 failed:',e);res.statusCode=500;res.setHeader('Content-Type','application/json; charset=utf-8');return res.end(JSON.stringify({ok:false,error:'pdf_generation_failed',message:e?.message||String(e)}))}
 }
