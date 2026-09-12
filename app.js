@@ -3147,6 +3147,7 @@ function convertQuoteToOrder(qid){
   function tdy(){ return (typeof today === 'function') ? today() : new Date().toISOString().slice(0,10); }
   function isRep(){ return currentUser?.role === 'rep'; }
   function isManager(){ return currentUser && ((currentUser&&currentUser.role) === 'admin' || (currentUser&&currentUser.role) === 'sales'); }
+  function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
   function cn(id){ return (typeof customerName === 'function') ? customerName(id) : ((db.customers.find(c=>c.id===id)||{}).name || '-'); }
   function rn(id){ return (typeof repName === 'function') ? repName(id) : ((db.reps.find(r=>r.id===id)||{}).name || '-'); }
   function timeStr(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
@@ -3160,12 +3161,14 @@ function convertQuoteToOrder(qid){
     return document.getElementById('visitTo')?.value || document.getElementById('smartVisitTo')?.value || '';
   }
   function selectedRep(){
-    return document.getElementById('visitRep')?.value || document.getElementById('smartVisitRepFilter')?.value || 'all';
+    return document.getElementById('visitRepFilter')?.value || document.getElementById('visitRep')?.value || document.getElementById('smartVisitRepFilter')?.value || 'all';
   }
   function selectedResult(){
+    if(document.getElementById('visits')?.classList.contains('active')) return 'all';
     return document.getElementById('smartVisitResultFilter')?.value || 'all';
   }
   function qText(){
+    if(document.getElementById('visits')?.classList.contains('active')) return '';
     return (document.getElementById('smartVisitSearch')?.value || document.getElementById('visitSearch')?.value || '').trim();
   }
   function allRepsForFilter(){
@@ -3209,7 +3212,7 @@ function convertQuoteToOrder(qid){
   }
   function renderRepFilters(){
     const reps=allRepsForFilter();
-    ['visitRep','smartVisitRepFilter'].forEach(id=>{
+    ['visitRepFilter','visitRep','smartVisitRepFilter'].forEach(id=>{
       const el=document.getElementById(id);
       if(!el) return;
       const old=el.value || 'all';
@@ -3230,14 +3233,64 @@ function convertQuoteToOrder(qid){
     if(window.smartVisitsAvg) smartVisitsAvg.textContent=avg;
     if(window.smartVisitsNoResult) smartVisitsNoResult.textContent=none;
 
-    if(window.visitsPeriodCount) visitsPeriodCount.textContent=list.length;
-    if(window.visitedCustomersCount) visitedCustomersCount.textContent=new Set(list.map(v=>v.customer_id).filter(Boolean)).size;
-    if(window.unvisitedCustomersCount){
-      const rep=selectedRep();
-      const customerScope = rep && rep !== 'all' ? db.customers.filter(c=>c.rep_id===rep) : db.customers;
-      const visited=new Set(list.map(v=>v.customer_id).filter(Boolean));
-      unvisitedCustomersCount.textContent=customerScope.filter(c=>!visited.has(c.id)).length;
+    const rep=selectedRep();
+    let customerScope = typeof allowedCustomers === 'function' ? allowedCustomers() : db.customers;
+    if(rep && rep !== 'all') customerScope=customerScope.filter(c=>c.rep_id===rep);
+    const visited=new Set(list.map(v=>v.customer_id).filter(Boolean));
+    const notVisited=customerScope.filter(c=>!visited.has(c.id));
+    const late30=customerScope.filter(c=>typeof daysFrom === 'function' && daysFrom(typeof lastVisit === 'function' ? lastVisit(c.id) : c.last_visit)>=30);
+
+    const periodEl=document.getElementById('visitsPeriodCount');
+    const visitedEl=document.getElementById('visitedCustomersCount');
+    const notVisitedEl=document.getElementById('notVisitedCustomersCount');
+    const late30El=document.getElementById('late30CustomersCount');
+    if(periodEl) periodEl.textContent=list.length;
+    if(visitedEl) visitedEl.textContent=visited.size;
+    if(notVisitedEl) notVisitedEl.textContent=notVisited.length;
+    if(late30El) late30El.textContent=late30.length;
+  }
+
+  function customerScopeForReport(){
+    const rep=selectedRep();
+    let customers=typeof allowedCustomers === 'function' ? allowedCustomers() : db.customers;
+    if(rep && rep !== 'all') customers=customers.filter(c=>c.rep_id===rep);
+    return customers;
+  }
+  function customerReportCard(c,latestVisit){
+    const visitDate=latestVisit?.date || (typeof lastVisit === 'function' ? lastVisit(c.id) : c.last_visit) || '';
+    const delay=typeof daysFrom === 'function' ? daysFrom(visitDate) : '-';
+    return `<div class="late-line">
+      <b>${esc(c.name||'-')}</b><br>
+      المندوب: ${esc(rn(c.rep_id))} — آخر زيارة: ${esc(visitDate||'لم يزر')}${visitDate?` — منذ: ${esc(delay)} يوم`:''}
+      <div class="row-actions"><button onclick="visit('${esc(c.id)}')">تسجيل زيارة</button><button onclick="appointment('${esc(c.id)}')">موعد</button><button onclick="newOrder('${esc(c.id)}')">طلب جديد</button></div>
+    </div>`;
+  }
+  function renderLegacyVisitsReport(list){
+    const visitsEl=document.getElementById('visitsList');
+    const customersEl=document.getElementById('notVisitedList');
+    if(!visitsEl || !customersEl) return;
+
+    visitsEl.innerHTML=list.map(visitCard).join('') || '<div class="ok-line">لا توجد زيارات في هذه الفترة</div>';
+
+    const customers=customerScopeForReport();
+    const latestByCustomer=new Map();
+    list.forEach(v=>{ if(v.customer_id && !latestByCustomer.has(v.customer_id)) latestByCustomer.set(v.customer_id,v); });
+    const visitedIds=new Set(latestByCustomer.keys());
+    const type=document.getElementById('visitReportType')?.value || 'visited';
+    let rows=[];
+    let title='العملاء الذين تمت زيارتهم';
+    if(type==='notvisited'){
+      title='العملاء الذين لم تتم زيارتهم';
+      rows=customers.filter(c=>!visitedIds.has(c.id));
+    }else if(type==='late30'){
+      title='العملاء المتأخرون أكثر من 30 يوم';
+      rows=customers.filter(c=>typeof daysFrom === 'function' && daysFrom(typeof lastVisit === 'function' ? lastVisit(c.id) : c.last_visit)>=30);
+    }else{
+      rows=customers.filter(c=>visitedIds.has(c.id));
     }
+    const titleEl=document.getElementById('visitCustomersReportTitle');
+    if(titleEl) titleEl.textContent=title;
+    customersEl.innerHTML=rows.map(c=>customerReportCard(c,latestByCustomer.get(c.id))).join('') || '<div class="ok-line">لا يوجد عملاء في هذا التقرير</div>';
   }
   function visitCard(v){
     const open=!v.checkout_at;
@@ -3290,7 +3343,16 @@ function convertQuoteToOrder(qid){
       const el=window.visitLog || window.visitsLog;
       el.innerHTML = list.map(visitCard).join('') || '<div class="panel">لا توجد زيارات حسب الفلتر المحدد</div>';
     }
+    renderLegacyVisitsReport(list);
     renderPerformance(list);
+  };
+
+  window.showVisitCustomerReport = function(type){
+    const select=document.getElementById('visitReportType');
+    if(select && type!=='visits') select.value=type;
+    renderSmartVisits();
+    const target=type==='visits' ? document.getElementById('visitsList') : document.getElementById('notVisitedList');
+    target?.closest('.panel')?.scrollIntoView({behavior:'smooth',block:'start'});
   };
 
   // Patch old visits report page too
