@@ -2882,7 +2882,7 @@ function convertQuoteToOrder(qid){
   function timeStr(iso){ if(!iso) return '-'; try{return new Date(iso).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){return '-'} }
   function minDiff(a,b){ if(!a||!b) return 0; return Math.max(0, Math.round((new Date(b)-new Date(a))/60000)); }
   function resultText(r){
-    return ({quote:'عرض سعر',sale:'تم البيع',collection:'تحصيل',no_manager:'لا يوجد مسؤول',closed:'العميل مغلق',postponed:'مؤجل',none:'بدون نتيجة'})[r||'none'] || 'بدون نتيجة';
+    return ({quote:'طلب عرض سعر',sale:'تم أخذ طلب',collection:'تم التحصيل',no_manager:'المسؤول غير موجود',closed:'العميل مغلق',postponed:'متابعة لاحقًا',none:'بدون نتيجة'})[r||'none'] || 'بدون نتيجة';
   }
   function allowedReps(){
     return currentUser?.role==='rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
@@ -2975,43 +2975,67 @@ function convertQuoteToOrder(qid){
   window.endSmartVisit = function(visitId){
     const v=db.visits.find(x=>x.id===visitId);
     if(!v) return;
-    modalBody.innerHTML = `<h2>إنهاء الزيارة</h2>
-      <p><b>العميل:</b> ${customerNm(v.customer_id)}</p>
-      <div class="form-grid two">
-        <label>نتيجة الزيارة
-          <select id="evResult">
-            <option value="quote">عرض سعر</option>
-            <option value="sale">تم البيع</option>
-            <option value="collection">تحصيل</option>
-            <option value="no_manager">لا يوجد مسؤول</option>
-            <option value="closed">العميل مغلق</option>
-            <option value="postponed">مؤجل</option>
-            <option value="none">بدون نتيجة</option>
-          </select>
-        </label>
-        <label>الزيارة القادمة
-          <input id="evNextDate" type="date" value="${v.next_visit_date||''}">
-        </label>
+    modalBody.innerHTML = `<div class="visit-end-sheet">
+      <div class="visit-end-heading">
+        <span class="visit-end-icon">✓</span>
+        <div><h2>انتهت الزيارة بإيش؟</h2><p>${customerNm(v.customer_id)}</p></div>
       </div>
-      <label>ملاحظات الزيارة
-        <input id="evNotes" value="${v.notes||''}" placeholder="ماذا حدث في الزيارة؟">
-      </label>
-      <div class="smart-note">سيتم تسجيل وقت المغادرة وموقع GPS إن سمح المتصفح بذلك.</div>
-      <br><button class="primary" onclick="saveEndSmartVisit('${visitId}')">حفظ وإنهاء الزيارة</button>`;
+      <input id="evResult" type="hidden" value="">
+      <div class="visit-outcome-grid" role="radiogroup" aria-label="نتيجة الزيارة">
+        <button type="button" class="visit-outcome quote" data-result="quote" onclick="selectVisitOutcome(this,'quote')"><span>📄</span><b>طلب عرض سعر</b></button>
+        <button type="button" class="visit-outcome sale" data-result="sale" onclick="selectVisitOutcome(this,'sale')"><span>🛍️</span><b>تم أخذ طلب</b></button>
+        <button type="button" class="visit-outcome collection" data-result="collection" onclick="selectVisitOutcome(this,'collection')"><span>💵</span><b>تم التحصيل</b></button>
+        <button type="button" class="visit-outcome postponed" data-result="postponed" onclick="selectVisitOutcome(this,'postponed')"><span>📅</span><b>متابعة لاحقًا</b></button>
+        <button type="button" class="visit-outcome no-manager" data-result="no_manager" onclick="selectVisitOutcome(this,'no_manager')"><span>👤</span><b>المسؤول غير موجود</b></button>
+        <button type="button" class="visit-outcome closed" data-result="closed" onclick="selectVisitOutcome(this,'closed')"><span>🔒</span><b>العميل مغلق</b></button>
+        <button type="button" class="visit-outcome none" data-result="none" onclick="selectVisitOutcome(this,'none')"><span>✏️</span><b>نتيجة أخرى</b></button>
+      </div>
+      <div id="evNextDateWrap" class="visit-end-field ${v.next_visit_date?'':'hidden'}">
+        <label for="evNextDate">موعد المتابعة القادمة</label>
+        <input id="evNextDate" type="date" value="${v.next_visit_date||''}">
+      </div>
+      <div class="visit-end-field">
+        <label for="evNotes">ملاحظة <small>(اختياري)</small></label>
+        <textarea id="evNotes" rows="2" placeholder="اكتب ملاحظة قصيرة إذا احتجت">${v.notes||''}</textarea>
+      </div>
+      <p class="visit-end-error hidden" id="evResultError">اختر نتيجة الزيارة أولًا</p>
+      <button class="primary visit-end-save" onclick="saveEndSmartVisit('${visitId}')">حفظ وإنهاء الزيارة</button>
+      <div class="visit-end-gps">سيُسجل وقت وموقع المغادرة تلقائيًا</div>
+    </div>`;
     modal.classList.remove('hidden');
+  };
+
+  window.selectVisitOutcome = function(button,result){
+    const input=document.getElementById('evResult');
+    if(input) input.value=result;
+    document.querySelectorAll('.visit-outcome').forEach(btn=>{
+      const selected=btn===button;
+      btn.classList.toggle('selected',selected);
+      btn.setAttribute('aria-checked',selected?'true':'false');
+    });
+    document.getElementById('evResultError')?.classList.add('hidden');
+    document.getElementById('evNextDateWrap')?.classList.toggle('hidden',result!=='postponed');
   };
 
   window.saveEndSmartVisit = function(visitId){
     const v=db.visits.find(x=>x.id===visitId);
     if(!v) return;
+    const result=document.getElementById('evResult')?.value||'';
+    if(!result){
+      document.getElementById('evResultError')?.classList.remove('hidden');
+      document.querySelector('.visit-outcome')?.focus();
+      return;
+    }
+    const notes=document.getElementById('evNotes')?.value||'';
+    const nextDate=document.getElementById('evNextDate')?.value||'';
     getGeo((geo,err)=>{
       v.checkout_at=nowIso();
       v.checkout_lat=geo?.lat||null;
       v.checkout_lng=geo?.lng||null;
       v.checkout_accuracy=geo?.accuracy||null;
-      v.result=evResult.value;
-      v.notes=evNotes.value||'';
-      v.next_visit_date=evNextDate.value||'';
+      v.result=result;
+      v.notes=notes;
+      v.next_visit_date=nextDate;
       v.duration_minutes=minDiff(v.checkin_at,v.checkout_at);
       if(geo){
         db.repLocations ||= [];

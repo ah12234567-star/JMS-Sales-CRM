@@ -537,6 +537,28 @@
 .visit-actions .end{background:#991b1b}
 .visit-actions .quote{background:#1d4ed8}
 .visit-actions .route{background:#166534}
+
+/* Fast, mobile-first visit checkout */
+.visit-end-sheet{display:grid;gap:16px;padding-top:2px}
+.visit-end-heading{display:flex;align-items:center;gap:12px;padding-inline-end:42px}
+.visit-end-heading h2{margin:0 0 4px;font-size:24px;color:#0f172a}
+.visit-end-heading p{margin:0;color:#64748b;font-weight:800}
+.visit-end-icon{display:grid;place-items:center;flex:0 0 46px;height:46px;border-radius:15px;background:#dcfce7;color:#166534;font-size:25px;font-weight:900}
+.visit-outcome-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.visit-outcome{min-height:78px;border:2px solid #e2e8f0;border-radius:16px;background:#fff;color:#1e293b;padding:12px 10px;display:flex;align-items:center;gap:10px;text-align:right;font-size:14px;font-weight:900;cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.visit-outcome span{display:grid;place-items:center;flex:0 0 38px;height:38px;border-radius:12px;background:#f1f5f9;font-size:19px}
+.visit-outcome:active{transform:scale(.98)}
+.visit-outcome.selected{border-color:#166534;background:#f0fdf4;box-shadow:0 0 0 3px rgba(22,101,52,.1)}
+.visit-outcome.selected span{background:#dcfce7}
+.visit-outcome.none{grid-column:1/-1;min-height:62px}
+.visit-end-field{display:grid;gap:7px}
+.visit-end-field label{font-weight:900;color:#334155}
+.visit-end-field label small{color:#94a3b8;font-weight:700}
+.visit-end-field input,.visit-end-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;background:#fff;padding:13px;font:inherit;font-size:16px;resize:vertical}
+.visit-end-error{margin:0;padding:10px 12px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-weight:900;text-align:center}
+.visit-end-save{width:100%;min-height:52px;font-size:16px;background:#166534}
+.visit-end-gps{text-align:center;color:#64748b;font-size:12px;margin-top:-7px}
+@media(max-width:520px){.visit-outcome-grid{grid-template-columns:1fr}.visit-outcome,.visit-outcome.none{grid-column:auto;min-height:60px}.visit-end-heading h2{font-size:22px}}
 .smart-note{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;padding:10px;margin-top:10px;color:#475569}
 @media(max-width:900px){.visits-stats{grid-template-columns:1fr 1fr}.visit-lines{grid-template-columns:1fr}}
 
