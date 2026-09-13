@@ -3037,33 +3037,46 @@ function convertQuoteToOrder(qid){
     }
     const notes=document.getElementById('evNotes')?.value||'';
     const nextDate=document.getElementById('evNextDate')?.value||'';
-    getGeo((geo,err)=>{
-      v.checkout_at=nowIso();
-      v.checkout_lat=geo?.lat||null;
-      v.checkout_lng=geo?.lng||null;
-      v.checkout_accuracy=geo?.accuracy||null;
-      v.result=result;
-      v.notes=notes;
-      v.next_visit_date=nextDate;
-      v.duration_minutes=minDiff(v.checkin_at,v.checkout_at);
-      if(geo){
-        db.repLocations ||= [];
-        db.repLocations.unshift({id:uid(),rep_id:v.rep_id,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'visit_checkout',visit_id:v.id,created_at:nowIso()});
-      }
-      const c=customerObj(v.customer_id);
-      if(c){
-        c.last_visit=v.date;
-        c.next_visit_date=v.next_visit_date || c.next_visit_date || '';
-        c.last_visit_result=v.result;
-      }
-      setRepStatus(v.rep_id,'on_duty');
-      saveRender();
-      closeModal();
-      if(v.result==='quote' && confirm('نتيجة الزيارة عرض سعر. هل تريد إنشاء عرض سعر الآن؟')){
-        if(typeof openQuoteForm==='function') openQuoteForm(v.customer_id);
-      }else{
-        alert('تم إنهاء الزيارة');
-      }
+    const saveButton=document.querySelector('.visit-end-save');
+    if(saveButton){saveButton.disabled=true;saveButton.textContent='جاري الحفظ...';}
+
+    // Finish immediately. GPS is optional and must never block a representative.
+    v.checkout_at=nowIso();
+    v.checkout_lat=null;
+    v.checkout_lng=null;
+    v.checkout_accuracy=null;
+    v.result=result;
+    v.notes=notes;
+    v.next_visit_date=nextDate;
+    v.duration_minutes=minDiff(v.checkin_at,v.checkout_at);
+    v.updated_at=nowIso();
+    const c=customerObj(v.customer_id);
+    if(c){
+      c.last_visit=v.date;
+      c.next_visit_date=v.next_visit_date || c.next_visit_date || '';
+      c.last_visit_result=v.result;
+      c.updated_at=nowIso();
+    }
+    setRepStatus(v.rep_id,'on_duty');
+    saveRender();
+    closeModal();
+
+    if(v.result==='quote' && confirm('تم إنهاء الزيارة. هل تريد إنشاء عرض سعر الآن؟')){
+      if(typeof openQuoteForm==='function') openQuoteForm(v.customer_id);
+    }else{
+      alert('تم حفظ وإنهاء الزيارة بنجاح');
+    }
+
+    // Try to add the checkout location in the background after the visit is closed.
+    getGeo((geo)=>{
+      if(!geo) return;
+      v.checkout_lat=geo.lat;
+      v.checkout_lng=geo.lng;
+      v.checkout_accuracy=geo.accuracy;
+      v.updated_at=nowIso();
+      db.repLocations ||= [];
+      db.repLocations.unshift({id:uid(),rep_id:v.rep_id,lat:geo.lat,lng:geo.lng,accuracy:geo.accuracy,source:'visit_checkout',visit_id:v.id,created_at:nowIso()});
+      if(typeof save==='function') save();
     });
   };
 
