@@ -2952,7 +2952,16 @@ function convertQuoteToOrder(qid){
     if(!customerId) return alert('اختر العميل');
     if(!repId) return alert('اختر المندوب');
     const open=db.visits.find(v=>v.rep_id===repId && !v.checkout_at && (v.smart||v.checkin_at));
-    if(open) return alert('يوجد زيارة مفتوحة لهذا المندوب. أنهها أولًا.');
+    if(open){
+      const openCustomer=customerNm(open.customer_id);
+      const openTime=timeStr(open.checkin_at);
+      const goToOpen=confirm(`لديك زيارة مفتوحة الآن:\n\nالعميل: ${openCustomer}\nبدأت الساعة: ${openTime}\n\nاضغط موافق لفتحها وإنهائها.`);
+      if(goToOpen){
+        closeModal();
+        setTimeout(()=>endSmartVisit(open.id),50);
+      }
+      return;
+    }
     getGeo((geo,err)=>{
       const v={
         id:uid(), smart:true, date:tdy(), customer_id:customerId, rep_id:repId,
