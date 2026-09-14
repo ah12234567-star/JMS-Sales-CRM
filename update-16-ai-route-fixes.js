@@ -61,6 +61,7 @@
     body.scrollTop=body.scrollHeight;
   }
   function installAiPatch(){
+    if(window.JMSConversationalAI)return;
     if(typeof window.askJmsAI==='function' && !window.askJmsAI.__jmsUpdate16Scoped){
       const original=window.askJmsAI;
       const wrapped=function(q){

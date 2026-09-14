@@ -1,0 +1,25 @@
+name: JMS AI Tests
+on:
+  push:
+    branches: [feature/jms-conversational-ai-20260914]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/ai-*.js'
+      - 'api/ai.js'
+      - 'jms-conversational-ai.js'
+      - 'quote-smart-assistant.js'
+      - 'tests/ai-*.test.js'
+      - '.github/workflows/ai-tests.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/ai-*.test.js
+      - run: node --check api/ai.js && node --check jms-conversational-ai.js && node --check quote-smart-assistant.js

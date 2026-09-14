@@ -12,11 +12,13 @@ function localParse(text){
  const thickness=t.match(/(?:سمك|سماك[هة]|سماكة)\s*(\d+(?:\.\d+)?)/i)||t.match(/(\d+(?:\.\d+)?)\s*(?:مايكرون|ميكرون|micron)/i);
  const kg=t.match(/(?:كمية|الكمية)?\s*(\d+(?:\.\d+)?)\s*(?:كيلو|كجم|kg)/i);
  const price=t.match(/(?:بسعر|سعر(?:\s*الكيلو)?|بـ?)\s*(\d+(?:\.\d+)?)\s*(?:ريال|ر\.س)?/i);
+ const explicitColors=t.match(/(?:طباعة\s*)?(\d+)\s*(?:ألوان|الوان|لون)/i);
  const colors=t.match(/(?:طباعة\s*)?(لون|لونين|ثلاثة\s*ألوان|ثلاث\s*الوان|4\s*ألوان|4\s*الوان|أربعة\s*ألوان|اربعة\s*الوان)/i);
  let print_colors='';
  if(colors){const x=colors[1];print_colors=/لونين/.test(x)?2:/ثلاث/.test(x)?3:/(?:4|أربع|اربع)/.test(x)?4:1;}
+ if(explicitColors)print_colors=Number(explicitColors[1])>=1&&Number(explicitColors[1])<=8?Number(explicitColors[1]):'';
  return {
-  product_type:/رول/.test(t)?'رول بلاستيك':'أكياس بلاستيك',
+  product_type:/رول/.test(t)?'رول بلاستيك':/كيس|أكياس|اكياس/.test(t)?'أكياس بلاستيك':'',
   material:/\bHD(?:PE)?\b/i.test(t)?'HDPE':/\bLD(?:PE)?\b/i.test(t)?'LDPE':'',
   color:(t.match(/\b(أبيض|ابيض|شفاف|أسود|اسود|أحمر|احمر|أزرق|ازرق|أخضر|اخضر)\b/)||[])[1]||'',
   width_cm:size?num(size[1]):'',length_cm:size?num(size[2]):'',thickness_micron:thickness?num(thickness[1]):'',
@@ -36,7 +38,7 @@ async function aiParse(text){
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
  try{
   const token=sessionStorage.getItem('jms_auth_token')||'';
-  const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({question,allowWeb:false}),signal:controller.signal});
+  const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({question,task:'quote_parse',allowWeb:false}),signal:controller.signal});
   const data=await res.json();
   if(!res.ok||data.ok===false)throw new Error(data.answer||data.error||'AI unavailable');
   return extractJson(data.answer);
@@ -47,7 +49,7 @@ function applyParsed(data){
  if(!data)return false;
  const product=/رول/.test(data.product_type||'')?'رول بلاستيك':/كيس|أكياس/.test(data.product_type||'')?'أكياس بلاستيك':'';
  if(product)value('mqProduct',product);
- if(data.material)value('mqMaterial',/^HD/i.test(data.material)?'HDPE':'LDPE');
+ if(data.material)value('mqMaterial',data.material);
  value('mqColor',data.color);value('mqWidth',data.width_cm);value('mqLength',data.length_cm);value('mqThickness',data.thickness_micron);value('mqKg',data.quantity_kg);value('mqPriceKg',data.price_per_kg);
  if($('mqSizeUnit'))value('mqSizeUnit','cm');if($('mqThicknessUnit'))value('mqThicknessUnit','micron');
  if(data.printing)value('mqPrint',data.printing);if(data.print_colors)value('mqPrintColors',data.print_colors);
