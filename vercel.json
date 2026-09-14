@@ -1,17 +1,65 @@
 {
   "headers": [
-    { "source": "/store", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }] },
-    { "source": "/store.html", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }] }
+    {
+      "source": "/store",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive, nosnippet"
+        }
+      ]
+    },
+    {
+      "source": "/store.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive, nosnippet"
+        }
+      ]
+    }
   ],
   "rewrites": [
-    { "source": "/quote", "destination": "/quote.html" },
-    { "source": "/store", "destination": "/store.html" },
-    { "source": "/store.html", "destination": "/store.html" },
-    { "source": "/production", "destination": "/production.html" },
-    { "source": "/production.html", "destination": "/production.html" },
-    { "source": "/production-preview.html", "destination": "/production-preview.html" },
-    { "source": "/api/auth-update-user", "destination": "/api/auth-create-user?action=update" },
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/quote",
+      "destination": "/quote.html"
+    },
+    {
+      "source": "/store",
+      "destination": "/store.html"
+    },
+    {
+      "source": "/store.html",
+      "destination": "/store.html"
+    },
+    {
+      "source": "/production",
+      "destination": "/production.html"
+    },
+    {
+      "source": "/production.html",
+      "destination": "/production.html"
+    },
+    {
+      "source": "/production-preview.html",
+      "destination": "/production-preview.html"
+    },
+    {
+      "source": "/api/auth-update-user",
+      "destination": "/api/auth-create-user?action=update"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/ai.js": {
+      "maxDuration": 60
+    }
+  }
 }
