@@ -300,10 +300,10 @@
       </div>
 
       <div class="stats visit-stats">
-        <div class="stat"><span>زيارات الفترة</span><b id="visitsPeriodCount">0</b><small>زيارة</small></div>
-        <div class="stat"><span>عملاء تمت زيارتهم</span><b id="visitedCustomersCount">0</b><small>عميل</small></div>
-        <div class="stat danger-card"><span>لم تتم زيارتهم</span><b id="notVisitedCustomersCount">0</b><small>عميل</small></div>
-        <div class="stat danger-card"><span>متأخرين +30 يوم</span><b id="late30CustomersCount">0</b><small>عميل</small></div>
+        <div class="stat visit-stat-card" role="button" tabindex="0" onclick="showVisitCustomerReport('visits')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showVisitCustomerReport('visits')}" title="عرض سجل زيارات الفترة"><span>زيارات الفترة</span><b id="visitsPeriodCount">0</b><small>زيارة</small></div>
+        <div class="stat visit-stat-card" role="button" tabindex="0" onclick="showVisitCustomerReport('visited')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showVisitCustomerReport('visited')}" title="عرض أسماء العملاء الذين تمت زيارتهم"><span>عملاء تمت زيارتهم</span><b id="visitedCustomersCount">0</b><small>عميل</small></div>
+        <div class="stat danger-card visit-stat-card" role="button" tabindex="0" onclick="showVisitCustomerReport('notvisited')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showVisitCustomerReport('notvisited')}" title="عرض أسماء العملاء الذين لم تتم زيارتهم"><span>لم تتم زيارتهم</span><b id="notVisitedCustomersCount">0</b><small>عميل</small></div>
+        <div class="stat danger-card visit-stat-card" role="button" tabindex="0" onclick="showVisitCustomerReport('late30')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showVisitCustomerReport('late30')}" title="عرض العملاء المتأخرين أكثر من 30 يوم"><span>متأخرين +30 يوم</span><b id="late30CustomersCount">0</b><small>عميل</small></div>
       </div>
 
       <div class="grid2">
@@ -312,7 +312,7 @@
           <div id="visitsList"></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><b>العملاء بدون زيارة</b><span>حسب الفترة المختارة</span></div>
+          <div class="panel-head"><b id="visitCustomersReportTitle">العملاء بدون زيارة</b><span>حسب الفترة المختارة</span></div>
           <div id="notVisitedList"></div>
         </div>
       </div>
