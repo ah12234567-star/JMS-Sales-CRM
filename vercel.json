@@ -21,6 +21,10 @@
   ],
   "rewrites": [
     {
+      "source": "/field-rounds.html",
+      "destination": "/field-rounds.html"
+    },
+    {
       "source": "/quote",
       "destination": "/quote.html"
     },
@@ -58,6 +62,9 @@
     }
   ],
   "functions": {
+    "api/field-rounds.js": {
+      "maxDuration": 60
+    },
     "api/ai.js": {
       "maxDuration": 60
     }

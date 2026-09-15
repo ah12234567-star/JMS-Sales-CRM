@@ -1,5 +1,6 @@
-const CACHE_NAME='jms-crm-app-v39-clear-stale-customer-phone';
+const CACHE_NAME='jms-crm-app-v40-field-rounds';
 const SHELL=[
+  '/field-rounds.html','/field-rounds.js','/field-rounds.css','/field-rounds-entry.js',
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
   '/assets/store/bags.webp','/assets/store/tableware.webp','/assets/store/packaging.webp',
@@ -47,7 +48,7 @@ self.addEventListener('fetch',event=>{
 
   if(request.mode==='navigate'){
     const storePage=url.pathname==='/store'||url.pathname==='/store.html'||url.pathname.startsWith('/store/');
-    const fallback=storePage?'/store.html':'/index.html';
+    const fallback=url.pathname==='/field-rounds.html'?'/field-rounds.html':storePage?'/store.html':'/index.html';
     event.respondWith(
       fetch(request,{cache:'no-store'}).then(response=>{
         const copy=response.clone();

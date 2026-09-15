@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>جولة اليوم — JMS</title><link rel="stylesheet" href="/field-rounds.css?v=1"></head>
+<body>
+ <header><a href="/">العودة إلى JMS</a><b>JMS · جولة اليوم</b><span id="userName"></span></header>
+ <main>
+  <h1>جولة اليوم</h1><p class="intro">سجّل جولاتك على المنشآت الجديدة دون إضافتها إلى قائمة العملاء.</p>
+  <p id="message" role="status" aria-live="polite"></p>
+  <section id="compose" class="panel">
+   <h2>احكِ ما حدث في جولتك</h2>
+   <div class="two"><label>تاريخ الجولة<input id="date" type="date" required></label><label>الحي أو المنطقة<input id="area" maxlength="120" placeholder="مثل: حي السامر" required></label></div>
+   <label>ملخص الجولة<textarea id="source" rows="5" maxlength="8000" placeholder="مثال: اليوم في السامر زرت بخاري الأمانة وما يحتاج الآن، ومضبيكم طلبوا أرجع الخميس. مررت أمام مطعم آخر دون دخول."></textarea></label>
+   <p class="hint">اكتب الأسماء التي تتذكرها ونتيجة كل زيارة. لا تحتاج رقم جوال أو إنشاء بطاقة عميل.</p>
+   <button id="prepare" class="primary">رتّب كلامي في جدول</button>
+  </section>
+  <section id="review" class="panel" hidden>
+   <div class="heading"><h2 id="reviewTitle">راجع الجولة</h2><button id="newRound">جولة جديدة</button></div>
+   <p id="roundMeta"></p><details><summary>الكلام الأصلي</summary><p id="original"></p></details>
+   <p id="clarification" class="hint"></p>
+   <div id="entries"></div>
+   <div id="reviewActions"><button id="addRow">+ إضافة منشأة</button><label class="confirm"><input id="confirmed" type="checkbox">راجعت الأسماء والنتائج وهي تصف ما حدث فعلًا.</label><button id="submit" class="primary">اعتماد الجولة وإظهارها للمدير</button></div>
+   <p class="hint">هذا تقرير أدخله المندوب، وليس إثبات حضور GPS. وقت التسجيل لا يمثل وقت دخول كل منشأة.</p>
+  </section>
+  <section class="panel">
+   <div class="heading"><h2 id="reportsTitle">تقاريري</h2><button id="refresh">تحديث</button></div>
+   <div class="two"><label>تاريخ التقارير<input id="filterDate" type="date"></label><label>بحث بالمنشأة أو المندوب أو الحي<input id="search" type="search" placeholder="بحث في التقارير المعروضة"></label></div>
+   <p id="totals"></p><div id="reports"></div><button id="more" hidden>تحميل المزيد</button>
+  </section>
+ </main>
+ <script type="module" src="/field-rounds.js?v=1"></script>
+</body></html>

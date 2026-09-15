@@ -7,7 +7,7 @@ function allowed(auth,route){
 function isInternalRecord(route){
   const type=String(route?.record_type||'');
   const id=String(route?.id||'');
-  return type==='radar_lead'||type==='store_product'||type==='store_order'||type==='customer_otp'||
+  return type==='field_round'||id.startsWith('field-round-')||type==='radar_lead'||type==='store_product'||type==='store_order'||type==='customer_otp'||
     id.startsWith('radar-lead-')||id.startsWith('store-product-')||id.startsWith('store-order-')||id.startsWith('customer-otp-');
 }
 
