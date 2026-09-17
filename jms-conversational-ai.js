@@ -51,12 +51,12 @@
   } catch {thinking.textContent='تعذر الاتصال بالمساعد. أعد المحاولة؛ لم أستخدم بيانات قديمة لإعطائك إجماليًا.';}
   finally{clearTimeout(timer);s.busy=false;body.scrollTop=body.scrollHeight;}
  }
- window.JMSConversationalAI={version:'20260914',ask,clear:()=>sessions.clear()};
+ window.JMSConversationalAI={version:'20260917',ask,clear:()=>sessions.clear()};
  window.askJmsAI=q=>ask('manager',q);
  window.jmsRepAiAsk=q=>ask('rep',q);
  window.askRepAI=q=>ask('rep',q);
  function setup(){
-  for(const id of ['jmsAiInput','repAiInput']){const el=document.getElementById(id);if(el){el.placeholder='اكتب سؤالك بطريقتك، ثم أكمل على نفس الإجابة';el.style.fontSize='16px';}}
+  for(const id of ['jmsAiInput','repAiInput']){const el=document.getElementById(id);if(el){el.placeholder='اكتب مثلًا: خطة يومي، أو مين أتابع اليوم؟';el.style.fontSize='16px';}}
   // Keep the conversation uncluttered; actions appear only with relevant results.
   document.querySelectorAll('.jms-rep-ai-actions,#repAiAssistant .head-actions').forEach(el=>el.hidden=true);
  }
