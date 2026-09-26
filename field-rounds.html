@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>جولة اليوم — JMS</title><link rel="stylesheet" href="/field-rounds.css?v=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>جولة اليوم — JMS</title><link rel="stylesheet" href="/field-rounds.css?v=2"></head>
 <body>
  <header><a href="/">العودة إلى JMS</a><b>JMS · جولة اليوم</b><span id="userName"></span></header>
  <main>
@@ -10,7 +10,8 @@
    <h2>احكِ ما حدث في جولتك</h2>
    <div class="two"><label>تاريخ الجولة<input id="date" type="date" required></label><label>الحي أو المنطقة<input id="area" maxlength="120" placeholder="مثل: حي السامر" required></label></div>
    <label>ملخص الجولة<textarea id="source" rows="5" maxlength="8000" placeholder="مثال: اليوم في السامر زرت بخاري الأمانة وما يحتاج الآن، ومضبيكم طلبوا أرجع الخميس. مررت أمام مطعم آخر دون دخول."></textarea></label>
-   <p class="hint">اكتب الأسماء التي تتذكرها ونتيجة كل زيارة. لا تحتاج رقم جوال أو إنشاء بطاقة عميل.</p>
+   <div class="voice-controls"><button id="voiceInput" type="button" aria-pressed="false">🎙 ابدأ الإملاء</button><span id="voiceStatus" role="status" aria-live="polite">تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.</span></div>
+   <p class="hint">اكتب أو أمْلِ أسماء المنشآت ونتيجة كل زيارة. لا تحتاج رقم جوال أو إنشاء بطاقة عميل.</p>
    <button id="prepare" class="primary">رتّب كلامي في جدول</button>
   </section>
   <section id="review" class="panel" hidden>
@@ -27,5 +28,5 @@
    <p id="totals"></p><div id="reports"></div><button id="more" hidden>تحميل المزيد</button>
   </section>
  </main>
- <script type="module" src="/field-rounds.js?v=1"></script>
+ <script type="module" src="/field-rounds.js?v=2"></script>
 </body></html>

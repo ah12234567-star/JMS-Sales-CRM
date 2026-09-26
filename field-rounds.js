@@ -4,6 +4,32 @@ const labels={entered:'دخلت / تحدثت مع المنشأة',passed:'مرو
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let user=null,record=null,records=[],offset=0,busy=false;
 function token(){return sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token')||'';}
+let voiceRecognition=null,voiceActive=false,voiceBase='';
+function setupVoiceInput(){
+ const button=$('voiceInput'),status=$('voiceStatus');if(!button)return;
+ const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!Recognition){button.hidden=true;return;}
+ const setActive=active=>{voiceActive=active;button.textContent=active?'⏹ إيقاف الإملاء':'🎙 ابدأ الإملاء';button.setAttribute('aria-pressed',String(active));};
+ button.onclick=()=>{
+  if(voiceActive){voiceRecognition?.stop();return;}
+  try{
+   voiceRecognition=new Recognition();voiceRecognition.lang='ar-SA';voiceRecognition.continuous=true;voiceRecognition.interimResults=true;voiceBase=$('source').value.trim();
+   voiceRecognition.onstart=()=>{setActive(true);status.textContent='أستمع الآن… اضغط إيقاف عند الانتهاء.';};
+   voiceRecognition.onresult=event=>{
+    let finalText='',interimText='';
+    for(let i=0;i<event.results.length;i++){const transcript=event.results[i][0]?.transcript||'';if(event.results[i].isFinal)finalText+=transcript+' ';else interimText+=transcript+' ';}
+    $('source').value=[voiceBase,finalText.trim(),interimText.trim()].filter(Boolean).join(' ').trim().slice(0,8000);persist();
+   };
+   voiceRecognition.onerror=event=>{
+    if(event.error==='not-allowed'||event.error==='service-not-allowed')message('اسمح للمتصفح باستخدام الميكروفون، أو اكتب ملخص الجولة.',true);
+    else if(event.error==='no-speech')message('لم أسمع كلامًا. حاول مرة أخرى أو اكتب الملخص.',true);
+    else if(event.error!=='aborted')message('تعذر إكمال الإملاء. يمكنك كتابة الملخص يدويًا.',true);
+   };
+   voiceRecognition.onend=()=>{setActive(false);status.textContent='تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.';if($('source').value.trim())message('انتهى الإملاء. راجع النص ثم رتّب كلامك في جدول.');};
+   voiceRecognition.start();setActive(true);
+  }catch{setActive(false);message('تعذر بدء الإملاء. تحقق من إذن الميكروفون أو اكتب الملخص.',true);}
+ };
+}
 function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);}
 async function request(path='',body){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),55000);
@@ -40,6 +66,7 @@ async function loadReports(append=false){
  $('reportsTitle').textContent=user.role==='rep'?'تقاريري':'جولات المناديب';
  records=append?[...records,...result.records]:result.records;offset=records.length;$('more').hidden=!result.hasMore;renderReports();
 }
+setupVoiceInput();
 $('prepare').onclick=()=>operation($('prepare'),async()=>{
  if(!$('date').value||!$('area').value.trim()||!$('source').value.trim())throw new Error('حدد الحي والتاريخ واكتب ما حدث في الجولة.');
  persist();const result=await request('',{action:'prepare',date:$('date').value,area:$('area').value,text:$('source').value});showRecord(result.record);message(result.record.status==='submitted'?'هذه الجولة معتمدة مسبقًا؛ لم تُكرر.':'المسودة جاهزة للمراجعة؛ لم تُرسل للمدير بعد.');
@@ -51,7 +78,7 @@ $('submit').onclick=()=>operation($('submit'),async()=>{
  if(!$('confirmed').checked)throw new Error('راجع الأسماء والنتائج ثم ضع علامة التأكيد.');
  const result=await request('',{action:'submit',id:record.id,entries:record.entries,confirmed:true});showRecord(result.record,false);message('تم الحفظ على السيرفر. الجولة متاحة للمدير، ولم يُضف أي عميل.');await loadReports();
 });
-$('newRound').onclick=()=>{if(record?.status==='draft'&&!confirm('المسودة محفوظة ويمكن العودة إليها. فتح جولة جديدة؟'))return;record=null;$('review').hidden=true;$('compose').hidden=false;$('source').value='';$('date').value=today();history.replaceState(null,'',location.pathname);persist();message('');};
+$('newRound').onclick=()=>{if(voiceActive)voiceRecognition?.stop();if(record?.status==='draft'&&!confirm('المسودة محفوظة ويمكن العودة إليها. فتح جولة جديدة؟'))return;record=null;$('review').hidden=true;$('compose').hidden=false;$('source').value='';$('date').value=today();history.replaceState(null,'',location.pathname);persist();message('');};
 $('reports').onclick=e=>{const button=e.target.closest('[data-open]');if(button)operation(button,async()=>{const r=await request('?id='+button.dataset.open);showRecord(r.record);message('المسودة جاهزة للمراجعة.');$('review').scrollIntoView({behavior:'smooth'});});};
 $('refresh').onclick=()=>operation($('refresh'),async()=>{await loadReports();message('تم تحديث التقارير.');});
 $('more').onclick=()=>operation($('more'),async()=>{await loadReports(true);message('تم تحميل المزيد.');});
