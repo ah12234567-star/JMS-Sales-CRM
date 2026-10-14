@@ -98,13 +98,13 @@ loginForm.onsubmit=async e=>{
     const data=await jmsPostJson('/api/auth-login',{email,password,role});
     const u=data.user;
     if(!u) return alert('بيانات الدخول غير صحيحة');
-    currentUser={id:u.id,name:u.name,email:u.email,role:u.role};
+    currentUser={id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{}};
     window.currentUser=currentUser;
     sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
     if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
     // Keep a local copy only for display/permissions; password is not stored in browser.
     db.users = (db.users||[]).filter(x=>x.email!==u.email);
-    db.users.push({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active'});
+    db.users.push({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active',permissions:u.permissions||{}});
     save();
     showApp();
   }catch(err){
