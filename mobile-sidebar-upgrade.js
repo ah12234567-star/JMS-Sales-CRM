@@ -34,12 +34,36 @@
     });
   }
 
+  function addQuoteCreate(sidebar) {
+    const nav = sidebar?.querySelector('nav');
+    const quoteItem = nav?.querySelector('.nav[data-page="quotes"]');
+    const oldButton = nav?.querySelector('.jms-quote-create-nav');
+    if (!nav || !quoteItem) return;
+    if (window.currentUser?.role !== 'rep') {
+      oldButton?.remove();
+      return;
+    }
+    if (oldButton) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'nav jms-quote-create-nav';
+    button.dataset.page = 'quotes';
+    button.innerHTML = '<span class="jms-nav-icon">＋</span><span>إنشاء عرض السعر</span>';
+    button.addEventListener('click', () => {
+      document.body.classList.remove('jms-mobile-menu-open');
+      quoteItem.click();
+      window.setTimeout(() => window.openQuoteForm?.(), 120);
+    });
+    quoteItem.insertAdjacentElement('afterend', button);
+  }
+
   function enhance() {
     const sidebar = document.querySelector('.sidebar');
     if (!sidebar) return;
     sidebar.classList.add('jms-mobile-sidebar-pro');
     addSearch(sidebar);
     addIcons(sidebar);
+    addQuoteCreate(sidebar);
   }
 
   const style = document.createElement('style');
@@ -67,8 +91,19 @@
     }
     @media(max-width:390px){.sidebar.jms-mobile-sidebar-pro{width:88vw!important}}
   `;
+  style.textContent += `
+    .jms-quote-create-nav{margin-right:14px!important;min-height:40px!important;border:1px solid rgba(96,165,250,.32)!important;background:rgba(37,99,235,.16)!important;color:#bfdbfe!important;font-size:12px!important}
+    .jms-quote-create-nav .jms-nav-icon{background:#2563eb!important;color:#fff!important}
+  `;
   document.head.appendChild(style);
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enhance);
+  function watchLogin() {
+    const name = document.getElementById('currentUserName');
+    if (!name || name.dataset.jmsQuoteCreateWatch) return;
+    name.dataset.jmsQuoteCreateWatch = '1';
+    new MutationObserver(enhance).observe(name, { childList:true, characterData:true, subtree:true });
+  }
+  watchLogin();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { watchLogin(); enhance(); });
   else enhance();
   setTimeout(enhance,500);
   setTimeout(enhance,1800);
