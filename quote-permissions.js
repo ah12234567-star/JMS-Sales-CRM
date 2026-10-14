@@ -1,6 +1,8 @@
 (function(){
   'use strict';
   const deniedMessage='لا تملك صلاحية إنشاء عرض سعر';
+  let lastPermissionRefresh=0;
+  let permissionRefreshPromise=null;
 
   function current(){
     try{return typeof currentUser!=='undefined'&&currentUser?currentUser:window.currentUser||null}
@@ -31,26 +33,34 @@
     if(['admin','sales'].includes(user.role))return true;
 
     const token=sessionStorage.getItem('jms_auth_token');
-    if(token){
-      try{
-        const request=window.jmsPostJson||(typeof jmsPostJson==='function'?jmsPostJson:null);
-        if(!request)return false;
-        const result=await request('/api/auth-session',{});
-        const fresh=result?.user;
-        if(!fresh||fresh.id!==user.id)return false;
-        user={...user,...fresh,permissions:fresh.permissions||{}};
-        setCurrent(user);
-      }catch(error){
-        console.warn('Unable to refresh quote permissions:',error);
-        return false;
+    if(token&&(Date.now()-lastPermissionRefresh>30000)){
+      if(!permissionRefreshPromise){
+        permissionRefreshPromise=(async()=>{
+          try{
+            const request=window.jmsPostJson||(typeof jmsPostJson==='function'?jmsPostJson:null);
+            if(!request)return false;
+            const result=await request('/api/auth-session',{});
+            const fresh=result?.user;
+            if(!fresh||fresh.id!==user.id)return false;
+            user={...user,...fresh,permissions:fresh.permissions||{}};
+            setCurrent(user);
+            lastPermissionRefresh=Date.now();
+            return permitted(user);
+          }catch(error){
+            console.warn('Unable to refresh quote permissions:',error);
+            lastPermissionRefresh=Date.now();
+            return false;
+          }finally{permissionRefreshPromise=null}
+        })();
       }
+      if(!await permissionRefreshPromise)return false;
     }
-    return permitted(user);
+    return permitted(current());
   }
   window.jmsCanCreateQuote=canCreate;
 
-  function updateCreateButtons(){
-    const allowed=permitted(current());
+  async function updateCreateButtons(){
+    const allowed=await canCreate();
     document.querySelectorAll('.jms-quote-create-nav,#quotes .page-head button').forEach(button=>{
       const text=String(button.textContent||'').trim();
       const isCreate=button.classList.contains('jms-quote-create-nav')||/إنشاء عرض سعر|إنشاء عرض السعر|Create Quotation/i.test(text);
@@ -91,7 +101,7 @@
       return result;
     };
   }
-  new MutationObserver(updateCreateButtons).observe(document.documentElement,{childList:true,subtree:true});
+  new MutationObserver(()=>{updateCreateButtons()}).observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',updateCreateButtons);
   window.addEventListener('pageshow',updateCreateButtons);
   setTimeout(updateCreateButtons,0);
