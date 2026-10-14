@@ -210,6 +210,26 @@ function showApp(){
   resetAppViewport();
 }
 if(currentUser) showApp();
+refreshStoredPermissions();
+
+async function refreshStoredPermissions(){
+  if(!currentUser || currentUser.role==='admin' || !sessionStorage.getItem('jms_auth_token')) return;
+  if(currentUser.permissions && Object.prototype.hasOwnProperty.call(currentUser.permissions,'manage_quotes')) return;
+  try{
+    const data=await jmsPostJson('/api/auth-session',{});
+    const u=data.user;
+    if(!u || u.id!==currentUser.id) return;
+    currentUser={...currentUser,id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{}};
+    window.currentUser=currentUser;
+    sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
+    db.users=(db.users||[]).filter(x=>x.id!==u.id);
+    db.users.push({id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active',permissions:u.permissions||{}});
+    save();
+    renderAll();
+  }catch(error){
+    console.warn('JMS session permissions refresh failed:',error);
+  }
+}
 
 document.querySelectorAll('.nav').forEach(btn=>btn.onclick=()=>{
   document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
