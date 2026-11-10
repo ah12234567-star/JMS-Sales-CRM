@@ -22,7 +22,7 @@
       const store=typeof db!=='undefined'?db:window.db;
       if(store?.users){
         const index=store.users.findIndex(item=>item.id===user.id);
-        if(index>=0)store.users[index]={...store.users[index],...user,permissions:{...(store.users[index].permissions||{}),...(user.permissions||{})}};
+        if(index>=0)store.users[index]={...store.users[index],...user,permissions:user.permissions||{}};
         else store.users.push(user);
       }
     }catch(_){}
@@ -32,7 +32,7 @@
     if(!user)return false;
     if(['admin','sales'].includes(user.role))return true;
 
-    const token=sessionStorage.getItem('jms_auth_token');
+    const token=sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token');
     if(token&&(Date.now()-lastPermissionRefresh>30000)){
       if(!permissionRefreshPromise){
         permissionRefreshPromise=(async()=>{
@@ -41,14 +41,15 @@
             if(!request)return false;
             const result=await request('/api/auth-session',{});
             const fresh=result?.user;
-            if(!fresh||fresh.id!==user.id)return false;
+            if(!fresh||fresh.id!==user.id||current()?.id!==user.id)return false;
             user={...user,...fresh,permissions:fresh.permissions||{}};
             setCurrent(user);
+            window.dispatchEvent(new CustomEvent('jms:session-refreshed',{detail:user}));
             lastPermissionRefresh=Date.now();
             return permitted(user);
           }catch(error){
             console.warn('Unable to refresh quote permissions:',error);
-            lastPermissionRefresh=Date.now();
+            lastPermissionRefresh=0;
             return false;
           }finally{permissionRefreshPromise=null}
         })();
@@ -63,7 +64,7 @@
     const allowed=await canCreate();
     document.querySelectorAll('.jms-quote-create-nav,#quotes .page-head button').forEach(button=>{
       const text=String(button.textContent||'').trim();
-      const isCreate=button.classList.contains('jms-quote-create-nav')||/إنشاء عرض سعر|إنشاء عرض السعر|Create Quotation/i.test(text);
+      const isCreate=button.dataset.action==='create-quote'||button.classList.contains('jms-quote-create-nav')||/إنشاء عرض سعر|إنشاء عرض السعر|Create Quotation/i.test(text);
       if(!isCreate)return;
       button.style.display=allowed?'':'none';
       button.disabled=!allowed;
@@ -103,6 +104,9 @@
   }
   new MutationObserver(()=>{updateCreateButtons()}).observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',updateCreateButtons);
-  window.addEventListener('pageshow',updateCreateButtons);
+  function refreshNow(){lastPermissionRefresh=0;updateCreateButtons();}
+  window.addEventListener('pageshow',refreshNow);
+  window.addEventListener('focus',refreshNow);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshNow()});
   setTimeout(updateCreateButtons,0);
 })();

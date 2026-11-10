@@ -43,7 +43,7 @@
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok || !data.user || !data.token) { setStatus('البريد أو كلمة المرور غير صحيحة', true); return; }
 
-      var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role };
+      var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role, status:data.user.status||'active', permissions:data.user.permissions||{} };
       var userJson = JSON.stringify(user);
       sessionStorage.setItem('jms_current_user', userJson);
       sessionStorage.setItem('jms_auth_token', data.token);
