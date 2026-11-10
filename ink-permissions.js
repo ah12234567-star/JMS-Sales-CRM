@@ -7,9 +7,9 @@
     return window.currentUser || (typeof currentUser!=='undefined'?currentUser:null);
   }
 
-  // Quotation creation now uses the EXISTING "إدارة عروض الأسعار" permission.
+  // Management access remains separate from quotation creation.
   // Admin always has access. Sales managers keep access unless explicitly disabled.
-  // Representatives must have manage_quotes=true.
+  // create_quotes grants creation only; it does not grant management access.
   function canManageQuotes(){
     const u=getUser();
     if(!u) return false;
@@ -17,7 +17,11 @@
     if(u.role==='sales') return u.permissions?.[QUOTE_PERMISSION] !== false;
     return u.permissions?.[QUOTE_PERMISSION] === true;
   }
-  window.jmsCanCreateQuote=canManageQuotes;
+  function canCreateQuotes(){
+    const u=getUser();
+    return !!u && (canManageQuotes() || u.permissions?.create_quotes === true);
+  }
+  window.jmsCanCreateQuote=canCreateQuotes;
   window.jmsCanManageQuotes=canManageQuotes;
 
   function addWarehouseOption(select){
@@ -63,7 +67,7 @@
     const u=(store.users||[]).find(x=>String(x.id)===String(userId));
     if(!u) return alert('تعذر العثور على المستخدم');
 
-    const permissions={};
+    const permissions={...(u.permissions||{})};
     document.querySelectorAll('.jmsPerm').forEach(x=>permissions[x.dataset.perm]=!!x.checked);
     const field=id=>document.getElementById(id);
     const updated={
@@ -123,7 +127,7 @@
   function applyQuoteAccess(){
     const u=getUser();
     if(!u) return;
-    const allowed=canManageQuotes();
+    const allowed=canCreateQuotes();
     document.querySelectorAll('button,a,[role="button"]').forEach(el=>{
       if(!isCreateQuoteControl(el)) return;
       el.dataset.jmsQuoteCreateControl='1';
@@ -139,8 +143,8 @@
       const original=window[name];
       if(typeof original!=='function' || original.__jmsManageQuoteGuarded) return;
       const wrapped=function(){
-        if(!canManageQuotes()){
-          alert('لا تملك صلاحية إدارة عروض الأسعار.');
+        if(!canCreateQuotes()){
+          alert('لا تملك صلاحية إنشاء عرض سعر.');
           return false;
         }
         return original.apply(this,arguments);
@@ -169,10 +173,10 @@
   };
 
   document.addEventListener('click',event=>{
-    if(!canManageQuotes() && isCreateQuoteControl(event.target)){
+    if(!canCreateQuotes() && isCreateQuoteControl(event.target)){
       event.preventDefault();
       event.stopImmediatePropagation();
-      alert('لا تملك صلاحية إدارة عروض الأسعار.');
+      alert('لا تملك صلاحية إنشاء عرض سعر.');
       return;
     }
     if(event.target.closest('[data-page="users"],button[onclick*="User"],button[onclick*="Permission"]')){
