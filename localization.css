@@ -1,0 +1,26 @@
+.account-language{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0}
+.account-language label{font-size:12px;color:inherit}
+.account-language select{min-height:42px;max-width:130px;border:1px solid #cbd5e1;border-radius:9px;padding:6px;background:#fff;color:#0f172a}
+html[dir=ltr] .sidebar .nav,html[dir=ltr] .customer-search-results button,html[dir=ltr] .jms-search-results button{text-align:left}
+html[dir=ltr] th,html[dir=ltr] td{text-align:start}
+html[dir=ltr] .modal-close{left:auto;right:15px}
+html[dir=ltr] .sidebar .nav:before{right:auto;left:12px}
+html[dir=ltr] .sidebar .user-box:before{left:auto;right:16px}
+html[dir=ltr] .jms-ai-msg.user{margin-right:0;margin-left:40px}
+html[dir=ltr] .jms-ai-msg.bot{margin-left:0;margin-right:20px}
+@media(max-width:900px){
+ html[dir=ltr] .sidebar.jms-mobile-sidebar-pro .jms-mobile-close{left:auto!important;right:12px!important}
+ html[dir=ltr] .sidebar.jms-mobile-sidebar-pro .brand{margin:0 0 7px 48px!important}
+}
+@media(max-width:920px){
+ html[dir=ltr] .sidebar{right:auto!important;left:0!important;transform:translateX(-105%)!important;border-left:0!important;border-right:1px solid rgba(255,255,255,.1)!important}
+ html[dir=ltr] body.jms-mobile-menu-open .sidebar{transform:translateX(0)!important}
+}
+
+html[dir=ltr] :is(input,select,textarea,.page,.modal-card){text-align:start}
+
+/* Keep account UI from flashing the previous language during dictionary loading. */
+html[data-locale-pending] #appView,html[data-account-page][data-locale-pending] main{
+ visibility:hidden;animation:jms-locale-fallback 0s 3s forwards
+}
+@keyframes jms-locale-fallback{to{visibility:visible}}

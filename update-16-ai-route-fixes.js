@@ -45,10 +45,10 @@
     const total=debtors.reduce((sum,c)=>sum+num(c.debt_balance),0);
     const title=target?`ديون عملاء ${repName(target)}`:'كل ديون العملاء';
     if(!debtors.length){
-      return `<div class="jms-ai-scope-card"><h3>${esc(title)}</h3><p>لا توجد مديونيات مسجلة ضمن هذا النطاق.</p><small>تم تطبيق فلتر المندوب قبل التحليل حتى لا تختلط بيانات ياسر وعثمان.</small></div>`;
+      return `<div class="jms-ai-scope-card"><h3>${esc(title)}</h3><p data-i18n="ui_ae307f6d1bb7">لا توجد مديونيات مسجلة ضمن هذا النطاق.</p><small data-i18n="ui_c69631c2bd0b">تم تطبيق فلتر المندوب قبل التحليل حتى لا تختلط بيانات ياسر وعثمان.</small></div>`;
     }
     const rows=debtors.slice(0,15).map((c,i)=>`<tr><td>${i+1}</td><td>${esc(c.name)}</td><td>${esc(repName(c.rep_id))}</td><td>${esc(c.phone||'-')}</td><td><b>${money(c.debt_balance)}</b></td></tr>`).join('');
-    return `<div class="jms-ai-scope-card"><h3>${esc(title)}</h3><div class="jms-ai-scope-kpis"><span>عدد العملاء: <b>${debtors.length}</b></span><span>الإجمالي: <b>${money(total)} ريال</b></span></div><div class="jms-ai-scope-table"><table><thead><tr><th>#</th><th>العميل</th><th>المندوب</th><th>الجوال</th><th>المديونية</th></tr></thead><tbody>${rows}</tbody></table></div>${debtors.length>15?`<small>تم عرض أعلى 15 عميل من أصل ${debtors.length}.</small>`:''}<small>تم تطبيق فلتر المندوب قبل التحليل حتى لا تختلط بيانات ياسر وعثمان.</small></div>`;
+    return `<div class="jms-ai-scope-card"><h3>${esc(title)}</h3><div class="jms-ai-scope-kpis"><span>عدد العملاء: <b>${debtors.length}</b></span><span>الإجمالي: <b>${money(total)} ريال</b></span></div><div class="jms-ai-scope-table"><table><thead><tr><th>#</th><th data-i18n="ui_a042411e90be">العميل</th><th data-i18n="ui_4059aaa08477">المندوب</th><th data-i18n="ui_0b6aa9453dfb">الجوال</th><th data-i18n="ui_8ef13d3ef3ca">المديونية</th></tr></thead><tbody>${rows}</tbody></table></div>${debtors.length>15?`<small>تم عرض أعلى 15 عميل من أصل ${debtors.length}.</small>`:''}<small data-i18n="ui_c69631c2bd0b">تم تطبيق فلتر المندوب قبل التحليل حتى لا تختلط بيانات ياسر وعثمان.</small></div>`;
   }
   function pushAiMessage(html){
     const bodies=['jmsAiBody','repAiBody','repAiMessages','aiChatBody','aiBody'].map(id=>document.getElementById(id)).filter(Boolean);
@@ -113,7 +113,7 @@
     const u=getUser();
     if(u?.role==='rep') return '';
     const options=reps().map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
-    return `<label>المندوب<select id="fieldLeadRep"><option value="">اختر المندوب</option>${options}</select></label>`;
+    return `<label><span data-i18n="ui_4059aaa08477">المندوب</span><select id="fieldLeadRep"><option value="" data-i18n="ui_c4e04e973bd0">اختر المندوب</option>${options}</select></label>`;
   }
   function getQuickLeadData(){
     const u=getUser();
@@ -131,14 +131,14 @@
   }
   window.jmsCaptureFieldLeadLocation=function(){
     const status=document.getElementById('fieldLeadLocationStatus');
-    if(!navigator.geolocation){if(status)status.textContent='المتصفح لا يدعم تحديد الموقع';return;}
-    if(status)status.textContent='جاري تحديد الموقع...';
+    if(!navigator.geolocation){if(status)(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"المتصفح لا يدعم تحديد الموقع");return;}
+    if(status)(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,'جاري تحديد الموقع...');
     navigator.geolocation.getCurrentPosition(pos=>{
       const lat=pos.coords.latitude.toFixed(6),lng=pos.coords.longitude.toFixed(6);
       const latInput=document.getElementById('fieldLeadLat'),lngInput=document.getElementById('fieldLeadLng');
       if(latInput)latInput.value=lat;if(lngInput)lngInput.value=lng;
-      if(status)status.textContent='تم حفظ الموقع الحالي';
-    },err=>{if(status)status.textContent='تعذر أخذ الموقع، فعّل صلاحية الموقع أو أدخله يدويًا';console.warn(err);},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+      if(status)(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,'تم حفظ الموقع الحالي');
+    },err=>{if(status)(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,'تعذر أخذ الموقع، فعّل صلاحية الموقع أو أدخله يدويًا');console.warn(err);},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
   };
   function addFieldLead(startVisit){
     const s=getDb(), u=getUser(), data=getQuickLeadData();
@@ -168,7 +168,7 @@
     const modal=document.getElementById('modal'),body=document.getElementById('modalBody');
     if(!body||!modal)return alert('تعذر فتح النموذج');
     const openCount=currentOpenVisits().length;
-    body.innerHTML=`<div class="jms-field-lead-form"><h2>إضافة فرصة من الطريق</h2><p class="muted">أضف مطعم أو محل شفته وأنت في المسار. النظام لا يقفل زيارتك الحالية ولا يلغي المسار.</p>${openCount?`<div class="jms-open-visit-note">لديك ${openCount} زيارة مفتوحة. الإضافة الجديدة لن تغلقها.</div>`:''}<div class="form-grid two"><label>اسم العميل / المحل<input id="fieldLeadName" placeholder="مثال: مطعم فلة"></label><label>رقم الجوال<input id="fieldLeadPhone" inputmode="tel" placeholder="05xxxxxxxx"></label><label>المدينة<input id="fieldLeadCity" value="جدة"></label><label>الحي / المنطقة<input id="fieldLeadDistrict" placeholder="شاطئ النخيل"></label><label>النشاط<select id="fieldLeadCategory"><option>مطعم</option><option>كافيه</option><option>مصنع</option><option>محل تجاري</option><option>فرصة من الطريق</option></select></label>${repSelectHtml()}<label class="full">ملاحظة<input id="fieldLeadNotes" placeholder="شافه المندوب أثناء المسار / يحتاج زيارة لاحقة"></label><label>خط العرض<input id="fieldLeadLat" placeholder="اختياري"></label><label>خط الطول<input id="fieldLeadLng" placeholder="اختياري"></label></div><div class="jms-route-discovery-actions"><button type="button" class="secondary" onclick="jmsCaptureFieldLeadLocation()">📍 أخذ موقعي الحالي</button><span id="fieldLeadLocationStatus"></span></div><div class="jms-route-discovery-actions"><button type="button" class="primary" onclick="jmsSaveFieldLeadOnly()">حفظ كفرصة فقط</button><button type="button" class="primary secondary" onclick="jmsSaveFieldLeadAndVisit()">حفظ وبدء زيارة سريعة</button></div></div>`;
+    body.innerHTML=`<div class="jms-field-lead-form"><h2 data-i18n="ui_873855b171f3">إضافة فرصة من الطريق</h2><p class="muted" data-i18n="ui_b92d205d1399">أضف مطعم أو محل شفته وأنت في المسار. النظام لا يقفل زيارتك الحالية ولا يلغي المسار.</p>${openCount?`<div class="jms-open-visit-note">لديك ${openCount} زيارة مفتوحة. الإضافة الجديدة لن تغلقها.</div>`:''}<div class="form-grid two"><label><span data-i18n="ui_abf4ce1e6465">اسم العميل / المحل</span><input id="fieldLeadName" placeholder="مثال: مطعم فلة" data-i18n-placeholder="ui_df361c27dd72"></label><label><span data-i18n="ui_6dbe8474b01b">رقم الجوال</span><input id="fieldLeadPhone" inputmode="tel" placeholder="05xxxxxxxx"></label><label><span data-i18n="ui_23ee0d351c7b">المدينة</span><input id="fieldLeadCity" value="جدة"></label><label><span data-i18n="ui_c7a5fa28a976">الحي / المنطقة</span><input id="fieldLeadDistrict" placeholder="شاطئ النخيل" data-i18n-placeholder="ui_92dc72323ef5"></label><label><span data-i18n="ui_7d72e4a54516">النشاط</span><select id="fieldLeadCategory"><option data-i18n="ui_9209e5540063">مطعم</option><option data-i18n="ui_f40f8081aba4">كافيه</option><option data-i18n="ui_6436aafb2346">مصنع</option><option data-i18n="ui_e93aa13f8a81">محل تجاري</option><option data-i18n="ui_26c064883dac">فرصة من الطريق</option></select></label>${repSelectHtml()}<label class="full"><span data-i18n="ui_0be7afd7e65f">ملاحظة</span><input id="fieldLeadNotes" placeholder="شافه المندوب أثناء المسار / يحتاج زيارة لاحقة" data-i18n-placeholder="ui_4120e61e40b5"></label><label><span data-i18n="ui_06bf528a7092">خط العرض</span><input id="fieldLeadLat" placeholder="اختياري" data-i18n-placeholder="ui_33408684704e"></label><label><span data-i18n="ui_a1dec4029b5d">خط الطول</span><input id="fieldLeadLng" placeholder="اختياري" data-i18n-placeholder="ui_33408684704e"></label></div><div class="jms-route-discovery-actions"><button type="button" class="secondary" onclick="jmsCaptureFieldLeadLocation()" data-i18n="ui_c3396f68e119">📍 أخذ موقعي الحالي</button><span id="fieldLeadLocationStatus"></span></div><div class="jms-route-discovery-actions"><button type="button" class="primary" onclick="jmsSaveFieldLeadOnly()" data-i18n="ui_2bb42d18b485">حفظ كفرصة فقط</button><button type="button" class="primary secondary" onclick="jmsSaveFieldLeadAndVisit()" data-i18n="ui_5f59b8cab0ed">حفظ وبدء زيارة سريعة</button></div></div>`;
     modal.classList.remove('hidden');
   };
 
@@ -184,7 +184,7 @@
     btn.id='jmsRouteFieldDiscoveryBtn';
     btn.type='button';
     btn.className='primary small jms-route-discovery-btn';
-    btn.textContent='+ فرصة من الطريق';
+    (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,'+ فرصة من الطريق');
     btn.onclick=window.openRouteFieldLead;
     actions.appendChild(btn);
   }

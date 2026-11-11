@@ -27,7 +27,7 @@
     if(oldInput) oldInput.remove();
     var old=document.getElementById('jmsDebtAgingImportBtn');
     if(old){
-      old.textContent='استيراد الديون الذكي';
+      (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(old,"استيراد الديون الذكي");
       old.onclick=openSmart;
       old.removeAttribute('data-old-yaser-import');
       return;
@@ -43,7 +43,7 @@
     btn.id='jmsSmartDebtImportBtn';
     btn.type='button';
     btn.className='primary secondary';
-    btn.textContent='استيراد الديون الذكي';
+    (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"استيراد الديون الذكي");
     btn.onclick=openSmart;
     actions.appendChild(btn);
   }

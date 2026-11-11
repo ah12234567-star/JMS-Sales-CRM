@@ -37,7 +37,7 @@
 
       const field=document.createElement('div');
       field.className='rgn-field rgn-packaging';
-      field.innerHTML=`<span>التعبئة / عدد العبوات</span><input type="text" inputmode="text" autocomplete="off" placeholder="مثال: 24 كرتون / 15 شدة"><small>تظهر كما هي في عمود التعبئة داخل PDF</small>`;
+      field.innerHTML=`<span data-i18n="ui_0c0822b00817">التعبئة / عدد العبوات</span><input type="text" inputmode="text" autocomplete="off" placeholder="مثال: 24 كرتون / 15 شدة" data-i18n-placeholder="ui_19dd60f4f10e"><small data-i18n="ui_90b96e37f5b6">تظهر كما هي في عمود التعبئة داخل PDF</small>`;
       const input=field.querySelector('input');
       input.value=values.get(id)||'';
       input.addEventListener('input',()=>{
@@ -46,7 +46,7 @@
         window.JMSReadyGoods.patch(id,'packaging_label',v,input);
       });
 
-      const priceField=[...grid.querySelectorAll('.rgn-field')].find(x=>x.textContent.includes('سعر الوحدة قبل الضريبة'));
+      const priceField=[...grid.querySelectorAll('.rgn-field')].find(x=>x.textContent.includes(window.JMSI18n?.label('سعر الوحدة قبل الضريبة') || 'سعر الوحدة قبل الضريبة'));
       if(priceField) grid.insertBefore(field,priceField);
       else grid.insertBefore(field,grid.lastElementChild);
     });

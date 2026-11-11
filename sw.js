@@ -1,5 +1,6 @@
-const CACHE_NAME='jms-crm-app-v40-field-rounds';
+const CACHE_NAME='jms-crm-app-v42-localization';
 const SHELL=[
+  '/localization.js','/localization.css','/locales/ar.json','/locales/en.json',
   '/field-rounds.html','/field-rounds.js','/field-rounds.css','/field-rounds-entry.js',
   '/','/index.html','/style.css','/manifest.json','/app.js','/config.js',
   '/store','/store.html','/store.css','/store.js','/store-manifest.json','/store-admin.js',
@@ -59,7 +60,7 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  if(url.pathname.endsWith('.js')){
+  if(url.pathname.endsWith('.js')||url.pathname.startsWith('/locales/')||url.pathname==='/localization.css'){
     event.respondWith(
       fetch(request,{cache:'no-store'}).then(response=>{
         if(response.ok&&url.origin===self.location.origin){

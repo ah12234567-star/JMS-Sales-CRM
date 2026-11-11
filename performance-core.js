@@ -24,7 +24,7 @@
     const id=safeText(customer.id);
     return '<div class="customer-card jms-lazy-card" data-customer-id="'+id+'">'+
       '<div class="customer-head"><div><h3>'+safeText(customer.name||'عميل بدون اسم')+'</h3><p>'+safeText(customer.phone||'—')+' · '+safeText(customer.city||'—')+' · '+safeText(rep(customer.rep_id))+'</p></div><span class="badge '+safeText(tone[1])+'">'+safeText(tone[0])+'</span></div>'+
-      '<div class="metrics"><div><b>'+amount(customer.debt_balance)+'</b><span>مديونية</span></div><div><b>'+safeText(visitDate(customer.id))+'</b><span>آخر زيارة</span></div><div><b>'+safeText(customer.next_date||'—')+'</b><span>موعد</span></div></div>'+
+      '<div class="metrics"><div><b>'+amount(customer.debt_balance)+"</b><span data-i18n=\"ui_9d061763061c\">مديونية</span></div><div><b>"+safeText(visitDate(customer.id))+"</b><span data-i18n=\"ui_f9fd43b0460f\">آخر زيارة</span></div><div><b>"+safeText(customer.next_date||'—')+"</b><span data-i18n=\"ui_4c2142366eca\">موعد</span></div></div>"+
       '<div class="customer-actions"><button onclick="visit(\''+id+'\')">تمت الزيارة</button><button onclick="newOrder(\''+id+'\')">طلب جديد</button><button onclick="appointment(\''+id+'\')">موعد</button><button onclick="collect(\''+id+'\')">تحصيل</button><button onclick="note(\''+id+'\')">ملاحظة</button></div>'+
     '</div>';
   }
@@ -40,7 +40,7 @@
       return [customer.name,customer.phone,customer.city,customer.district].some(function(value){return String(value||'').toLowerCase().includes(query)});
     });
     const visible=list.slice(0,customerLimit);
-    grid.innerHTML=visible.map(card).join('')||'<div class="panel">لا يوجد عملاء</div>';
+    grid.innerHTML=visible.map(card).join('')||"<div class=\"panel\" data-i18n=\"ui_1027871af7c9\">لا يوجد عملاء</div>";
     if(visible.length<list.length){
       const button=document.createElement('button');
       button.type='button';button.className='jms-load-more';
@@ -86,7 +86,7 @@
       const old=host.querySelector('.jms-list-more');if(old)old.remove();
       if(rows.length>PAGE_SIZE){
         const button=document.createElement('button');button.type='button';button.className='jms-load-more jms-list-more';
-        button.textContent='عرض 20 عنصر إضافي';
+        (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,'عرض 20 عنصر إضافي');
         button.onclick=function(){
           const hidden=Array.from(host.querySelectorAll('.jms-page-hidden')).slice(0,PAGE_SIZE);
           hidden.forEach(function(row){row.classList.remove('jms-page-hidden')});

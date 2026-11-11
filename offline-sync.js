@@ -76,7 +76,8 @@ function updateBadge(){
  const online=navigator.onLine;
  hasPending().then(pending=>{
   badge.className=online?(pending?'pending':'online'):'offline';
-  badge.textContent=!online?'بدون إنترنت · محفوظ محلياً':pending?'متصل · جاري المزامنة':'متصل · تمت المزامنة';
+  const caption=!online?'بدون إنترنت · محفوظ محلياً':pending?'متصل · جاري المزامنة':'متصل · تمت المزامنة';
+  if(window.JMSI18n)window.JMSI18n.setText(badge,caption);else badge.textContent=caption;
  });
 }
 

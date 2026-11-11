@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html data-account-page lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>مراقبة مخزون الأحبار</title>
+<title data-i18n="ui_c1575c22e1cb">مراقبة مخزون الأحبار</title>
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--ink:#17202f;--muted:#6b7280;--line:#e5e7eb;--nav:#173f67;--green:#166534;--red:#b42318;--amber:#9a6700;}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial;color:var(--ink)}
@@ -30,54 +30,54 @@ table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--l
 @media(max-width:900px){.grid{grid-template-columns:1fr 1fr} th:nth-child(2),td:nth-child(2){display:none}}
 @media(max-width:520px){.grid{grid-template-columns:1fr} main{padding:10px}}
 </style>
-</head>
+<link rel="stylesheet" href="/localization.css?v=20261111-1"><script defer src="/localization.js?v=20261111-1"></script></head>
 <body>
 <header>
-<div><h1>مراقبة مخزون الأحبار</h1><small>صرف • إرجاع • عهدة • حد أدنى • سجل حركات</small></div>
-<button class="light" onclick="exportData()">نسخة احتياطية</button>
+<div><h1 data-i18n="ui_c1575c22e1cb">مراقبة مخزون الأحبار</h1><small data-i18n="ui_eb3461b041c1">صرف • إرجاع • عهدة • حد أدنى • سجل حركات</small></div>
+<button class="light" onclick="exportData()" data-i18n="ui_348fd04aaabf">نسخة احتياطية</button>
 </header>
 <main>
 <div class="grid">
-  <div class="card kpi"><span class="muted">عدد الأصناف</span><b id="kItems">0</b></div>
-  <div class="card kpi"><span class="muted">رصيد المستودع</span><b id="kStock">0</b><span class="muted">كجم</span></div>
-  <div class="card kpi"><span class="muted">العهدة المفتوحة</span><b id="kOut">0</b><span class="muted">كجم</span></div>
-  <div class="card kpi"><span class="muted">تحت الحد الأدنى</span><b id="kLow">0</b></div>
-  <div class="card kpi"><span class="muted">المستهلك الفعلي</span><b id="kConsumed">0</b><span class="muted">كجم</span></div>
+  <div class="card kpi"><span class="muted" data-i18n="ui_f6f66d9545bc">عدد الأصناف</span><b id="kItems">0</b></div>
+  <div class="card kpi"><span class="muted" data-i18n="ui_97be47d21b54">رصيد المستودع</span><b id="kStock">0</b><span class="muted" data-i18n="ui_f1d35c260a77">كجم</span></div>
+  <div class="card kpi"><span class="muted" data-i18n="ui_be1e8eb52111">العهدة المفتوحة</span><b id="kOut">0</b><span class="muted" data-i18n="ui_f1d35c260a77">كجم</span></div>
+  <div class="card kpi"><span class="muted" data-i18n="ui_cbb69541ddb2">تحت الحد الأدنى</span><b id="kLow">0</b></div>
+  <div class="card kpi"><span class="muted" data-i18n="ui_a11b21ad9a38">المستهلك الفعلي</span><b id="kConsumed">0</b><span class="muted" data-i18n="ui_f1d35c260a77">كجم</span></div>
 </div>
 
 <div class="tabs">
-<button class="tab active" onclick="showTab('inv',this)">المخزون</button>
-<button class="tab" onclick="showTab('mov',this)">سجل الحركات</button>
-<button class="tab" onclick="showTab('cust',this)">العهد الموجودة</button>
-<button class="tab" onclick="showTab('printers',this)">استهلاك الطابعات</button>
+<button class="tab active" onclick="showTab('inv',this)" data-i18n="ui_a0e7c1b2423d">المخزون</button>
+<button class="tab" onclick="showTab('mov',this)" data-i18n="ui_f8d1be50b273">سجل الحركات</button>
+<button class="tab" onclick="showTab('cust',this)" data-i18n="ui_a64cc8574f80">العهد الموجودة</button>
+<button class="tab" onclick="showTab('printers',this)" data-i18n="ui_d395658d122a">استهلاك الطابعات</button>
 </div>
 
 <section id="inv" class="panel active card">
 <div class="toolbar">
-<input id="q" class="search" type="text" placeholder="ابحث باسم أو رمز الحبر..." oninput="renderInventory()">
+<input id="q" class="search" type="text" placeholder="ابحث باسم أو رمز الحبر..." oninput="renderInventory()" data-i18n-placeholder="ui_6a62a619081f">
 <select id="filter" onchange="renderInventory()">
-<option value="all">كل الأصناف</option>
-<option value="low">تحت الحد الأدنى</option>
-<option value="out">يوجد عهدة</option>
+<option value="all" data-i18n="ui_eda91c126a5f">كل الأصناف</option>
+<option value="low" data-i18n="ui_cbb69541ddb2">تحت الحد الأدنى</option>
+<option value="out" data-i18n="ui_a5da75264098">يوجد عهدة</option>
 </select>
 </div>
 <div class="scroll"><table>
-<thead><tr><th>الصنف</th><th>الرمز الداخلي</th><th>الموجود</th><th>العهدة</th><th>الحد الأدنى</th><th>الحالة</th><th>الحركة</th></tr></thead>
+<thead><tr><th data-i18n="ui_5b12a452b19e">الصنف</th><th data-i18n="ui_edf442120328">الرمز الداخلي</th><th data-i18n="ui_0d3982a1dfaf">الموجود</th><th data-i18n="ui_d64b904b9f6c">العهدة</th><th data-i18n="ui_a3e1e1424079">الحد الأدنى</th><th data-i18n="ui_c3a4749caed4">الحالة</th><th data-i18n="ui_139f5cbccb9c">الحركة</th></tr></thead>
 <tbody id="invBody"></tbody>
 </table></div>
 </section>
 
 <section id="mov" class="panel card">
-<div class="toolbar"><input id="mq" class="search" type="text" placeholder="بحث في الحركات..." oninput="renderMoves()"></div>
+<div class="toolbar"><input id="mq" class="search" type="text" placeholder="بحث في الحركات..." oninput="renderMoves()" data-i18n-placeholder="ui_4c1fd5ffa54a"></div>
 <div class="scroll"><table>
-<thead><tr><th>التاريخ</th><th>الحركة</th><th>الصنف</th><th>الكمية</th><th>المستهلك</th><th>الطابعة</th><th>الموظف / الجهة</th><th>ملاحظات</th></tr></thead>
+<thead><tr><th data-i18n="ui_d90c384199ac">التاريخ</th><th data-i18n="ui_139f5cbccb9c">الحركة</th><th data-i18n="ui_5b12a452b19e">الصنف</th><th data-i18n="ui_935e21853946">الكمية</th><th data-i18n="ui_9487fb127a10">المستهلك</th><th data-i18n="ui_156049faf5bf">الطابعة</th><th data-i18n="ui_1eee78884bd7">الموظف / الجهة</th><th data-i18n="ui_d446d2dc6b81">ملاحظات</th></tr></thead>
 <tbody id="moveBody"></tbody>
 </table></div>
 </section>
 
 <section id="cust" class="panel card">
 <div class="scroll"><table>
-<thead><tr><th>الموظف / الجهة</th><th>الصنف</th><th>الكمية المفتوحة بالعهدة</th></tr></thead>
+<thead><tr><th data-i18n="ui_1eee78884bd7">الموظف / الجهة</th><th data-i18n="ui_5b12a452b19e">الصنف</th><th data-i18n="ui_76607714a7a8">الكمية المفتوحة بالعهدة</th></tr></thead>
 <tbody id="custBody"></tbody>
 </table></div>
 </section>
@@ -85,16 +85,16 @@ table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--l
 <section id="printers" class="panel card">
 <div class="toolbar">
 <select id="printerFilter" onchange="renderPrinters()">
-<option value="all">كل الطابعات</option>
-<option>طابعة رقم 1 - فرز ألوان</option>
-<option>طابعة رقم 2 - صيني</option>
-<option>طابعة رقم 3 - هاي بلس</option>
-<option>طابعة رقم 4 - ليلو كبير</option>
-<option>طابعة رقم 5 - ليلو صغير</option>
+<option value="all" data-i18n="ui_9ff2bb230dff">كل الطابعات</option>
+<option value="طابعة رقم 1 - فرز ألوان" data-i18n="ui_8d4b755b4983">طابعة رقم 1 - فرز ألوان</option>
+<option value="طابعة رقم 2 - صيني" data-i18n="ui_27a15f95881e">طابعة رقم 2 - صيني</option>
+<option value="طابعة رقم 3 - هاي بلس" data-i18n="ui_e2081fd610a6">طابعة رقم 3 - هاي بلس</option>
+<option value="طابعة رقم 4 - ليلو كبير" data-i18n="ui_d56469009228">طابعة رقم 4 - ليلو كبير</option>
+<option value="طابعة رقم 5 - ليلو صغير" data-i18n="ui_9adcf624b896">طابعة رقم 5 - ليلو صغير</option>
 </select>
 </div>
 <div class="scroll"><table>
-<thead><tr><th>الطابعة</th><th>إجمالي المصروف</th><th>إجمالي المرتجع</th><th>المستهلك الفعلي</th></tr></thead>
+<thead><tr><th data-i18n="ui_156049faf5bf">الطابعة</th><th data-i18n="ui_c9e37ad9e515">إجمالي المصروف</th><th data-i18n="ui_f6668a6e45d9">إجمالي المرتجع</th><th data-i18n="ui_a11b21ad9a38">المستهلك الفعلي</th></tr></thead>
 <tbody id="printerBody"></tbody>
 </table></div>
 </section>
@@ -102,35 +102,35 @@ table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--l
 </main>
 
 <div class="modal" id="moveModal"><div class="box">
-<h3 id="moveTitle">حركة مخزون</h3>
+<h3 id="moveTitle" data-i18n="ui_55066c190257">حركة مخزون</h3>
 <div class="form">
-<div class="full"><label>الصنف<input id="mItemName" disabled></label></div>
-<div><label>نوع الحركة<select id="mType" onchange="updateMoveTitle()"><option value="receive">وارد / استلام</option><option value="take">صرف / أخذ</option><option value="return">إرجاع وإقفال العهدة</option></select></label></div>
-<div><label>الكمية بالكيلو<input id="mQty" type="number" step="0.01" min="0"></label></div>
-<div class="full"><label>الطابعة
-<select id="mPrinter">
-<option value="">اختر الطابعة</option>
-<option>طابعة رقم 1 - فرز ألوان</option>
-<option>طابعة رقم 2 - صيني</option>
-<option>طابعة رقم 3 - هاي بلس</option>
-<option>طابعة رقم 4 - ليلو كبير</option>
-<option>طابعة رقم 5 - ليلو صغير</option>
+<div class="full"><label><span data-i18n="ui_5b12a452b19e">الصنف</span><input id="mItemName" disabled></label></div>
+<div><label><span data-i18n="ui_1749a8ff00bc">نوع الحركة</span><select id="mType" onchange="updateMoveTitle()"><option value="receive" data-i18n="ui_9efc81cf0fe1">وارد / استلام</option><option value="take" data-i18n="ui_a2b0e5f5f7cc">صرف / أخذ</option><option value="return" data-i18n="ui_f4056a75e18f">إرجاع وإقفال العهدة</option></select></label></div>
+<div><label><span data-i18n="ui_f37e8d51e0a4">الكمية بالكيلو</span><input id="mQty" type="number" step="0.01" min="0"></label></div>
+<div class="full"><label><span data-i18n="ui_156049faf5bf">الطابعة
+</span><select id="mPrinter">
+<option value="" data-i18n="ui_b17143d582a5">اختر الطابعة</option>
+<option value="طابعة رقم 1 - فرز ألوان" data-i18n="ui_8d4b755b4983">طابعة رقم 1 - فرز ألوان</option>
+<option value="طابعة رقم 2 - صيني" data-i18n="ui_27a15f95881e">طابعة رقم 2 - صيني</option>
+<option value="طابعة رقم 3 - هاي بلس" data-i18n="ui_e2081fd610a6">طابعة رقم 3 - هاي بلس</option>
+<option value="طابعة رقم 4 - ليلو كبير" data-i18n="ui_d56469009228">طابعة رقم 4 - ليلو كبير</option>
+<option value="طابعة رقم 5 - ليلو صغير" data-i18n="ui_9adcf624b896">طابعة رقم 5 - ليلو صغير</option>
 </select></label></div>
-<div class="full"><label>اسم الموظف / الجهة<input id="mPerson" type="text" placeholder="مثال: عامل الطباعة / ماكينة 1"></label></div>
-<div class="full"><label>ملاحظات<input id="mNote" type="text" placeholder="اختياري"></label></div>
+<div class="full"><label><span data-i18n="ui_ae0be49f57fd">اسم الموظف / الجهة</span><input id="mPerson" type="text" placeholder="مثال: عامل الطباعة / ماكينة 1" data-i18n-placeholder="ui_c9a55a849692"></label></div>
+<div class="full"><label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mNote" type="text" placeholder="اختياري" data-i18n-placeholder="ui_33408684704e"></label></div>
 </div>
-<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveMove()">حفظ الحركة</button><button class="light" onclick="closeModal()">إلغاء</button></div>
+<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveMove()" data-i18n="ui_f768177b68a3">حفظ الحركة</button><button class="light" onclick="closeModal()" data-i18n="ui_9a30dc2a96b8">إلغاء</button></div>
 <input type="hidden" id="mItemId">
 </div></div>
 
 <div class="modal" id="editModal"><div class="box">
-<h3>تعديل رصيد وحد أدنى</h3>
+<h3 data-i18n="ui_1e310bdcf29f">تعديل رصيد وحد أدنى</h3>
 <div class="form">
-<div class="full"><label>الصنف<input id="eName" disabled></label></div>
-<div><label>رصيد المستودع الحالي<input id="eStock" type="number" min="0" step="0.01"></label></div>
-<div><label>الحد الأدنى<input id="eMin" type="number" min="0" step="0.01"></label></div>
+<div class="full"><label><span data-i18n="ui_5b12a452b19e">الصنف</span><input id="eName" disabled></label></div>
+<div><label><span data-i18n="ui_e9c9960a5fce">رصيد المستودع الحالي</span><input id="eStock" type="number" min="0" step="0.01"></label></div>
+<div><label><span data-i18n="ui_a3e1e1424079">الحد الأدنى</span><input id="eMin" type="number" min="0" step="0.01"></label></div>
 </div>
-<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveEdit()">حفظ</button><button class="light" onclick="closeEdit()">إلغاء</button></div>
+<div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="primary" onclick="saveEdit()" data-i18n="ui_ddfcaf9d0144">حفظ</button><button class="light" onclick="closeEdit()" data-i18n="ui_9a30dc2a96b8">إلغاء</button></div>
 <input type="hidden" id="eId">
 </div></div>
 
@@ -170,13 +170,13 @@ function renderInventory(){
  });
  invBody.innerHTML=arr.map(x=>{
    const out=Math.max(0,outstanding(x.id)), [st,cl]=state(x);
-   return `<tr><td><b>${escapeHtml(x.name)}</b></td><td>${x.id}</td><td>${fmt(x.stock)} كجم</td><td>${fmt(out)} كجم</td><td>${n(x.min)>0?fmt(x.min)+' كجم':'—'}</td><td><span class="badge ${cl}">${st}</span></td><td><div class="toolbar" style="margin:0"><button class="primary" onclick="openMove('${x.id}','receive')">وارد</button><button class="take" onclick="openMove('${x.id}','take')">صرف</button><button class="ret" onclick="openMove('${x.id}','return')">إرجاع</button><button class="light" onclick="openEdit('${x.id}')">الرصيد/الحد</button></div></td></tr>`;
- }).join('')||'<tr><td colspan="7" class="empty">لا توجد نتائج</td></tr>';
+   return `<tr><td><b>${escapeHtml(x.name)}</b></td><td>${x.id}</td><td>${fmt(x.stock)} كجم</td><td>${fmt(out)} كجم</td><td>${n(x.min)>0?fmt(x.min)+' كجم':'—'}</td><td><span class="badge ${cl}">${st}</span></td><td><div class="toolbar" style="margin:0"><button class="primary" onclick="openMove('${x.id}','receive')" data-i18n="ui_eb80f90a9433">وارد</button><button class="take" onclick="openMove('${x.id}','take')" data-i18n="ui_d9388205a0bb">صرف</button><button class="ret" onclick="openMove('${x.id}','return')" data-i18n="ui_eb0167790970">إرجاع</button><button class="light" onclick="openEdit('${x.id}')" data-i18n="ui_ee29c9122255">الرصيد/الحد</button></div></td></tr>`;
+ }).join('')||'<tr><td colspan="7" class="empty" data-i18n="ui_2d8a461130e0">لا توجد نتائج</td></tr>';
 }
 function renderMoves(){
  const query=(mq.value||'').toLowerCase();
  const arr=[...moves].reverse().filter(m=>(m.itemName+' '+(m.printer||'')+' '+m.person+' '+m.note).toLowerCase().includes(query));
- moveBody.innerHTML=arr.map(m=>`<tr><td>${new Date(m.date).toLocaleString('ar-SA')}</td><td><span class="badge ${m.type==='take'?'low':'ok'}">${m.type==='receive'?'وارد':m.type==='take'?'صرف':'إرجاع'}</span></td><td>${escapeHtml(m.itemName)}</td><td>${fmt(m.qty)} كجم</td><td>${m.type==='return'?fmt(m.consumed||0)+' كجم':'—'}</td><td>${escapeHtml(m.printer||'—')}</td><td>${escapeHtml(m.person||'—')}</td><td>${escapeHtml(m.note||'')}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">لا توجد حركات</td></tr>';
+ moveBody.innerHTML=arr.map(m=>`<tr><td>${new Date(m.date).toLocaleString('ar-SA')}</td><td><span class="badge ${m.type==='take'?'low':'ok'}">${m.type==='receive'?'وارد':m.type==='take'?'صرف':'إرجاع'}</span></td><td>${escapeHtml(m.itemName)}</td><td>${fmt(m.qty)} كجم</td><td>${m.type==='return'?fmt(m.consumed||0)+' كجم':'—'}</td><td>${escapeHtml(m.printer||'—')}</td><td>${escapeHtml(m.person||'—')}</td><td>${escapeHtml(m.note||'')}</td></tr>`).join('')||'<tr><td colspan="8" class="empty" data-i18n="ui_42817b82a8c0">لا توجد حركات</td></tr>';
 }
 function renderCustody(){
  const map={};
@@ -186,7 +186,7 @@ function renderCustody(){
    map[key].qty += m.type==='take'?n(m.qty):m.type==='return'?-n(m.qty)-n(m.consumed):0;
  }
  const arr=Object.values(map).filter(x=>x.qty>0.0001).sort((a,b)=>a.person.localeCompare(b.person,'ar'));
- custBody.innerHTML=arr.map(x=>`<tr><td><b>${escapeHtml(x.person)}</b></td><td>${escapeHtml(x.item)}</td><td>${fmt(x.qty)} كجم</td></tr>`).join('')||'<tr><td colspan="3" class="empty">لا توجد عهد حالية</td></tr>';
+ custBody.innerHTML=arr.map(x=>`<tr><td><b>${escapeHtml(x.person)}</b></td><td>${escapeHtml(x.item)}</td><td>${fmt(x.qty)} كجم</td></tr>`).join('')||'<tr><td colspan="3" class="empty" data-i18n="ui_57450cbb176f">لا توجد عهد حالية</td></tr>';
 }
 
 const PRINTERS=[

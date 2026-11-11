@@ -58,16 +58,16 @@ window.quoteCard=function(quote){
  if(!html)return html;
  let extra='';
  if(quote.status==='customer_approved'||quote.manager_review_status==='pending'){
-  extra='<div class="jms-manager-review pending"><div><b>✓ موقّع من العميل</b><span>'+escapeHtml(quote.customer_signer_name||customerName(quote.customer_id))+' · بانتظار مراجعة الإدارة</span></div>'+(manager()?'<button type="button" onclick="jmsManagerApproveSignedQuote(\''+escapeHtml(quote.id)+'\')">اعتماد وتحويل للإنتاج</button>':'')+'</div>';
+  extra="<div class=\"jms-manager-review pending\"><div><b data-i18n=\"ui_d7818a039d8b\">✓ موقّع من العميل</b><span>"+escapeHtml(quote.customer_signer_name||customerName(quote.customer_id))+' · بانتظار مراجعة الإدارة</span></div>'+(manager()?'<button type="button" onclick="jmsManagerApproveSignedQuote(\''+escapeHtml(quote.id)+'\')">اعتماد وتحويل للإنتاج</button>':'')+'</div>';
  }else if(quote.status==='manager_approved'||quote.manager_review_status==='approved'){
-  extra='<div class="jms-manager-review approved"><div><b>✓ اعتمدته الإدارة</b><span>'+escapeHtml(quote.manager_approved_by||'مدير النظام')+' · تم تحويله للإنتاج</span></div></div>';
+  extra="<div class=\"jms-manager-review approved\"><div><b data-i18n=\"ui_ed535df64aab\">✓ اعتمدته الإدارة</b><span>"+escapeHtml(quote.manager_approved_by||'مدير النظام')+' · تم تحويله للإنتاج</span></div></div>';
  }
  if(!extra)return html;
  const end=html.lastIndexOf('</div>');return end>=0?html.slice(0,end)+extra+html.slice(end):html+extra;
 };
 function enhanceFilter(){
  const select=document.getElementById('quoteStatusFilter');if(!select||select.querySelector('option[value="customer_approved"]'))return;
- const option=document.createElement('option');option.value='customer_approved';option.textContent='معتمد من العميل - بانتظار الإدارة';select.appendChild(option);
+ const option=document.createElement('option');option.value='customer_approved';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(option,"معتمد من العميل - بانتظار الإدارة");select.appendChild(option);
 }
 const oldRender=window.renderQuotes;
 window.renderQuotes=function(){

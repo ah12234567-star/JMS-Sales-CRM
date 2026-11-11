@@ -24,7 +24,7 @@
     CONFIG.forEach(function(config){
       const count=document.getElementById(config[0]);const card=count?.closest('.stat');if(!card)return;
       card.classList.add('jms-quote-stat-filter');card.dataset.quoteFilter=config[1];
-      card.setAttribute('role','button');card.setAttribute('tabindex','0');card.setAttribute('aria-label','تصفية القائمة: '+config[2]);
+      card.setAttribute('role','button');card.setAttribute('tabindex','0');card.setAttribute('aria-label',(window.JMSI18n?.label('تصفية القائمة:') || 'تصفية القائمة:')+' '+(window.JMSI18n?.label(config[2]) || config[2]));
       if(card.dataset.jmsQuoteFilterBound==='1')return;
       card.dataset.jmsQuoteFilterBound='1';
       card.addEventListener('click',function(){openQuotes(config[1],card)});
@@ -37,6 +37,7 @@
     element.textContent='#quotes .jms-quote-stat-filter{cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}#quotes .jms-quote-stat-filter:active{transform:scale(.98)}#quotes .jms-quote-stat-filter.active{border-color:#2563eb!important;box-shadow:0 0 0 3px rgba(37,99,235,.14),0 14px 30px rgba(15,23,42,.1)!important}#quotes .jms-quote-stat-filter:focus-visible{outline:3px solid rgba(37,99,235,.35);outline-offset:3px}';
     document.head.appendChild(element);
   }
+  document.addEventListener('jms:locale-rendered',bind);
   function boot(){style();bind();setTimeout(bind,900)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
   window.JMS_QUOTE_STATS_FILTER='2026-08-14-v1';

@@ -61,14 +61,14 @@ function applyParsed(data){
 async function analyze(){
  const input=$('jmsQuoteAiText'),status=$('jmsQuoteAiStatus'),button=$('jmsQuoteAiAnalyze');
  const text=input?.value?.trim();if(!text)return alert('اكتب تفاصيل العرض أو استخدم زر الميكروفون');
- button.disabled=true;status.textContent='جاري قراءة تفاصيل العرض...';
+ button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"جاري قراءة تفاصيل العرض...");
  try{
   let parsed=null;
   try{parsed=await aiParse(text)}catch(error){console.warn('JMS quote AI fallback',error)}
   parsed={...localParse(text),...(parsed||{})};
   applyParsed(parsed);
-  status.textContent='تمت تعبئة الحقول. راجعها ثم اضغط حفظ وإرساله للمدير للاعتماد.';
- }catch(error){console.error(error);status.textContent='تعذر تحليل النص. حاول بصياغة أوضح.';}
+  (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تمت تعبئة الحقول. راجعها ثم اضغط حفظ وإرساله للمدير للاعتماد.");
+ }catch(error){console.error(error);(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تعذر تحليل النص. حاول بصياغة أوضح.");}
  finally{button.disabled=false}
 }
 
@@ -76,10 +76,10 @@ function startVoice(){
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!Recognition)return alert('التسجيل الصوتي غير مدعوم في هذا المتصفح. استخدم الكتابة حالياً.');
  const button=$('jmsQuoteAiMic'),status=$('jmsQuoteAiStatus');
- const recognition=new Recognition();recognition.lang='ar-SA';recognition.interimResults=false;recognition.maxAlternatives=1;
- button.disabled=true;status.textContent='🎙️ أتكلم الآن...';
- recognition.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';if(text){$('jmsQuoteAiText').value=text;status.textContent='تم تحويل الصوت إلى نص. اضغط تعبئة العرض.';}};
- recognition.onerror=()=>{status.textContent='تعذر التعرف على الصوت. جرّب مرة أخرى أو اكتب النص.';};
+ const recognition=new Recognition();recognition.lang=document.documentElement.lang==='en'?'en-US':'ar-SA';recognition.interimResults=false;recognition.maxAlternatives=1;
+ button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"🎙️ أتكلم الآن...");
+ recognition.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';if(text){$('jmsQuoteAiText').value=text;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تم تحويل الصوت إلى نص. اضغط تعبئة العرض.");}};
+ recognition.onerror=()=>{(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تعذر التعرف على الصوت. جرّب مرة أخرى أو اكتب النص.");};
  recognition.onend=()=>{button.disabled=false;};recognition.start();
 }
 
@@ -87,7 +87,7 @@ function mount(){
  const product=$('mqProduct');if(!product||$('jmsQuoteSmartAssistant'))return;
  const formAnchor=product.closest('.form-grid');if(!formAnchor)return;
  const panel=document.createElement('div');panel.id='jmsQuoteSmartAssistant';panel.className='jms-quote-ai';
- panel.innerHTML=`<div class="jms-quote-ai-head"><div><b>✨ مساعد ذكي</b><span>اكتب أو سجل تفاصيل العرض وسيتم تعبئة الحقول تلقائياً</span></div></div><textarea id="jmsQuoteAiText" rows="3" placeholder="مثال: كيس 50*60 LD أبيض سمك 70 مايكرون طباعة لونين كمية 1000 كيلو بسعر 8 ريال"></textarea><div class="jms-quote-ai-actions"><button id="jmsQuoteAiMic" type="button">🎙️ صوت</button><button id="jmsQuoteAiAnalyze" class="primary" type="button">✨ تعبئة العرض</button></div><small id="jmsQuoteAiStatus">بعد التعبئة راجع البيانات، وعند الحفظ ينتقل العرض تلقائياً لاعتماد المدير.</small>`;
+ panel.innerHTML=`<div class="jms-quote-ai-head"><div><b data-i18n="ui_18325e6b16d5">✨ مساعد ذكي</b><span data-i18n="ui_581f11780516">اكتب أو سجل تفاصيل العرض وسيتم تعبئة الحقول تلقائياً</span></div></div><textarea id="jmsQuoteAiText" rows="3" placeholder="مثال: كيس 50*60 LD أبيض سمك 70 مايكرون طباعة لونين كمية 1000 كيلو بسعر 8 ريال" data-i18n-placeholder="ui_636301e0d251"></textarea><div class="jms-quote-ai-actions"><button id="jmsQuoteAiMic" type="button" data-i18n="ui_0f334ba9dc1f">🎙️ صوت</button><button id="jmsQuoteAiAnalyze" class="primary" type="button" data-i18n="ui_ec09e5e28e17">✨ تعبئة العرض</button></div><small id="jmsQuoteAiStatus" data-i18n="ui_36cd15e3cbf3">بعد التعبئة راجع البيانات، وعند الحفظ ينتقل العرض تلقائياً لاعتماد المدير.</small>`;
  formAnchor.insertAdjacentElement('beforebegin',panel);
  $('jmsQuoteAiAnalyze').addEventListener('click',analyze);$('jmsQuoteAiMic').addEventListener('click',startVoice);
 }

@@ -153,10 +153,10 @@
   }
   function resultHtml(out){
     let html=`<div class="jms-phone-result">تمت معالجة ملف العملاء\nالمحدث: ${out.updated}\nأرقام تغيرت: ${out.phoneChanged}\nبدون تغيير: ${out.noChange}\nالمضاف: ${out.created}\nالمتجاهل: ${out.skipped}\nتعارضات مندوب: ${out.conflicts.length}\nأسماء متكررة عند نفس المندوب: ${out.multiple.length}\nغير موجود: ${out.unmatched.length}</div>`;
-    const rows=(title,items,mapper)=>items.length?`<div class="panel import-conflict-panel"><h3>${title}</h3><div class="table-wrap"><table><thead><tr><th>السطر</th><th>الاسم</th><th>الجوال</th><th>تفصيل</th><th>المندوب الحالي</th><th>المندوب المطلوب</th></tr></thead><tbody>${items.slice(0,100).map(mapper).join('')}</tbody></table></div></div>`:'';
+    const rows=(title,items,mapper)=>items.length?`<div class="panel import-conflict-panel"><h3>${title}</h3><div class="table-wrap"><table><thead><tr><th data-i18n="ui_ae8adcc1e7fa">السطر</th><th data-i18n="ui_52ab09847cf8">الاسم</th><th data-i18n="ui_0b6aa9453dfb">الجوال</th><th data-i18n="ui_a198868681be">تفصيل</th><th data-i18n="ui_6dc5545baad1">المندوب الحالي</th><th data-i18n="ui_8a51335f30d4">المندوب المطلوب</th></tr></thead><tbody>${items.slice(0,100).map(mapper).join('')}</tbody></table></div></div>`:'';
     html+=rows('تعارضات لا يتم تعديلها حتى لا تختلط العملاء',out.conflicts,x=>`<tr><td>${x.row}</td><td>${x.name||x.existingName||'-'}</td><td>${displayPhone(x.phone)}</td><td>${x.reason||'-'}</td><td>${repNameById(x.oldRep)}</td><td>${repNameById(x.newRep)}</td></tr>`);
     html+=rows('أسماء متكررة عند نفس المندوب تحتاج مراجعة',out.multiple,x=>`<tr><td>${x.row}</td><td>${x.name||'-'}</td><td>${displayPhone(x.phone)}</td><td>${x.count} عملاء بنفس الاسم</td><td>${repNameById(x.rep_id)}</td><td>${repNameById(x.rep_id)}</td></tr>`);
-    if(out.unmatched.length) html+=`<div class="panel import-conflict-panel"><h3>عملاء غير موجودين عند المندوب المختار</h3><p>لم أضفهم لأن اختيارك كان تحديث الموجود فقط. لتضيفهم، افتح النافذة مرة ثانية واختر: إضافة غير الموجود.</p></div>`;
+    if(out.unmatched.length) html+=`<div class="panel import-conflict-panel"><h3 data-i18n="ui_9eff93370bf4">عملاء غير موجودين عند المندوب المختار</h3><p data-i18n="ui_0ec6c76124b9">لم أضفهم لأن اختيارك كان تحديث الموجود فقط. لتضيفهم، افتح النافذة مرة ثانية واختر: إضافة غير الموجود.</p></div>`;
     return html;
   }
   window.openCustomerPhoneUpdateImportV2=function(){
@@ -164,23 +164,23 @@
     const s=store(); s.reps ||= []; s.customers ||= [];
     const repOptions=(s.reps||[]).map(r=>`<option value="${r.id}" ${String(r.id)==='rep-osman'?'selected':''}>${r.name}</option>`).join('');
     const body=window.modalBody||document.getElementById('modalBody'), m=window.modal||document.getElementById('modal'); if(!body||!m) return alert('تعذر فتح نافذة الاستيراد');
-    body.innerHTML=`<h2>تحديث أرقام العملاء من Excel / CSV</h2>
-      <div class="import-help">استخدم هذا الخيار لإعادة استيراد عملاء عثمان أو أي مندوب لتحديث الجوالات فقط بدون تكرار. النظام يطابق بالاسم/الكود داخل المندوب المختار، وإذا وجد العميل عند مندوب آخر يعرض تعارض ولا يعدله.</div>
+    body.innerHTML=`<h2 data-i18n="ui_23ed4cbf1bc8">تحديث أرقام العملاء من Excel / CSV</h2>
+      <div class="import-help" data-i18n="ui_59263bc2377c">استخدم هذا الخيار لإعادة استيراد عملاء عثمان أو أي مندوب لتحديث الجوالات فقط بدون تكرار. النظام يطابق بالاسم/الكود داخل المندوب المختار، وإذا وجد العميل عند مندوب آخر يعرض تعارض ولا يعدله.</div>
       <div class="form-grid two">
-        <label>ربط وتحديث العملاء على المندوب
-          <select id="phoneUpdateTargetRep"><option value="file">حسب الملف / rep_id</option>${repOptions}</select>
+        <label><span data-i18n="ui_a3ec5460c431">ربط وتحديث العملاء على المندوب
+          </span><select id="phoneUpdateTargetRep"><option value="file" data-i18n="ui_3cc8157ae2bc">حسب الملف / rep_id</option>${repOptions}</select>
         </label>
-        <label>إذا العميل غير موجود عند المندوب المختار
-          <select id="phoneUpdateMissingPolicy">
-            <option value="skip">حدث الموجود فقط ولا تضف جديد</option>
-            <option value="create">أضف عميل جديد على المندوب المختار</option>
+        <label><span data-i18n="ui_b58d4b5b87b9">إذا العميل غير موجود عند المندوب المختار
+          </span><select id="phoneUpdateMissingPolicy">
+            <option value="skip" data-i18n="ui_41203e10092e">حدث الموجود فقط ولا تضف جديد</option>
+            <option value="create" data-i18n="ui_51e5dbff9356">أضف عميل جديد على المندوب المختار</option>
           </select>
         </label>
       </div>
-      <div class="import-help">الأعمدة المقبولة: <b>name / اسم العميل</b> + <b>phone / الجوال</b>، ويفضل city والرمز إن موجود.</div>
-      <div class="import-drop"><b>اختر ملف العملاء</b><input id="phoneUpdateFile" type="file" accept=".xlsx,.xls,.csv"><small>لعملاء عثمان: اختر عثمان بالأعلى، ثم ارفع ملفه الجديد.</small></div>
-      <div class="import-actions"><button class="import" onclick="runCustomerPhoneUpdateImportV2()">تحديث أرقام العملاء الآن</button></div>
-      <div id="phoneUpdateResult" class="import-result">لم يتم التحديث بعد.</div>
+      <div class="import-help"><span data-i18n="ui_6cd30b4c7296">الأعمدة المقبولة: </span><b data-i18n="ui_c7c4c91b7d0f">name / اسم العميل</b> + <b data-i18n="ui_35ca61075807">phone / الجوال</b>، ويفضل city والرمز إن موجود.</div>
+      <div class="import-drop"><b data-i18n="ui_bace89eb7cd4">اختر ملف العملاء</b><input id="phoneUpdateFile" type="file" accept=".xlsx,.xls,.csv"><small data-i18n="ui_9cb12c586ba2">لعملاء عثمان: اختر عثمان بالأعلى، ثم ارفع ملفه الجديد.</small></div>
+      <div class="import-actions"><button class="import" onclick="runCustomerPhoneUpdateImportV2()" data-i18n="ui_71defff36629">تحديث أرقام العملاء الآن</button></div>
+      <div id="phoneUpdateResult" class="import-result" data-i18n="ui_39a0317a9cd4">لم يتم التحديث بعد.</div>
       <div id="phoneUpdateDetails"></div>`;
     m.classList.remove('hidden');
   };
@@ -188,7 +188,7 @@
     const file=document.getElementById('phoneUpdateFile')?.files?.[0];
     const res=document.getElementById('phoneUpdateResult'), details=document.getElementById('phoneUpdateDetails');
     if(!file) return alert('اختر ملف Excel أو CSV أولاً');
-    if(res) res.textContent='جاري قراءة الملف...'; if(details) details.innerHTML='';
+    if(res) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(res,"جاري قراءة الملف..."); if(details) details.innerHTML='';
     readFile(file,(rows,err)=>{
       if(err){ if(res) res.textContent='خطأ: '+err; return; }
       const out=processRows(rows); if(res) res.outerHTML=resultHtml(out); else if(details) details.innerHTML=resultHtml(out);
@@ -200,7 +200,7 @@
     const head=page.querySelector('.page-head'); if(!head) return;
     let actions=head.querySelector('.head-actions'); if(!actions){ actions=document.createElement('div'); actions.className='head-actions'; head.appendChild(actions); }
     if(!document.getElementById('jmsPhoneUpdateV2Btn')){
-      const b=document.createElement('button'); b.id='jmsPhoneUpdateV2Btn'; b.type='button'; b.className='primary secondary'; b.textContent='تحديث أرقام العملاء V2'; b.onclick=window.openCustomerPhoneUpdateImportV2; actions.appendChild(b);
+      const b=document.createElement('button'); b.id='jmsPhoneUpdateV2Btn'; b.type='button'; b.className='primary secondary'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,'تحديث أرقام العملاء V2'); b.onclick=window.openCustomerPhoneUpdateImportV2; actions.appendChild(b);
     }
     document.querySelectorAll('button').forEach(btn=>{
       const t=(btn.textContent||'').trim();

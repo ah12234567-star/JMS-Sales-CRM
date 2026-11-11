@@ -172,40 +172,40 @@
     if(box) box.textContent=`تمت معالجة ملف الديون\nالمحدّث: ${out.updated}\nالمنقول: ${out.moved}\nالمضاف: ${out.created}\nالمتجاهل: ${out.skipped}\nتعارضات المندوب: ${out.conflicts.length}\nغير مطابق: ${out.unmatched.length}`;
     let html='';
     if(out.conflicts.length){
-      html += `<div class="panel import-conflict-panel"><h3>تعارضات المندوب</h3><p>لم يتم تعديل هؤلاء حتى لا تختلط ديون ياسر مع عثمان أو العكس.</p><div class="table-wrap"><table><thead><tr><th>السطر</th><th>الاسم في الملف</th><th>الجوال</th><th>موجود باسم</th><th>المندوب الحالي</th><th>المندوب المطلوب</th><th>السبب</th></tr></thead><tbody>${out.conflicts.slice(0,100).map(x=>`<tr><td>${x.row}</td><td>${x.name||'-'}</td><td>${x.phone||'-'}</td><td>${x.existingName||'-'}</td><td>${repNameById(x.oldRep)}</td><td>${repNameById(x.newRep)}</td><td>${x.reason}</td></tr>`).join('')}</tbody></table></div></div>`;
+      html += `<div class="panel import-conflict-panel"><h3 data-i18n="ui_28f1a626c47a">تعارضات المندوب</h3><p data-i18n="ui_529c0d958180">لم يتم تعديل هؤلاء حتى لا تختلط ديون ياسر مع عثمان أو العكس.</p><div class="table-wrap"><table><thead><tr><th data-i18n="ui_ae8adcc1e7fa">السطر</th><th data-i18n="ui_00384fb0d676">الاسم في الملف</th><th data-i18n="ui_0b6aa9453dfb">الجوال</th><th data-i18n="ui_aae2c837921a">موجود باسم</th><th data-i18n="ui_6dc5545baad1">المندوب الحالي</th><th data-i18n="ui_8a51335f30d4">المندوب المطلوب</th><th data-i18n="ui_c3b023d78238">السبب</th></tr></thead><tbody>${out.conflicts.slice(0,100).map(x=>`<tr><td>${x.row}</td><td>${x.name||'-'}</td><td>${x.phone||'-'}</td><td>${x.existingName||'-'}</td><td>${repNameById(x.oldRep)}</td><td>${repNameById(x.newRep)}</td><td>${x.reason}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
     if(out.unmatched.length){
-      html += `<div class="panel import-conflict-panel"><h3>عملاء غير موجودين</h3><p>هؤلاء موجودون في ملف الديون لكن لم أجد لهم عميل مطابق في النظام.</p><div class="table-wrap"><table><thead><tr><th>السطر</th><th>الاسم</th><th>الجوال</th><th>المندوب</th><th>الرصيد</th><th>السبب</th></tr></thead><tbody>${out.unmatched.slice(0,100).map(x=>`<tr><td>${x.row}</td><td>${x.name||'-'}</td><td>${x.phone||'-'}</td><td>${repNameById(x.rep_id)}</td><td>${money(x.balance)}</td><td>${x.reason}</td></tr>`).join('')}</tbody></table></div></div>`;
+      html += `<div class="panel import-conflict-panel"><h3 data-i18n="ui_112de44cd53a">عملاء غير موجودين</h3><p data-i18n="ui_596c0f7b3158">هؤلاء موجودون في ملف الديون لكن لم أجد لهم عميل مطابق في النظام.</p><div class="table-wrap"><table><thead><tr><th data-i18n="ui_ae8adcc1e7fa">السطر</th><th data-i18n="ui_52ab09847cf8">الاسم</th><th data-i18n="ui_0b6aa9453dfb">الجوال</th><th data-i18n="ui_4059aaa08477">المندوب</th><th data-i18n="ui_f311da916aa5">الرصيد</th><th data-i18n="ui_c3b023d78238">السبب</th></tr></thead><tbody>${out.unmatched.slice(0,100).map(x=>`<tr><td>${x.row}</td><td>${x.name||'-'}</td><td>${x.phone||'-'}</td><td>${repNameById(x.rep_id)}</td><td>${money(x.balance)}</td><td>${x.reason}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
-    if(conflictBox) conflictBox.innerHTML=html || '<div class="hint">لا توجد تعارضات.</div>';
+    if(conflictBox) conflictBox.innerHTML=html || "<div class=\"hint\" data-i18n=\"ui_bd609e5a61e7\">لا توجد تعارضات.</div>";
   }
   window.openSmartDebtImport=function(){
     if(!canUse()) return alert('استيراد الديون متاح فقط لمدير النظام');
     const s=store(); s.reps ||= [];
     const reps=s.reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
-    modalBody.innerHTML=`<h2>استيراد الديون الذكي</h2>
-      <div class="import-help">اختر المندوب قبل رفع ملف الديون. إذا ظهر العميل عند مندوب آخر، النظام لا يغيره ولا يكرر البيانات، بل يعرض تعارض واضح للمراجعة.</div>
+    modalBody.innerHTML=`<h2 data-i18n="ui_f5ac137e014d">استيراد الديون الذكي</h2>
+      <div class="import-help" data-i18n="ui_26d967029eb5">اختر المندوب قبل رفع ملف الديون. إذا ظهر العميل عند مندوب آخر، النظام لا يغيره ولا يكرر البيانات، بل يعرض تعارض واضح للمراجعة.</div>
       <div class="form-grid two">
-        <label>ربط الديون على المندوب
-          <select id="debtImportTargetRep"><option value="file">حسب الملف / مندوب الحساب</option>${reps}</select>
+        <label><span data-i18n="ui_3079c035153d">ربط الديون على المندوب
+          </span><select id="debtImportTargetRep"><option value="file" data-i18n="ui_a7fb561bf572">حسب الملف / مندوب الحساب</option>${reps}</select>
         </label>
-        <label>سياسة تعارض المندوب
-          <select id="debtDuplicatePolicy"><option value="conflict">اعرض تعارض ولا تنقل</option><option value="move">انقل العميل للمندوب المختار ثم حدّث الدين</option></select>
+        <label><span data-i18n="ui_17f29615738d">سياسة تعارض المندوب
+          </span><select id="debtDuplicatePolicy"><option value="conflict" data-i18n="ui_4bf64517565f">اعرض تعارض ولا تنقل</option><option value="move" data-i18n="ui_ee962fbc5215">انقل العميل للمندوب المختار ثم حدّث الدين</option></select>
         </label>
-        <label>إذا العميل غير موجود
-          <select id="debtMissingPolicy"><option value="skip">لا تضف، اعرضه كمشكلة</option><option value="create">أضف عميل جديد على المندوب المختار</option></select>
+        <label><span data-i18n="ui_4b2a34df10c7">إذا العميل غير موجود
+          </span><select id="debtMissingPolicy"><option value="skip" data-i18n="ui_81f67ab0d9bb">لا تضف، اعرضه كمشكلة</option><option value="create" data-i18n="ui_51e5dbff9356">أضف عميل جديد على المندوب المختار</option></select>
         </label>
-        <label>ملف الديون Excel / CSV<input id="smartDebtImportFile" type="file" accept=".xlsx,.xls,.csv"></label>
+        <label><span data-i18n="ui_d800aa59e431">ملف الديون Excel / CSV</span><input id="smartDebtImportFile" type="file" accept=".xlsx,.xls,.csv"></label>
       </div>
-      <div class="import-actions"><button class="import" onclick="runSmartDebtImport()">استيراد الديون الآن</button></div>
-      <pre id="debtImportResult" class="import-result">لم يتم الاستيراد بعد.</pre>
+      <div class="import-actions"><button class="import" onclick="runSmartDebtImport()" data-i18n="ui_27278cb8089f">استيراد الديون الآن</button></div>
+      <pre id="debtImportResult" class="import-result" data-i18n="ui_42a0d57c778b">لم يتم الاستيراد بعد.</pre>
       <div id="debtImportConflicts"></div>`;
     modal.classList.remove('hidden');
   };
   window.runSmartDebtImport=function(){
     const file=document.getElementById('smartDebtImportFile')?.files?.[0];
     if(!file) return alert('اختر ملف الديون أولاً');
-    const result=document.getElementById('debtImportResult'); if(result) result.textContent='جاري قراءة الملف...';
+    const result=document.getElementById('debtImportResult'); if(result) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(result,"جاري قراءة الملف...");
     readFile(file,(rows,err)=>{ if(err){ if(result) result.textContent='خطأ: '+err; return; } renderResult(runImportRows(rows)); });
   };
   function injectButton(){
@@ -213,9 +213,9 @@
     const page=document.getElementById('customers'); if(!page) return;
     const head=page.querySelector('.page-head'); if(!head) return;
     let actions=head.querySelector('.head-actions'); if(!actions){ actions=document.createElement('div'); actions.className='head-actions'; head.appendChild(actions); }
-    const old=document.getElementById('jmsDebtAgingImportBtn'); if(old){ old.onclick=window.openSmartDebtImport; old.textContent='استيراد الديون الذكي'; return; }
+    const old=document.getElementById('jmsDebtAgingImportBtn'); if(old){ old.onclick=window.openSmartDebtImport; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(old,"استيراد الديون الذكي"); return; }
     if(document.getElementById('jmsSmartDebtImportBtn')) return;
-    const btn=document.createElement('button'); btn.id='jmsSmartDebtImportBtn'; btn.type='button'; btn.className='primary secondary'; btn.textContent='استيراد الديون الذكي'; btn.onclick=window.openSmartDebtImport; actions.appendChild(btn);
+    const btn=document.createElement('button'); btn.id='jmsSmartDebtImportBtn'; btn.type='button'; btn.className='primary secondary'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"استيراد الديون الذكي"); btn.onclick=window.openSmartDebtImport; actions.appendChild(btn);
   }
   function injectStyle(){ if(document.getElementById('jmsSmartDebtImportStyle')) return; const st=document.createElement('style'); st.id='jmsSmartDebtImportStyle'; st.textContent='.import-help{background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:14px;margin:10px 0;line-height:1.8}.import-result{background:#0f172a;color:#fff;border-radius:14px;padding:12px;white-space:pre-wrap}.import-conflict-panel{margin-top:12px}.table-wrap{overflow:auto}.table-wrap table{width:100%;border-collapse:collapse}.table-wrap th,.table-wrap td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:right;white-space:nowrap}'; document.head.appendChild(st); }
   function tick(){ injectStyle(); injectButton(); }

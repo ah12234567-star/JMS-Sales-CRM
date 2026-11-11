@@ -87,7 +87,7 @@
     const all = typeof allowedCustomers === 'function' ? allowedCustomers() : list;
     const late = all.filter(c => visitInfo(c).late).length;
     const todayText = new Date().toLocaleDateString('ar-SA',{weekday:'long'});
-    summary.innerHTML = `<div><b>${all.length}</b><span>عملائي</span></div><div><b>${late}</b><span>يحتاجون متابعة</span></div><div><b>${esc(todayText)}</b><span>خطة اليوم</span></div>`;
+    summary.innerHTML = `<div><b>${all.length}</b><span data-i18n="ui_51109adcef3f">عملائي</span></div><div><b>${late}</b><span data-i18n="ui_fa1c85afb4a6">يحتاجون متابعة</span></div><div><b>${esc(todayText)}</b><span data-i18n="ui_3f2e5630902e">خطة اليوم</span></div>`;
   }
 
   function card(customer) {
@@ -100,9 +100,9 @@
     return `<article class="customer-card rep-pro-card" data-customer-id="${safeId}">
       <div class="rep-pro-head"><div class="rep-pro-title"><h3>${safeName}</h3><p>${esc(place || 'جدة')}${code}${phone ? ` · ${esc(phone)}` : ''}</p></div><span class="rep-pro-status ${info.late?'':'ok'}">${esc(info.label)}</span></div>
       <div class="rep-pro-metrics">
-        <div class="rep-pro-metric"><b>${esc(info.date)}</b><span>آخر زيارة</span></div>
-        <div class="rep-pro-metric"><b>${esc(customer.next_date || 'غير محدد')}</b><span>الموعد القادم</span></div>
-        <div class="rep-pro-metric"><b>${debt ? esc(typeof money==='function' ? money(debt) : debt) : 'لا يوجد'}</b><span>المديونية</span></div>
+        <div class="rep-pro-metric"><b>${esc(info.date)}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div>
+        <div class="rep-pro-metric"><b>${esc(customer.next_date || 'غير محدد')}</b><span data-i18n="ui_7b0ae93ece0a">الموعد القادم</span></div>
+        <div class="rep-pro-metric"><b>${debt ? esc(typeof money==='function' ? money(debt) : debt) : 'لا يوجد'}</b><span data-i18n="ui_8ef13d3ef3ca">المديونية</span></div>
       </div>
       <div class="rep-pro-primary">
         <button class="jms-go-customer" type="button" onclick="window.jmsRepGoToCustomer&&window.jmsRepGoToCustomer('${safeId}',this.closest('.rep-pro-card').querySelector('h3').textContent.trim())">🚗 متجه للعميل</button>
@@ -111,7 +111,7 @@
         <button class="meeting" type="button" onclick="appointment('${safeId}')">تحديد موعد</button>
         <button class="profile" type="button" onclick="jmsOpenCustomer360Growth('${safeId}')">ملف العميل</button>
       </div>
-      <details class="rep-pro-more"><summary>المزيد من الأدوات</summary><div class="rep-pro-more-grid">
+      <details class="rep-pro-more"><summary data-i18n="ui_1999c9ae88f6">المزيد من الأدوات</summary><div class="rep-pro-more-grid">
         <button type="button" onclick="editCustomerPro('${safeId}')">تعديل البيانات</button>
         <button type="button" onclick="openCustomerNote('${safeId}')">إضافة ملاحظة</button>
         <button type="button" onclick="openCustomerMap('${safeId}')">فتح الموقع</button>
@@ -139,7 +139,7 @@
     const list = customerList();
     renderSummary(list);
     cleaning = true;
-    grid.innerHTML = list.map(card).join('') || '<div class="rep-pro-empty">لا يوجد عملاء مطابقون للبحث</div>';
+    grid.innerHTML = list.map(card).join('') || "<div class=\"rep-pro-empty\" data-i18n=\"ui_a660ae4b1102\">لا يوجد عملاء مطابقون للبحث</div>";
     cleaning = false;
     setTimeout(() => window.jmsRepLiveLocation?.refreshOwnState?.(), 0);
   }

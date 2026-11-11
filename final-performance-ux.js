@@ -33,12 +33,12 @@
     const st=customerTone(c);
     return `<article class="customer-card jms-customer-compact" data-customer-id="${esc(c.id)}">
       <div class="customer-head"><div><h3>${esc(c.name||'عميل بدون اسم')}</h3><p>${esc(c.phone||'—')} · ${esc(c.city||'—')} · ${esc(repText(c.rep_id))}</p></div><span class="badge ${esc(st[1])}">${esc(st[0])}</span></div>
-      <div class="metrics"><div><b>${moneyText(c.debt_balance)}</b><span>المديونية</span></div><div><b>${esc(lastVisitText(c.id))}</b><span>آخر زيارة</span></div><div><b>${esc(c.next_date||'—')}</b><span>الموعد القادم</span></div></div>
+      <div class="metrics"><div><b>${moneyText(c.debt_balance)}</b><span data-i18n="ui_8ef13d3ef3ca">المديونية</span></div><div><b>${esc(lastVisitText(c.id))}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div><div><b>${esc(c.next_date||'—')}</b><span data-i18n="ui_7b0ae93ece0a">الموعد القادم</span></div></div>
       <div class="jms-primary-customer-actions">
         <button type="button" class="visit" onclick="openVisitReportForm?.('${esc(c.id)}')||visit?.('${esc(c.id)}')">زيارة جديدة</button>
         <button type="button" class="quote" onclick="jmsStartQuoteForCustomer('${esc(c.id)}')">عرض سعر</button>
         <button type="button" class="collect" onclick="collect('${esc(c.id)}')">التحصيل</button>
-        <details class="jms-more-actions"><summary>•••<span>المزيد</span></summary><div>
+        <details class="jms-more-actions"><summary>•••<span data-i18n="ui_478c486f3efe">المزيد</span></summary><div>
           <button type="button" onclick="appointment('${esc(c.id)}')">تحديد موعد</button>
           <button type="button" onclick="note('${esc(c.id)}')">الملاحظات</button>
           <button type="button" onclick="newOrder('${esc(c.id)}')">طلب تصنيع</button>
@@ -53,7 +53,7 @@
     const q=(document.getElementById('customerSearch')?.value||'').trim();
     if(reset||q!==lastCustomerQuery){customerLimit=PAGE_SIZE;lastCustomerQuery=q}
     const list=allCustomers(),visible=list.slice(0,customerLimit);
-    host.innerHTML=visible.map(customerCard).join('')||'<div class="panel jms-empty-state">لا يوجد عملاء مطابقون للبحث</div>';
+    host.innerHTML=visible.map(customerCard).join('')||"<div class=\"panel jms-empty-state\" data-i18n=\"ui_a660ae4b1102\">لا يوجد عملاء مطابقون للبحث</div>";
     if(visible.length<list.length){
       host.insertAdjacentHTML('beforeend',`<button id="jmsCustomerLoadMore" class="jms-load-more" type="button">عرض ${Math.min(PAGE_SIZE,list.length-visible.length)} عميل إضافي <small>${visible.length} من ${list.length}</small></button>`);
       const btn=document.getElementById('jmsCustomerLoadMore');
@@ -139,7 +139,7 @@
         card.ondragstart=e=>{e.dataTransfer.setData('text/jms-production',id);card.classList.add('dragging')};
         card.ondragend=()=>card.classList.remove('dragging');
         const next=STAGES[index+1];
-        const btn=[...card.querySelectorAll('.jms-prod-actions button')].find(b=>b.textContent.includes('المرحلة التالية'));
+        const btn=[...card.querySelectorAll('.jms-prod-actions button')].find(b=>b.textContent.includes(window.JMSI18n?.label('المرحلة التالية') || 'المرحلة التالية'));
         if(btn&&next)btn.textContent='نقل إلى: '+next[1];
         if(cardIndex>=20)card.hidden=true;
       });

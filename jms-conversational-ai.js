@@ -9,7 +9,7 @@
  const FIELD_LABELS={total_kg:'الكمية بالكيلو',price_kg:'سعر الكيلو',print_colors:'ألوان الطباعة',width:'العرض',length:'الطول',thickness:'السماكة'};
  function addSources(node,sources){
   const refs=(sources||[]).filter(s=>['customer','quote'].includes(s.type)).slice(0,10);if(!refs.length)return;
-  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='السجلات المرتبطة';details.appendChild(summary);
+  const details=document.createElement('details'),summary=document.createElement('summary');(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(summary,'السجلات المرتبطة');details.appendChild(summary);
   for(const ref of refs){const b=document.createElement('button');b.type='button';b.textContent=ref.label;b.style.margin='4px';b.onclick=()=>{const fn=ref.type==='customer'?window.openCustomer360:window.viewQuote;if(typeof fn==='function')fn(ref.id);else alert('افتح السجل من صفحة '+(ref.type==='customer'?'العملاء':'العروض')+'.');};details.appendChild(b);}
   node.appendChild(details);
  }
@@ -44,11 +44,11 @@
    if(response.ok&&result.ok){
     s.context=result.context||s.context;s.history.push({role:'user',content:q},{role:'assistant',content:result.answer||''});s.history=s.history.slice(-8);
     addSources(thinking,result.sources);
-    if(result.draft){const button=document.createElement('button');button.type='button';button.textContent='مراجعة المسودة في نموذج العرض';button.style.display='block';button.style.marginTop='12px';button.onclick=()=>openDraft(result.draft);thinking.appendChild(button);}
+    if(result.draft){const button=document.createElement('button');button.type='button';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,'مراجعة المسودة في نموذج العرض');button.style.display='block';button.style.marginTop='12px';button.onclick=()=>openDraft(result.draft);thinking.appendChild(button);}
     if(result.notice){const note=document.createElement('p');note.textContent=result.notice;thinking.appendChild(note);}
     if(result.updatedAt){const stamp=document.createElement('small');stamp.style.display='block';stamp.textContent='قراءة البيانات: '+new Date(result.updatedAt).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh'});thinking.appendChild(stamp);}
    }
-  } catch {thinking.textContent='تعذر الاتصال بالمساعد. أعد المحاولة؛ لم أستخدم بيانات قديمة لإعطائك إجماليًا.';}
+  } catch {(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(thinking,'تعذر الاتصال بالمساعد. أعد المحاولة؛ لم أستخدم بيانات قديمة لإعطائك إجماليًا.');}
   finally{clearTimeout(timer);s.busy=false;body.scrollTop=body.scrollHeight;}
  }
  window.JMSConversationalAI={version:'20260917',ask,clear:()=>sessions.clear()};
