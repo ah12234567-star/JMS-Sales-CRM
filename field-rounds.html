@@ -1,31 +1,31 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>جولة اليوم — JMS</title><link rel="stylesheet" href="/field-rounds.css?v=2"></head>
+<html data-account-page lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title data-i18n="ui_be3c75644e7e">جولة اليوم — JMS</title><link rel="stylesheet" href="/field-rounds.css?v=2"><link rel="stylesheet" href="/localization.css?v=20261111-1"><script defer src="/localization.js?v=20261111-1"></script></head>
 <body>
- <header><a href="/">العودة إلى JMS</a><b>JMS · جولة اليوم</b><span id="userName"></span></header>
+ <header><a href="/" data-i18n="ui_e44ff6beaeb6">العودة إلى JMS</a><b data-i18n="ui_e5a7a0b29f2f">JMS · جولة اليوم</b><span id="userName"></span></header>
  <main>
-  <h1>جولة اليوم</h1><p class="intro">سجّل جولاتك على المنشآت الجديدة دون إضافتها إلى قائمة العملاء.</p>
+  <h1 data-i18n="ui_bb54b13528e5">جولة اليوم</h1><p class="intro" data-i18n="ui_c2ec7fb8d52d">سجّل جولاتك على المنشآت الجديدة دون إضافتها إلى قائمة العملاء.</p>
   <p id="message" role="status" aria-live="polite"></p>
   <section id="compose" class="panel">
-   <h2>احكِ ما حدث في جولتك</h2>
-   <div class="two"><label>تاريخ الجولة<input id="date" type="date" required></label><label>الحي أو المنطقة<input id="area" maxlength="120" placeholder="مثل: حي السامر" required></label></div>
-   <label>ملخص الجولة<textarea id="source" rows="5" maxlength="8000" placeholder="مثال: اليوم في السامر زرت بخاري الأمانة وما يحتاج الآن، ومضبيكم طلبوا أرجع الخميس. مررت أمام مطعم آخر دون دخول."></textarea></label>
-   <div class="voice-controls"><button id="voiceInput" type="button" aria-pressed="false">🎙 ابدأ الإملاء</button><span id="voiceStatus" role="status" aria-live="polite">تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.</span></div>
-   <p class="hint">اكتب أو أمْلِ أسماء المنشآت ونتيجة كل زيارة. لا تحتاج رقم جوال أو إنشاء بطاقة عميل.</p>
-   <button id="prepare" class="primary">رتّب كلامي في جدول</button>
+   <h2 data-i18n="ui_f45fe2d4d923">احكِ ما حدث في جولتك</h2>
+   <div class="two"><label><span data-i18n="ui_4dba4be67fed">تاريخ الجولة</span><input id="date" type="date" required></label><label><span data-i18n="ui_a5b9e4854a2d">الحي أو المنطقة</span><input id="area" maxlength="120" placeholder="مثل: حي السامر" required data-i18n-placeholder="ui_8f69f261146a"></label></div>
+   <label><span data-i18n="ui_d43addaaed1f">ملخص الجولة</span><textarea id="source" rows="5" maxlength="8000" placeholder="مثال: اليوم في السامر زرت بخاري الأمانة وما يحتاج الآن، ومضبيكم طلبوا أرجع الخميس. مررت أمام مطعم آخر دون دخول." data-i18n-placeholder="ui_892cc8e1e314"></textarea></label>
+   <div class="voice-controls"><button id="voiceInput" type="button" aria-pressed="false" data-i18n="ui_1f972abd6fae">🎙 ابدأ الإملاء</button><span id="voiceStatus" role="status" aria-live="polite" data-i18n="ui_9d9bc2beb5ac">تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.</span></div>
+   <p class="hint" data-i18n="ui_9bf3422fc657">اكتب أو أمْلِ أسماء المنشآت ونتيجة كل زيارة. لا تحتاج رقم جوال أو إنشاء بطاقة عميل.</p>
+   <button id="prepare" class="primary" data-i18n="ui_730b7be3993a">رتّب كلامي في جدول</button>
   </section>
   <section id="review" class="panel" hidden>
-   <div class="heading"><h2 id="reviewTitle">راجع الجولة</h2><button id="newRound">جولة جديدة</button></div>
-   <p id="roundMeta"></p><details><summary>الكلام الأصلي</summary><p id="original"></p></details>
+   <div class="heading"><h2 id="reviewTitle" data-i18n="ui_885ec03df633">راجع الجولة</h2><button id="newRound" data-i18n="ui_02afb1938d0f">جولة جديدة</button></div>
+   <p id="roundMeta"></p><details><summary data-i18n="ui_1ae312b97950">الكلام الأصلي</summary><p id="original"></p></details>
    <p id="clarification" class="hint"></p>
    <div id="entries"></div>
-   <div id="reviewActions"><button id="addRow">+ إضافة منشأة</button><label class="confirm"><input id="confirmed" type="checkbox">راجعت الأسماء والنتائج وهي تصف ما حدث فعلًا.</label><button id="submit" class="primary">اعتماد الجولة وإظهارها للمدير</button></div>
-   <p class="hint">هذا تقرير أدخله المندوب، وليس إثبات حضور GPS. وقت التسجيل لا يمثل وقت دخول كل منشأة.</p>
+   <div id="reviewActions"><button id="addRow" data-i18n="ui_e119e6c8df56">+ إضافة منشأة</button><label class="confirm"><input id="confirmed" type="checkbox">راجعت الأسماء والنتائج وهي تصف ما حدث فعلًا.</label><button id="submit" class="primary" data-i18n="ui_6b732323a65a">اعتماد الجولة وإظهارها للمدير</button></div>
+   <p class="hint" data-i18n="ui_a74473e2cf63">هذا تقرير أدخله المندوب، وليس إثبات حضور GPS. وقت التسجيل لا يمثل وقت دخول كل منشأة.</p>
   </section>
   <section class="panel">
-   <div class="heading"><h2 id="reportsTitle">تقاريري</h2><button id="refresh">تحديث</button></div>
-   <div class="two"><label>تاريخ التقارير<input id="filterDate" type="date"></label><label>بحث بالمنشأة أو المندوب أو الحي<input id="search" type="search" placeholder="بحث في التقارير المعروضة"></label></div>
-   <p id="totals"></p><div id="reports"></div><button id="more" hidden>تحميل المزيد</button>
+   <div class="heading"><h2 id="reportsTitle" data-i18n="ui_c5cd660f1038">تقاريري</h2><button id="refresh" data-i18n="ui_00eab31f95b7">تحديث</button></div>
+   <div class="two"><label><span data-i18n="ui_fc1c8883c330">تاريخ التقارير</span><input id="filterDate" type="date"></label><label><span data-i18n="ui_adef3ad350d6">بحث بالمنشأة أو المندوب أو الحي</span><input id="search" type="search" placeholder="بحث في التقارير المعروضة" data-i18n-placeholder="ui_fb6987baaaf9"></label></div>
+   <p id="totals"></p><div id="reports"></div><button id="more" hidden data-i18n="ui_4ec10c806490">تحميل المزيد</button>
   </section>
  </main>
  <script type="module" src="/field-rounds.js?v=2"></script>

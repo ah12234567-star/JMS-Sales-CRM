@@ -65,7 +65,7 @@ function requireLogin(){
 document.querySelectorAll('input[name=loginRole]').forEach(x=>x.onchange=()=>{
   loginEmail.value='';
   loginPassword.value='';
-  loginHint.textContent='لن تظهر بيانات الدخول على الصفحة حفاظًا على الأمان';
+  (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(loginHint,"لن تظهر بيانات الدخول على الصفحة حفاظًا على الأمان");
 });
 
 async function jmsPostJson(url, payload){
@@ -98,7 +98,7 @@ loginForm.onsubmit=async e=>{
     const data=await jmsPostJson('/api/auth-login',{email,password,role});
     const u=data.user;
     if(!u) return alert('بيانات الدخول غير صحيحة');
-    currentUser={id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{}};
+    currentUser={id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{},language:u.language||'ar'};
     window.currentUser=currentUser;
     sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
     if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
@@ -114,19 +114,19 @@ loginForm.onsubmit=async e=>{
 };
 
 function openPasswordReset(){
-  modalBody.innerHTML=`<h2>استعادة كلمة المرور</h2>
-    <p class="muted">اكتب البريد المسجل. سنرسل رمز تحقق عبر واتساب أو رسالة SMS حسب الإعدادات.</p>
+  modalBody.innerHTML=`<h2 data-i18n="ui_28185b7702b0">استعادة كلمة المرور</h2>
+    <p class="muted" data-i18n="ui_34539c35a60b">اكتب البريد المسجل. سنرسل رمز تحقق عبر واتساب أو رسالة SMS حسب الإعدادات.</p>
     <div class="form-grid">
-      <label>البريد الإلكتروني<input id="resetEmail" type="email" placeholder="name@example.com" autocomplete="username"></label>
-      <label>رقم الجوال / واتساب اختياري<input id="resetPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
+      <label><span data-i18n=ui_ddf0fca39a4f>البريد الإلكتروني</span><input id="resetEmail" type="email" placeholder="name@example.com" autocomplete="username"></label>
+      <label><span data-i18n="ui_36ace4e9146b">رقم الجوال / واتساب اختياري</span><input id="resetPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
     </div>
-    <br><button class="primary" onclick="requestPasswordReset()">إرسال رمز التحقق</button>
+    <br><button class="primary" onclick="requestPasswordReset()" data-i18n="ui_cbfda3bd7f5b">إرسال رمز التحقق</button>
     <hr>
     <div class="form-grid">
-      <label>رمز التحقق<input id="resetCode" inputmode="numeric" maxlength="6"></label>
-      <label>كلمة المرور الجديدة<input id="resetNewPassword" type="password" autocomplete="new-password"></label>
+      <label><span data-i18n="ui_28103d567ad9">رمز التحقق</span><input id="resetCode" inputmode="numeric" maxlength="6"></label>
+      <label><span data-i18n=ui_202b9814ea8b>كلمة المرور الجديدة</span><input id="resetNewPassword" type="password" autocomplete="new-password"></label>
     </div>
-    <br><button onclick="confirmPasswordReset()">تغيير كلمة المرور</button>`;
+    <br><button onclick="confirmPasswordReset()"><span data-i18n=ui_473bcc4e9b46>تغيير كلمة المرور</span></button>`;
   modal.classList.remove('hidden');
 }
 window.openPasswordReset=openPasswordReset;
@@ -180,7 +180,7 @@ function showApp(){
   loginView.classList.add('hidden');
   appView.classList.remove('hidden');
   currentUserName.textContent=((currentUser&&currentUser.name)||"");
-  currentUserRole.textContent=roleText((currentUser&&currentUser.role));
+  (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(currentUserRole,roleText((currentUser&&currentUser.role)));
 
   const repAllowed = ['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
   document.querySelectorAll('.nav').forEach(btn=>{
@@ -213,13 +213,13 @@ if(currentUser) showApp();
 refreshStoredPermissions();
 
 async function refreshStoredPermissions(){
-  if(!currentUser || currentUser.role==='admin' || !sessionStorage.getItem('jms_auth_token')) return;
-  if(currentUser.permissions && Object.prototype.hasOwnProperty.call(currentUser.permissions,'manage_quotes')) return;
+  if(!currentUser || !(sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token'))) return;
   try{
     const data=await jmsPostJson('/api/auth-session',{});
     const u=data.user;
     if(!u || u.id!==currentUser.id) return;
-    currentUser={...currentUser,id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{}};
+    currentUser={...currentUser,id:u.id,name:u.name,email:u.email,role:u.role,permissions:u.permissions||{},language:u.language||'ar'};
+    window.dispatchEvent(new CustomEvent('jms:session-refreshed',{detail:currentUser}));
     window.currentUser=currentUser;
     sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
     db.users=(db.users||[]).filter(x=>x.id!==u.id);
@@ -266,12 +266,12 @@ function renderCustomers(){
     const st=customerState(c);
     return `<div class="customer-card">
       <div class="customer-head"><div><h3>${c.name}</h3><p>${c.phone||'-'} · ${c.city||'-'} · ${repName(c.rep_id)}</p></div><span class="badge ${st[1]}">${st[0]}</span></div>
-      <div class="metrics"><div><b>${money(c.debt_balance)}</b><span>مديونية</span></div><div><b>${lastVisit(c.id)||'-'}</b><span>آخر زيارة</span></div><div><b>${c.next_date||'-'}</b><span>موعد</span></div></div>
+      <div class="metrics"><div><b>${money(c.debt_balance)}</b><span data-i18n="ui_9d061763061c">مديونية</span></div><div><b>${lastVisit(c.id)||'-'}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div><div><b>${c.next_date||'-'}</b><span data-i18n="ui_4c2142366eca">موعد</span></div></div>
       <div class="customer-actions">
-        <button onclick="visit('${c.id}')">تمت الزيارة</button><button onclick="newOrder('${c.id}')">طلب جديد</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="collect('${c.id}')">تحصيل</button><button onclick="note('${c.id}')">ملاحظة</button>
+        <button onclick="visit('${c.id}')">تمت الزيارة</button><button onclick="newOrder('${c.id}')">طلب جديد</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="collect('${c.id}')"><span data-i18n=ui_68f752e279d8>تحصيل</span></button><button onclick="note('${c.id}')"><span data-i18n=ui_0be7afd7e65f>ملاحظة</span></button>
       </div>
     </div>`;
-  }).join('')||'<div class="panel">لا يوجد عملاء</div>';
+  }).join('')||"<div class=\"panel\" data-i18n=\"ui_1027871af7c9\">لا يوجد عملاء</div>";
 }
 function visit(cid){const c=db.customers.find(x=>x.id===cid);db.visits.unshift({id:id(),customer_id:cid,rep_id:c.rep_id,date:today(),notes:'تمت الزيارة'});save();renderAll()}
 function newOrder(cid){document.querySelector('[data-page=orders]').click();setTimeout(()=>orderCustomer.value=cid,100)}
@@ -279,13 +279,13 @@ function appointment(cid){let d=prompt('تاريخ الموعد YYYY-MM-DD',toda
 function collect(cid){let a=Number(prompt('مبلغ التحصيل','0')||0);if(!a)return;let c=db.customers.find(x=>x.id===cid);c.debt_balance=Math.max(0,Number(c.debt_balance||0)-a);db.collections.unshift({id:id(),customer_id:cid,rep_id:c.rep_id,date:today(),amount:a});save();renderAll()}
 function note(cid){let n=prompt('ملاحظة العميل');if(!n)return;let c=db.customers.find(x=>x.id===cid);c.notes=[c.notes,n].filter(Boolean).join(' | ');save();renderAll()}
 function openCustomerForm(){
-  modalBody.innerHTML=`<h2>إضافة عميل</h2><div class="form-grid two"><label>اسم العميل<input id="mcName"></label><label>الجوال<input id="mcPhone"></label><label>المدينة<input id="mcCity" value="جدة"></label><label>المندوب<select id="mcRep">${db.reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label><label>الموقع<input id="mcLocation"></label><label>تصنيف العميل<input id="mcCategory" value="عميل"></label></div><br><button class="primary" onclick="saveCustomer()">حفظ</button>`;
+  modalBody.innerHTML=`<h2><span data-i18n=ui_bf5ecb5e2537>إضافة عميل</span></h2><div class="form-grid two"><label><span data-i18n="ui_70771eb8320f">اسم العميل</span><input id="mcName"></label><label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="mcPhone"></label><label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mcCity" value="جدة"></label><label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mcRep">${db.reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label><label><span data-i18n=ui_8937faa1e41f>الموقع</span><input id="mcLocation"></label><label><span data-i18n="ui_af813b88a2c9">تصنيف العميل</span><input id="mcCategory" value="عميل"></label></div><br><button class="primary" onclick="saveCustomer()"><span data-i18n=ui_ddfcaf9d0144>حفظ</span></button>`;
   modal.classList.remove('hidden');
 }
 function saveCustomer(){db.customers.unshift({id:id(),name:mcName.value,phone:mcPhone.value,city:mcCity.value,location:mcLocation.value,category:mcCategory.value,status:'active',rep_id:mcRep.value,debt_balance:0,notes:''});save();closeModal();renderAll()}
 
 function renderSelects(){
-  const cs=allowedCustomers();orderCustomer.innerHTML='<option value="">اختر العميل</option>'+cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  const cs=allowedCustomers();orderCustomer.innerHTML="<option value=\"\" data-i18n=\"ui_efac3d2cdb26\">اختر العميل</option>"+cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;orderRep.innerHTML=reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
 }
 ['width','length','thickness','sizeUnit','thicknessUnit','material','totalKg','priceKg'].forEach(x=>$(x).addEventListener('input',calc));
@@ -307,12 +307,12 @@ orderForm.onsubmit=e=>{
 }
 function resetOrder(){orderForm.reset();orderDate.value=today();calc()}
 function renderOrders(){
-  const rows=allowedOrders().map(o=>`<tr><td>${o.date}</td><td>${customerName(o.customer_id)}</td><td>${repName(o.rep_id)}</td><td>${o.product}</td><td>${o.width}×${o.length}</td><td>${o.thickness}</td><td>${o.total_kg} كجم</td><td>${o.piece_weight}</td><td>${o.pieces}</td><td>${o.amount}</td><td>${o.status}</td></tr>`).join('');
-  ordersList.innerHTML=rows?`<table><tr><th>التاريخ</th><th>العميل</th><th>المندوب</th><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الكمية</th><th>وزن الحبة</th><th>عدد الحبات</th><th>القيمة</th><th>الحالة</th></tr>${rows}</table>`:'لا توجد طلبات';
+  const rows=allowedOrders().map(o=>`<tr><td>${o.date}</td><td>${customerName(o.customer_id)}</td><td>${repName(o.rep_id)}</td><td>${o.product}</td><td>${o.width}×${o.length}</td><td>${o.thickness}</td><td>${o.total_kg} كجم</td><td>${o.piece_weight}</td><td>${o.pieces}</td><td>${o.amount}</td><td><span data-i18n-text>${o.status}</span></td></tr>`).join('');
+  ordersList.innerHTML=rows?`<table><tr><th data-i18n="ui_d90c384199ac">التاريخ</th><th><span data-i18n=ui_a042411e90be>العميل</span></th><th><span data-i18n=ui_4059aaa08477>المندوب</span></th><th data-i18n="ui_a79e304d96a1">المنتج</th><th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th><th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th><th><span data-i18n=ui_935e21853946>الكمية</span></th><th><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></th><th><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></th><th data-i18n="ui_4c49efecd6cb">القيمة</th><th><span data-i18n=ui_c3a4749caed4>الحالة</span></th></tr>${rows}</table>`:'لا توجد طلبات';
 }
 function renderAlerts(){
   const list=allowedCustomers().filter(c=>daysFrom(lastVisit(c.id))>=30);
-  alertsList.innerHTML=list.map(c=>`<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — لم تتم زيارته منذ ${daysFrom(lastVisit(c.id))} يوم <div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`).join('')||'<div class="panel">لا توجد تنبيهات</div>';
+  alertsList.innerHTML=list.map(c=>`<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — لم تتم زيارته منذ ${daysFrom(lastVisit(c.id))} يوم <div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`).join('')||"<div class=\"panel\" data-i18n=\"ui_2b0b9a6cfb90\">لا توجد تنبيهات</div>";
 }
 function createRoute(){
   const repId=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):prompt('اكتب ID المندوب: rep-yaser أو rep-demo','rep-yaser');
@@ -320,14 +320,14 @@ function createRoute(){
   db.routes.unshift({id:id(),date:today(),rep_id:repId,items:customers.map((c,i)=>({customer_id:c.id,order:i+1,status:'pending'}))});save();renderRoutes();
 }
 function renderRoutes(){
-  routesList.innerHTML=db.routes.filter(r=>(currentUser&&currentUser.role)!=='rep'||r.rep_id===(currentUser&&currentUser.id)).map(r=>`<div class="route-card"><b>مسار ${r.date} - ${repName(r.rep_id)}</b><div class="route-items">${r.items.map(i=>`<div class="route-item">${i.order}. ${customerName(i.customer_id)} <button onclick="visit('${i.customer_id}')">تمت الزيارة</button></div>`).join('')}</div></div>`).join('')||'<div class="panel">لا توجد مسارات</div>';
+  routesList.innerHTML=db.routes.filter(r=>(currentUser&&currentUser.role)!=='rep'||r.rep_id===(currentUser&&currentUser.id)).map(r=>`<div class="route-card"><b>مسار ${r.date} - ${repName(r.rep_id)}</b><div class="route-items">${r.items.map(i=>`<div class="route-item">${i.order}. ${customerName(i.customer_id)} <button onclick="visit('${i.customer_id}')">تمت الزيارة</button></div>`).join('')}</div></div>`).join('')||"<div class=\"panel\" data-i18n=\"ui_a55857953455\">لا توجد مسارات</div>";
 }
 function openUserForm(){
-  modalBody.innerHTML=`<h2>إضافة مستخدم / مندوب</h2><p class="muted">سيتم حفظ كلمة المرور مشفرة في السيرفر، ولن تظهر في الصفحة أو الكود.</p><div class="form-grid two"><label>الاسم<input id="muName"></label><label>البريد<input id="muEmail" type="email" autocomplete="username"></label><label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label><label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة"></label><label>الدور<select id="muRole"><option value="rep">مندوب</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label></div><br><button class="primary" onclick="saveUser()">حفظ</button>`;modal.classList.remove('hidden');
+  modalBody.innerHTML=`<h2><span data-i18n=ui_7a5655cc69b6>إضافة مستخدم / مندوب</span></h2><p class="muted" data-i18n="ui_b243715b8f6a">سيتم حفظ كلمة المرور مشفرة في السيرفر، ولن تظهر في الصفحة أو الكود.</p><div class="form-grid two"><label><span data-i18n=ui_52ab09847cf8>الاسم</span><input id="muName"></label><label><span data-i18n=ui_cb572218fea7>البريد</span><input id="muEmail" type="email" autocomplete="username"></label><label><span data-i18n=ui_45d490fda163>رقم الجوال / واتساب</span><input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label><label><span data-i18n=ui_eff5589e03e0>كلمة مرور مؤقتة</span><input id="muPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة" data-i18n-placeholder=ui_0a9a73d5552f></label><label><span data-i18n=ui_de69d94fee12>الدور</span><select id="muRole"><option value="rep" data-i18n=ui_3a574081142f>مندوب</option><option value="sales" data-i18n="ui_1457027fa98c">مدير مبيعات</option><option value="admin" data-i18n="ui_7419927aee59">مدير نظام</option></select></label></div><br><button class="primary" onclick="saveUser()"><span data-i18n=ui_ddfcaf9d0144>حفظ</span></button>`;modal.classList.remove('hidden');
 }
 async function saveUser(){const u={id:id(),name:muName.value.trim(),email:muEmail.value.trim(),phone:muPhone.value.trim(),password:muPass.value,role:muRole.value,status:'active'};if(!u.name||!u.email||!u.password)return alert('اكتب الاسم والبريد وكلمة المرور المؤقتة');try{await jmsPostJson('/api/auth-create-user',{id:u.id,name:u.name,email:u.email,phone:u.phone,password:u.password,role:u.role,status:u.status});}catch(e){return alert('تعذر إنشاء المستخدم في السيرفر. تأكد أنك داخل بحساب مدير النظام وأن متغيرات Vercel مضبوطة.');}delete u.password;db.users.push(u);if(u.role==='rep')db.reps.push({...u});save();closeModal();renderAll()}
 function renderUsers(){
-  usersList.innerHTML=`<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td>${roleText(u.role)}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions"><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button><button onclick="resetPass('${u.id}')">إعادة كلمة المرور</button></div></td></tr>`).join('')}</table>`;
+  usersList.innerHTML=`<table><tr><th><span data-i18n=ui_52ab09847cf8>الاسم</span></th><th><span data-i18n=ui_cb572218fea7>البريد</span></th><th><span data-i18n=ui_de69d94fee12>الدور</span></th><th><span data-i18n=ui_c3a4749caed4>الحالة</span></th><th data-i18n="ui_9f0a0f722601">إجراءات</th></tr>${db.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td>${roleText(u.role)}</td><td data-i18n-text>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions"><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button><button onclick="resetPass('${u.id}')">إعادة كلمة المرور</button></div></td></tr>`).join('')}</table>`;
 }
 function toggleUser(uid){let u=db.users.find(x=>x.id===uid);u.status=u.status==='active'?'disabled':'active';let r=db.reps.find(x=>x.id===uid);if(r)r.status=u.status;save();renderUsers()}
 async function resetPass(uid){let u=db.users.find(x=>x.id===uid);let p=prompt('كلمة المرور الجديدة');if(!p)return;try{await jmsPostJson('/api/auth-admin-reset-password',{userId:uid,newPassword:p});alert('تم تغيير كلمة المرور لجميع الأجهزة');}catch(e){alert('تعذر تغيير كلمة المرور في السيرفر')}}
@@ -355,7 +355,7 @@ function renderVisitFilters(){
   if(!visitTo.value) visitTo.value=today();
   const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   const current=visitRepFilter.value;
-  visitRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  visitRepFilter.innerHTML="<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>"+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   if(current) visitRepFilter.value=current;
 }
 function setVisitQuickRange(type){
@@ -399,15 +399,15 @@ function renderVisits(){
       <p>المندوب: ${repName(v.rep_id)}<br>التاريخ: ${v.date}<br>النتيجة: ${v.result||v.notes||'تمت الزيارة'}</p>
       <div class="mini"><span>وقت الوصول: ${v.arrive_time||'-'}</span><span>وقت المغادرة: ${v.leave_time||'-'}</span><span>مدة الزيارة: ${v.duration||'-'}</span></div>
     </div>`;
-  }).join('') || '<div class="ok-line">لا توجد زيارات في هذه الفترة</div>';
+  }).join('') || "<div class=\"ok-line\" data-i18n=\"ui_1afe107c3bf0\">لا توجد زيارات في هذه الفترة</div>";
 
   const reportType=visitReportType.value;
   let notList = reportType==='late30' ? late30 : notVisited;
   notVisitedList.innerHTML=notList.map(c=>`<div class="late-line">
     <b>${c.name}</b><br>
     المندوب: ${repName(c.rep_id)} — آخر زيارة: ${lastVisit(c.id)||'لم يزر'} — التأخير: ${daysFrom(lastVisit(c.id))} يوم
-    <div class="row-actions"><button onclick="visit('${c.id}')">تسجيل زيارة</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div>
-  </div>`).join('') || '<div class="ok-line">لا يوجد عملاء في هذا التقرير</div>';
+    <div class="row-actions"><button onclick="visit('${c.id}')"><span data-i18n=ui_dd5f9783f90a>تسجيل زيارة</span></button><button onclick="appointment('${c.id}')">موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div>
+  </div>`).join('') || "<div class=\"ok-line\" data-i18n=\"ui_3b198c0c2876\">لا يوجد عملاء في هذا التقرير</div>";
 
   renderRepVisitSummary();
 }
@@ -421,25 +421,25 @@ function renderRepVisitSummary(){
     const visited=new Set(vs.map(v=>v.customer_id));
     const notv=cs.filter(c=>!visited.has(c.id)).length;
     return `<div class="summary-card"><h4>${r.name}</h4><div class="nums">
-      <div><b>${vs.length}</b><span>زيارات</span></div>
-      <div><b>${orders.length}</b><span>طلبات</span></div>
-      <div><b>${notv}</b><span>بدون زيارة</span></div>
+      <div><b>${vs.length}</b><span data-i18n="ui_36f96e340f26">زيارات</span></div>
+      <div><b>${orders.length}</b><span data-i18n="ui_88ff1dc5f1fc">طلبات</span></div>
+      <div><b>${notv}</b><span data-i18n="ui_ab98ce6b8309">بدون زيارة</span></div>
     </div></div>`;
   }).join('')+'</div>';
 }
 function openVisitForm(){
   const cs=allowedCustomers();
-  modalBody.innerHTML=`<h2>تسجيل زيارة يدوية</h2>
+  modalBody.innerHTML=`<h2 data-i18n="ui_5a2f4dedc25c">تسجيل زيارة يدوية</h2>
     <div class="form-grid two">
-      <label>العميل<select id="mvCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
-      <label>المندوب<select id="mvRep">${((currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
-      <label>التاريخ<input id="mvDate" type="date" value="${today()}"></label>
-      <label>نتيجة الزيارة<select id="mvResult"><option>متابعة</option><option>طلب جديد</option><option>تحصيل</option><option>بدون طلب</option></select></label>
-      <label>وقت الوصول<input id="mvArrive" type="time"></label>
-      <label>وقت المغادرة<input id="mvLeave" type="time"></label>
+      <label><span data-i18n=ui_a042411e90be>العميل</span><select id="mvCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+      <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mvRep">${((currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
+      <label><span data-i18n="ui_d90c384199ac">التاريخ</span><input id="mvDate" type="date" value="${today()}"></label>
+      <label><span data-i18n="ui_a432ea868381">نتيجة الزيارة</span><select id="mvResult"><option value="متابعة" data-i18n="ui_322b7b613468">متابعة</option><option value="طلب جديد" data-i18n="ui_6d43782b2c9f">طلب جديد</option><option data-i18n=ui_68f752e279d8>تحصيل</option><option value="بدون طلب" data-i18n="ui_fa0f0bb09cfd">بدون طلب</option></select></label>
+      <label><span data-i18n="ui_b838ce9d2065">وقت الوصول</span><input id="mvArrive" type="time"></label>
+      <label><span data-i18n="ui_fcc600c8f7cf">وقت المغادرة</span><input id="mvLeave" type="time"></label>
     </div>
-    <br><label>ملاحظات<input id="mvNotes" placeholder="ملاحظات الزيارة"></label>
-    <br><button class="primary" onclick="saveManualVisit()">حفظ الزيارة</button>`;
+    <br><label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mvNotes" placeholder="ملاحظات الزيارة" data-i18n-placeholder="ui_00f8f581fe0d"></label>
+    <br><button class="primary" onclick="saveManualVisit()" data-i18n="ui_4f26a96c4a8d">حفظ الزيارة</button>`;
   modal.classList.remove('hidden');
 }
 function saveManualVisit(){
@@ -472,7 +472,7 @@ function renderQuoteFilters(){
   if(!window.quoteRepFilter) return;
   const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
   const cur=quoteRepFilter.value;
-  quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  quoteRepFilter.innerHTML="<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>"+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   if(cur) quoteRepFilter.value=cur;
 }
 function renderQuotes(){
@@ -498,7 +498,7 @@ function renderQuotes(){
     return true;
   });
 
-  quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
+  quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || "<div class=\"panel\" data-i18n=\"ui_5d53e3cf76ec\">لا توجد عروض أسعار</div>";
 }
 function quoteCard(q){
   const canApprove=(currentUser&&currentUser.role)==='admin'||(currentUser&&currentUser.role)==='sales';
@@ -510,28 +510,28 @@ function quoteCard(q){
         <h3>عرض رقم ${q.quote_no}</h3>
         <p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p>
       </div>
-      <span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span>
+      <span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span>
     </div>
 
     <div class="quote-lines">
-      <div><span>المنتج</span><b>${q.product}</b></div>
-      <div><span>المقاس</span><b>${q.width} × ${q.length} ${q.size_unit}</b></div>
-      <div><span>السماكة</span><b>${q.thickness} ${q.thickness_unit}</b></div>
-      <div><span>الخامة</span><b>${q.material}</b></div>
-      <div><span>الكمية</span><b>${q.total_kg} كجم</b></div>
-      <div><span>سعر الكيلو</span><b>${q.price_kg} ريال</b></div>
-      <div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div>
-      <div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div>
+      <div><span data-i18n="ui_a79e304d96a1">المنتج</span><b>${q.product}</b></div>
+      <div><span><span data-i18n=ui_d32ec91fdd57>المقاس</span></span><b>${q.width} × ${q.length} ${q.size_unit}</b></div>
+      <div><span><span data-i18n=ui_5cccef2ccc68>السماكة</span></span><b>${q.thickness} ${q.thickness_unit}</b></div>
+      <div><span><span data-i18n=ui_ed10f61584eb>الخامة</span></span><b>${q.material}</b></div>
+      <div><span><span data-i18n=ui_935e21853946>الكمية</span></span><b>${q.total_kg} كجم</b></div>
+      <div><span><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></span><b>${q.price_kg} ريال</b></div>
+      <div><span><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></span><b>${q.piece_weight||'-'}</b></div>
+      <div><span><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></span><b>${q.pieces||'-'}</b></div>
     </div>
 
-    <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
+    <div class="quote-total"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
     ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
     ${q.approved_by?`<div class="ok-line">اعتمد بواسطة: ${q.approved_by} بتاريخ ${q.approved_at||'-'}</div>`:''}
 
     <div class="quote-actions">
-      <button onclick="viewQuote('${q.id}')">عرض</button>
-      ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}
-      ${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}
+      <button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button>
+      ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="reject" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}
+      ${canSend?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}
       ${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}
     </div>
   </div>`;
@@ -540,39 +540,39 @@ function openQuoteForm(){
   ensureQuotes();
   const cs=allowedCustomers();
   const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
-  modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+  modalBody.innerHTML=`<h2><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></h2>
     <div class="form-grid two">
-      <label>العميل<select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
-      <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
-      <label>تاريخ العرض<input id="mqDate" type="date" value="${today()}"></label>
-      <label>صلاحية العرض<input id="mqValid" type="date"></label>
+      <label><span data-i18n=ui_a042411e90be>العميل</span><select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+      <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}</select></label>
+      <label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${today()}"></label>
+      <label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label>
     </div>
     <div class="form-grid four">
-      <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-      <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-      <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
-      <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+      <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+      <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+      <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label>
+      <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
     </div>
     <div class="form-grid four">
-      <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
-      <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
-      <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-      <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+      <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+      <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+      <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+      <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
     </div>
     <div class="form-grid four">
-      <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-      <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
-      <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
-      <label>الإجمالي<input id="mqTotal" readonly></label>
+      <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+      <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+      <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
+      <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label>
     </div>
     <div class="form-grid two">
-      <label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label>
-      <label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label>
-      <label>وزن الحبة<input id="mqPiece" readonly></label>
-      <label>عدد الحبات<input id="mqPieces" readonly></label>
+      <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label>
+      <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
+      <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>
+      <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>
     </div>
-    <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
-    <br><button class="primary" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+    <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
+    <br><button class="primary" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
 
   modal.classList.remove('hidden');
   ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(id=>{
@@ -631,12 +631,12 @@ function sendQuote(qid){
 function viewQuote(qid){
   const q=db.quotes.find(x=>x.id===qid); if(!q) return;
   modalBody.innerHTML=`<div class="quote-print">
-    <div class="print-head"><div><h1>عرض سعر</h1><p>شركة جدة النموذجية للصناعة</p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div>
-    <p><b>العميل:</b> ${customerName(q.customer_id)}<br><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}</p>
-    <table><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الخامة</th><th>الكمية</th><th>سعر الكيلو</th><th>الإجمالي</th></tr>
+    <div class="print-head"><div><h1><span data-i18n=ui_679403c38f0b>عرض سعر</span></h1><p><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div>
+    <p><b data-i18n="ui_a9fd8b729e26">العميل:</b> ${customerName(q.customer_id)}<br><b data-i18n="ui_7184f7e17194">المندوب:</b> ${repName(q.rep_id)}<br><b data-i18n="ui_02e196bdec60">الحالة:</b> <span data-i18n-text>${quoteStatusText(q.status)}</span></p>
+    <table><tr><th data-i18n="ui_a79e304d96a1">المنتج</th><th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th><th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th><th><span data-i18n=ui_ed10f61584eb>الخامة</span></th><th><span data-i18n=ui_935e21853946>الكمية</span></th><th><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></th><th><span data-i18n=ui_baed6e999960>الإجمالي</span></th></tr>
     <tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table>
-    <p><b>شروط الدفع:</b> ${q.payment_terms||'-'}<br><b>التسليم:</b> ${q.delivery_terms||'-'}<br><b>ملاحظات:</b> ${q.notes||'-'}</p>
-    <button class="primary" onclick="window.print()">طباعة / PDF</button>
+    <p><b data-i18n="ui_657ca638f19a">شروط الدفع:</b> ${q.payment_terms||'-'}<br><b data-i18n="ui_f3cb83cd2b0e">التسليم:</b> ${q.delivery_terms||'-'}<br><b data-i18n="ui_8c9d1b5aec34">ملاحظات:</b> ${q.notes||'-'}</p>
+    <button class="primary" onclick="window.print()"><span data-i18n=ui_698901f17ee1>طباعة / PDF</span></button>
   </div>`;
   modal.classList.remove('hidden');
 }
@@ -710,7 +710,7 @@ function convertQuoteToOrder(qid){
       const d=daysFrom(typeof lastVisit==='function'?lastVisit(c.id):'');
       const txt=d===null?'لم تتم زيارته من قبل':'لم تتم زيارته منذ '+d+' يوم';
       return `<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — ${txt}<div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`;
-    }).join('')||'<div class="panel">لا توجد تنبيهات</div>';
+    }).join('')||"<div class=\"panel\" data-i18n=\"ui_2b0b9a6cfb90\">لا توجد تنبيهات</div>";
   };
 
   window.ensureQuotes = function(){ db.quotes ||= []; saveDB(); };
@@ -721,7 +721,7 @@ function convertQuoteToOrder(qid){
     if(!window.quoteRepFilter) return;
     const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
     const cur=quoteRepFilter.value;
-    quoteRepFilter.innerHTML='<option value="all">كل المناديب</option>'+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+    quoteRepFilter.innerHTML="<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>"+reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
     if(cur) quoteRepFilter.value=cur;
   };
 
@@ -741,7 +741,7 @@ function convertQuoteToOrder(qid){
       if(txt && !String(q.quote_no).includes(txt) && !cname.includes(txt)) return false;
       return true;
     });
-    quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
+    quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || "<div class=\"panel\" data-i18n=\"ui_5d53e3cf76ec\">لا توجد عروض أسعار</div>";
   };
 
   window.quoteCard=function(q){
@@ -749,12 +749,12 @@ function convertQuoteToOrder(qid){
     const canSend=q.status==='approved'||q.status==='sent';
     const canConvert=q.status==='approved'||q.status==='sent';
     return `<div class="quote-card">
-      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
-      <div class="quote-lines"><div><span>المنتج</span><b>${q.product}</b></div><div><span>المقاس</span><b>${q.width} × ${q.length} ${q.size_unit}</b></div><div><span>السماكة</span><b>${q.thickness} ${q.thickness_unit}</b></div><div><span>الخامة</span><b>${q.material}</b></div><div><span>الكمية</span><b>${q.total_kg} كجم</b></div><div><span>سعر الكيلو</span><b>${q.price_kg} ريال</b></div><div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div><div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div></div>
-      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span></div>
+      <div class="quote-lines"><div><span data-i18n="ui_a79e304d96a1">المنتج</span><b>${q.product}</b></div><div><span><span data-i18n=ui_d32ec91fdd57>المقاس</span></span><b>${q.width} × ${q.length} ${q.size_unit}</b></div><div><span><span data-i18n=ui_5cccef2ccc68>السماكة</span></span><b>${q.thickness} ${q.thickness_unit}</b></div><div><span><span data-i18n=ui_ed10f61584eb>الخامة</span></span><b>${q.material}</b></div><div><span><span data-i18n=ui_935e21853946>الكمية</span></span><b>${q.total_kg} كجم</b></div><div><span><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></span><b>${q.price_kg} ريال</b></div><div><span><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></span><b>${q.piece_weight||'-'}</b></div><div><span><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></span><b>${q.pieces||'-'}</b></div></div>
+      <div class="quote-total"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${q.total_amount} ريال</b></div>
       ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
       ${q.approved_by?`<div class="ok-line">اعتمد بواسطة: ${q.approved_by} بتاريخ ${q.approved_at||'-'}</div>`:''}
-      <div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div>
+      <div class="quote-actions"><button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="reject" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div>
     </div>`;
   };
 
@@ -763,43 +763,43 @@ function convertQuoteToOrder(qid){
     const cs=typeof allowedCustomers==='function'?allowedCustomers():db.customers||[];
     const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
     const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
-    modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+    modalBody.innerHTML=`<h2><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></h2>
       <div class="quote-customer-mode">
-        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
-        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span><span data-i18n=ui_f8b7623c2a5f>اختيار عميل موجود</span></span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span data-i18n="ui_fdb4d8578880">إضافة عميل جديد</span></label>
       </div>
       <div id="existingCustomerBox" class="form-grid two">
-        <label>العميل<select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
-        <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label><span data-i18n=ui_a042411e90be>العميل</span><select id="mqCustomer">${cs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
       </div>
       <div id="newCustomerBox" class="form-grid two hidden">
-        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
-        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
-        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
-        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+        <label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label>
+        <label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label>
+        <label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label>
       </div>
-      <div class="form-grid two"><label>تاريخ العرض<input id="mqDate" type="date" value="${safeToday()}"></label><label>صلاحية العرض<input id="mqValid" type="date"></label></div>
+      <div class="form-grid two"><label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${safeToday()}"></label><label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label></div>
       <div class="form-grid four">
-        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
-        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
-      </div>
-      <div class="form-grid four">
-        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
-        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
-        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label>
+        <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
       </div>
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
-        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
-        <label>الإجمالي<input id="mqTotal" readonly></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
       </div>
-      <div class="form-grid two"><label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label><label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label><label>وزن الحبة<input id="mqPiece" readonly></label><label>عدد الحبات<input id="mqPieces" readonly></label></div>
-      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
-      <br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+      <div class="form-grid four">
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
+        <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label>
+      </div>
+      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div>
+      <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
+      <br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
     modal.classList.remove('hidden');
     ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{const el=$id(x);if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm);}});
     calcQuoteForm();
@@ -848,7 +848,7 @@ function convertQuoteToOrder(qid){
   window.approveQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;q.status='approved';q.approved_by=((currentUser&&currentUser.name)||"");q.approved_at=safeToday();saveDB();renderQuotes();alert('تم اعتماد عرض السعر');};
   window.rejectQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;const reason=prompt('سبب الرفض');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=((currentUser&&currentUser.name)||"");q.rejected_at=safeToday();saveDB();renderQuotes();alert('تم رفض العرض');};
   window.sendQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن الإرسال قبل اعتماد المدير');q.status='sent';q.sent_at=safeToday();saveDB();renderQuotes();const msg=`عرض سعر من شركة جدة النموذجية للصناعة%0Aرقم العرض: ${q.quote_no}%0Aالعميل: ${customerName(q.customer_id)}%0Aالمنتج: ${q.product}%0Aالمقاس: ${q.width} × ${q.length} ${q.size_unit}%0Aالسماكة: ${q.thickness} ${q.thickness_unit}%0Aالخامة: ${q.material}%0Aالكمية: ${q.total_kg} كجم%0Aالإجمالي: ${q.total_amount} ريال`;window.open(`https://wa.me/?text=${msg}`,'_blank');};
-  window.viewQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;modalBody.innerHTML=`<div class="quote-print"><div class="print-head"><div><h1>عرض سعر</h1><p>شركة جدة النموذجية للصناعة</p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div><p><b>العميل:</b> ${customerName(q.customer_id)}<br><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}</p><table><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>الخامة</th><th>الكمية</th><th>سعر الكيلو</th><th>الإجمالي</th></tr><tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table><p><b>شروط الدفع:</b> ${q.payment_terms||'-'}<br><b>التسليم:</b> ${q.delivery_terms||'-'}<br><b>ملاحظات:</b> ${q.notes||'-'}</p><button class="primary" onclick="window.print()">طباعة / PDF</button></div>`;modal.classList.remove('hidden');};
+  window.viewQuote=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;modalBody.innerHTML=`<div class="quote-print"><div class="print-head"><div><h1><span data-i18n=ui_679403c38f0b>عرض سعر</span></h1><p><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></p></div><div><b>${q.quote_no}</b><br>${q.date}</div></div><p><b data-i18n="ui_a9fd8b729e26">العميل:</b> ${customerName(q.customer_id)}<br><b data-i18n="ui_7184f7e17194">المندوب:</b> ${repName(q.rep_id)}<br><b data-i18n="ui_02e196bdec60">الحالة:</b> <span data-i18n-text>${quoteStatusText(q.status)}</span></p><table><tr><th data-i18n="ui_a79e304d96a1">المنتج</th><th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th><th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th><th><span data-i18n=ui_ed10f61584eb>الخامة</span></th><th><span data-i18n=ui_935e21853946>الكمية</span></th><th><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></th><th><span data-i18n=ui_baed6e999960>الإجمالي</span></th></tr><tr><td>${q.product}</td><td>${q.width}×${q.length} ${q.size_unit}</td><td>${q.thickness} ${q.thickness_unit}</td><td>${q.material}</td><td>${q.total_kg} كجم</td><td>${q.price_kg}</td><td>${q.total_amount}</td></tr></table><p><b data-i18n="ui_657ca638f19a">شروط الدفع:</b> ${q.payment_terms||'-'}<br><b data-i18n="ui_f3cb83cd2b0e">التسليم:</b> ${q.delivery_terms||'-'}<br><b data-i18n="ui_8c9d1b5aec34">ملاحظات:</b> ${q.notes||'-'}</p><button class="primary" onclick="window.print()"><span data-i18n=ui_698901f17ee1>طباعة / PDF</span></button></div>`;modal.classList.remove('hidden');};
   window.convertQuoteToOrder=function(x){const q=db.quotes.find(q=>q.id===x);if(!q)return;if(q.status!=='approved'&&q.status!=='sent')return alert('لا يمكن تحويل عرض غير معتمد إلى طلب');db.orders.unshift({id:newLocalId(),date:safeToday(),customer_id:q.customer_id,rep_id:q.rep_id,product:q.product,material:q.material,color:q.color,width:q.width,length:q.length,thickness:q.thickness,total_kg:q.total_kg,piece_weight:q.piece_weight,pieces:q.pieces,amount:q.total_amount+' ريال',amount_value:Number(q.total_amount||0),status:'جديد',notes:'تم التحويل من عرض السعر '+q.quote_no});q.converted_to_order=true;q.converted_at=safeToday();saveDB();renderAll();alert('تم تحويل عرض السعر إلى طلب تصنيع');};
 })();
 
@@ -881,7 +881,7 @@ function convertQuoteToOrder(qid){
     if(!window.visitNoteRepFilter) return;
     const reps = (currentUser&&currentUser.role) === 'rep' ? db.reps.filter(r=>r.id===(currentUser&&currentUser.id)) : db.reps;
     const cur = visitNoteRepFilter.value;
-    visitNoteRepFilter.innerHTML = '<option value="all">كل المناديب</option>' + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+    visitNoteRepFilter.innerHTML = "<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>" + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
     if(cur) visitNoteRepFilter.value = cur;
   };
 
@@ -904,7 +904,7 @@ function convertQuoteToOrder(qid){
     visitQuoteReqCount.textContent = reports.filter(r=>r.type==='quote').length;
     visitComplaintCount.textContent = reports.filter(r=>r.type==='complaint').length;
 
-    visitNotesList.innerHTML = reports.map(r=>visitNoteCard(r)).join('') || '<div class="panel">لا توجد ملاحظات زيارات</div>';
+    visitNotesList.innerHTML = reports.map(r=>visitNoteCard(r)).join('') || "<div class=\"panel\" data-i18n=\"ui_1c7b7430606f\">لا توجد ملاحظات زيارات</div>";
   };
 
   window.visitNoteCard = function(r){
@@ -918,13 +918,13 @@ function convertQuoteToOrder(qid){
       </div>
       <div class="visit-note-body">${r.note || '-'}</div>
       <div class="visit-note-meta">
-        <div><b>الاهتمام بالمنتج:</b><br>${r.product_interest||'-'}</div>
-        <div><b>السعر المطلوب:</b><br>${r.requested_price||'-'}</div>
-        <div><b>موعد المتابعة:</b><br>${r.followup_date||'-'}</div>
-        <div><b>الحالة:</b><br>${r.status==='closed'?'تمت المعالجة':'مفتوحة'}</div>
+        <div><b data-i18n="ui_a47a92cbec55">الاهتمام بالمنتج:</b><br>${r.product_interest||'-'}</div>
+        <div><b data-i18n="ui_b5af6454c057">السعر المطلوب:</b><br>${r.requested_price||'-'}</div>
+        <div><b data-i18n="ui_7857c537db89">موعد المتابعة:</b><br>${r.followup_date||'-'}</div>
+        <div><b data-i18n="ui_02e196bdec60">الحالة:</b><br>${r.status==='closed'?'تمت المعالجة':'مفتوحة'}</div>
       </div>
       <div class="visit-note-actions">
-        ${r.type==='quote'?`<button class="quote" onclick="createQuoteFromVisit('${r.id}')">إنشاء عرض سعر</button>`:''}
+        ${r.type==='quote'?`<button class="quote" onclick="createQuoteFromVisit('${r.id}')"><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></button>`:''}
         ${r.followup_date?`<button class="follow" onclick="appointment('${r.customer_id}')">تحديث الموعد</button>`:''}
         <button class="done" onclick="closeVisitReport('${r.id}')">تمت المعالجة</button>
       </div>
@@ -936,25 +936,25 @@ function convertQuoteToOrder(qid){
     if(!c) return;
     modalBody.innerHTML = `<h2>تقرير زيارة: ${c.name}</h2>
       <div class="form-grid two">
-        <label>نوع الملاحظة
+        <label><span data-i18n=ui_1a7331751415>نوع الملاحظة</span>
           <select id="vrType">
-            <option value="general">ملاحظة عامة</option>
-            <option value="quote">طلب عرض سعر</option>
-            <option value="complaint">شكوى عميل</option>
-            <option value="price">طلب سعر خاص</option>
-            <option value="manager">طلب مقابلة المدير</option>
-            <option value="followup">موعد متابعة</option>
+            <option value="general" data-i18n=ui_8c53d261e68c>ملاحظة عامة</option>
+            <option value="quote" data-i18n=ui_e725c837eb30>طلب عرض سعر</option>
+            <option value="complaint" data-i18n=ui_956c6b999113>شكوى عميل</option>
+            <option value="price" data-i18n=ui_3242cfbb2d68>طلب سعر خاص</option>
+            <option value="manager" data-i18n=ui_430b2cdf00e3>طلب مقابلة المدير</option>
+            <option value="followup" data-i18n=ui_792ce514c85c>موعد متابعة</option>
           </select>
         </label>
-        <label>تاريخ الزيارة<input id="vrDate" type="date" value="${tdy()}"></label>
-        <label>وقت الوصول<input id="vrArrive" type="time"></label>
-        <label>وقت المغادرة<input id="vrLeave" type="time"></label>
-        <label>المنتج الذي يهتم به العميل<input id="vrProduct" placeholder="مثال: أكياس رول / شرنك"></label>
-        <label>السعر الذي طلبه العميل<input id="vrPrice" placeholder="مثال: 8.5 ريال للكيلو"></label>
-        <label>موعد المتابعة القادم<input id="vrFollowup" type="date"></label>
+        <label><span data-i18n="ui_e5adc0c42d5c">تاريخ الزيارة</span><input id="vrDate" type="date" value="${tdy()}"></label>
+        <label><span data-i18n="ui_b838ce9d2065">وقت الوصول</span><input id="vrArrive" type="time"></label>
+        <label><span data-i18n="ui_fcc600c8f7cf">وقت المغادرة</span><input id="vrLeave" type="time"></label>
+        <label><span data-i18n="ui_65e291abc5b9">المنتج الذي يهتم به العميل</span><input id="vrProduct" placeholder="مثال: أكياس رول / شرنك" data-i18n-placeholder="ui_5ca5b939bb58"></label>
+        <label><span data-i18n="ui_4e9ebd53d58b">السعر الذي طلبه العميل</span><input id="vrPrice" placeholder="مثال: 8.5 ريال للكيلو" data-i18n-placeholder="ui_02c99cca7ac9"></label>
+        <label><span data-i18n="ui_e9b9e5d9e300">موعد المتابعة القادم</span><input id="vrFollowup" type="date"></label>
       </div>
       <br>
-      <label>ملاحظات الزيارة<textarea id="vrNote" style="width:100%;min-height:110px;border:1px solid #d8dee9;border-radius:14px;padding:12px" placeholder="اكتب تفاصيل الزيارة كاملة..."></textarea></label>
+      <label><span data-i18n="ui_00f8f581fe0d">ملاحظات الزيارة</span><textarea id="vrNote" style="width:100%;min-height:110px;border:1px solid #d8dee9;border-radius:14px;padding:12px" placeholder="اكتب تفاصيل الزيارة كاملة..." data-i18n-placeholder="ui_e2125362dc50"></textarea></label>
       <br><button class="primary" type="button" onclick="saveVisitReport('${customerId}')">حفظ تقرير الزيارة</button>`;
     modal.classList.remove('hidden');
   };
@@ -1066,13 +1066,13 @@ function convertQuoteToOrder(qid){
             <div class="quote-company">
               <img src="assets/jms-logo.svg" alt="JMS">
               <div>
-                <h1>شركة جدة النموذجية للصناعة</h1>
+                <h1><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></h1>
                 <p>Jeddah Model Industrial Company</p>
-                <p>عروض أسعار المنتجات البلاستيكية والتغليف</p>
+                <p data-i18n="ui_754c401a6adc">عروض أسعار المنتجات البلاستيكية والتغليف</p>
               </div>
             </div>
             <div class="quote-title-box">
-              <h2>عرض سعر</h2>
+              <h2><span data-i18n=ui_679403c38f0b>عرض سعر</span></h2>
               <div>رقم العرض: ${q.quote_no}</div>
               <div>تاريخ الإصدار: ${q.date || '-'}</div>
               <div>صالح حتى: ${q.valid_until || '-'}</div>
@@ -1081,21 +1081,21 @@ function convertQuoteToOrder(qid){
 
           <div class="quote-info-grid">
             <div class="quote-info-card">
-              <h3>بيانات العميل</h3>
+              <h3><span data-i18n=ui_8d098aea9a44>بيانات العميل</span></h3>
               <p>
-                <b>اسم العميل:</b> ${customerName(q.customer_id)}<br>
-                <b>الجوال:</b> ${c.phone || '-'}<br>
-                <b>المدينة:</b> ${c.city || '-'}<br>
-                <b>العنوان:</b> ${c.location || c.district || '-'}
+                <b data-i18n="ui_7418c6fa9fd1">اسم العميل:</b> ${customerName(q.customer_id)}<br>
+                <b data-i18n="ui_9b9aa4d7bcbf">الجوال:</b> ${c.phone || '-'}<br>
+                <b data-i18n="ui_04d639992f67">المدينة:</b> ${c.city || '-'}<br>
+                <b data-i18n="ui_378b712d4000">العنوان:</b> ${c.location || c.district || '-'}
               </p>
             </div>
             <div class="quote-info-card">
-              <h3>بيانات العرض</h3>
+              <h3><span data-i18n=ui_41c21ea6a1e3>بيانات العرض</span></h3>
               <p>
-                <b>المندوب:</b> ${repName(q.rep_id)}<br>
-                <b>الحالة:</b> ${quoteStatusText(q.status)}<br>
-                <b>شروط الدفع:</b> ${q.payment_terms || '-'}<br>
-                <b>مدة التسليم:</b> ${q.delivery_terms || '-'}
+                <b data-i18n="ui_7184f7e17194">المندوب:</b> ${repName(q.rep_id)}<br>
+                <b data-i18n="ui_02e196bdec60">الحالة:</b> <span data-i18n-text>${quoteStatusText(q.status)}</span><br>
+                <b data-i18n="ui_657ca638f19a">شروط الدفع:</b> ${q.payment_terms || '-'}<br>
+                <b data-i18n="ui_c3d8295c01fd">مدة التسليم:</b> ${q.delivery_terms || '-'}
               </p>
             </div>
           </div>
@@ -1103,16 +1103,16 @@ function convertQuoteToOrder(qid){
           <table class="quote-products-table">
             <thead>
               <tr>
-                <th>المنتج</th>
-                <th>المقاس</th>
-                <th>السماكة</th>
-                <th>اللون</th>
-                <th>الخامة</th>
-                <th>وزن الحبة</th>
-                <th>عدد الحبات</th>
-                <th>الكمية كجم</th>
-                <th>سعر الكيلو</th>
-                <th>الإجمالي</th>
+                <th data-i18n="ui_a79e304d96a1">المنتج</th>
+                <th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th>
+                <th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th>
+                <th><span data-i18n=ui_041b469dc8a9>اللون</span></th>
+                <th><span data-i18n=ui_ed10f61584eb>الخامة</span></th>
+                <th><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></th>
+                <th><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></th>
+                <th><span data-i18n=ui_2ae4ed35d5a8>الكمية كجم</span></th>
+                <th><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></th>
+                <th><span data-i18n=ui_baed6e999960>الإجمالي</span></th>
               </tr>
             </thead>
             <tbody>
@@ -1133,27 +1133,27 @@ function convertQuoteToOrder(qid){
 
           <div class="quote-summary">
             <div class="quote-terms">
-              <h3>الشروط والملاحظات</h3>
+              <h3><span data-i18n=ui_09a25fdc5194>الشروط والملاحظات</span></h3>
               <ul>
-                <li>الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
-                <li>مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
-                <li>مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
-                <li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
+                <li data-i18n="ui_ec8ff4abd8e6">الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
+                <li data-i18n="ui_e673af421dfc">مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
+                <li data-i18n="ui_0574a5b181bf">مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
+                <li data-i18n="ui_e0e1593e1e56">أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
                 <li>${q.notes || 'لا توجد ملاحظات إضافية.'}</li>
               </ul>
             </div>
             <div class="quote-totals">
-              <div class="quote-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div>
-              <div class="quote-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div>
-              <div class="quote-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div>
+              <div class="quote-total-row"><span><span data-i18n=ui_76165bc3874a>الإجمالي قبل الضريبة</span></span><b>${fmt(subtotal)} ريال</b></div>
+              <div class="quote-total-row"><span><span data-i18n=ui_834b90058142>ضريبة القيمة المضافة 15%</span></span><b>${fmt(vat)} ريال</b></div>
+              <div class="quote-total-row final"><span><span data-i18n=ui_63c2f6768cf8>الإجمالي النهائي</span></span><b>${fmt(grand)} ريال</b></div>
             </div>
           </div>
 
           <div class="quote-footer">
-            <div class="quote-sign">اعتماد مدير المبيعات</div>
-            <div class="quote-sign">ختم الشركة</div>
-            <div class="quote-qr">
-              رمز التحقق<br>
+            <div class="quote-sign" data-i18n="ui_6846ffce925c">اعتماد مدير المبيعات</div>
+            <div class="quote-sign"><span data-i18n=ui_75e4857a1bfa>ختم الشركة</span></div>
+            <div class="quote-qr"><span data-i18n="ui_28103d567ad9">
+              رمز التحقق</span><br>
               ${verifyText}<br>
               QR
             </div>
@@ -1161,10 +1161,10 @@ function convertQuoteToOrder(qid){
         </div>
 
         <div class="quote-actions-print">
-          <button onclick="window.print()">طباعة / حفظ PDF</button>
-          <button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>
+          <button onclick="window.print()" data-i18n="ui_c9dc22189457">طباعة / حفظ PDF</button>
+          <button class="whatsapp" onclick="sendQuote('${q.id}')"><span data-i18n=ui_bb5b8248a080>إرسال واتساب</span></button>
           <button onclick="convertQuoteToOrder('${q.id}')">تحويل إلى طلب</button>
-          <button class="close" onclick="closeModal()">إغلاق</button>
+          <button class="close" onclick="closeModal()"><span data-i18n=ui_ca90c297b099>إغلاق</span></button>
         </div>
       </div>
     `;
@@ -1222,7 +1222,7 @@ function convertQuoteToOrder(qid){
         ${safeHtml(c.name)}
         <small>${safeHtml(c.phone || '-')} · ${safeHtml(c.city || '-')} · ${safeHtml(repName(c.rep_id))}</small>
       </button>
-    `).join('') || `<button type="button" disabled>لا يوجد عميل بهذا الاسم</button>`;
+    `).join('') || `<button type="button" disabled data-i18n="ui_ae29fab7acd1">لا يوجد عميل بهذا الاسم</button>`;
 
     mqCustomerSearchResults.classList.add('active');
   };
@@ -1245,53 +1245,53 @@ function convertQuoteToOrder(qid){
     const reps = (currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;
     const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
 
-    modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2>
+    modalBody.innerHTML=`<h2><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></h2>
       <div class="quote-customer-mode">
-        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
-        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span><span data-i18n=ui_f8b7623c2a5f>اختيار عميل موجود</span></span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span data-i18n="ui_fdb4d8578880">إضافة عميل جديد</span></label>
       </div>
 
       <div id="existingCustomerBox" class="form-grid two">
-        <label>بحث باسم العميل
-          <div class="customer-search-picker">
-            <input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()">
+        <label><span data-i18n="ui_99092d18b155">بحث باسم العميل
+          </span><div class="customer-search-picker">
+            <input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()" data-i18n-placeholder="ui_9fea834a4d3c">
             <div id="mqCustomerSearchResults" class="customer-search-results"></div>
             <div id="selectedQuoteCustomer" class="selected-customer-pill"></div>
           </div>
           <input id="mqCustomer" type="hidden" value="">
         </label>
-        <label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label>
       </div>
 
       <div id="newCustomerBox" class="form-grid two hidden">
-        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
-        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
-        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
-        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+        <label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label>
+        <label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label>
+        <label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label>
       </div>
 
-      <div class="form-grid two"><label>تاريخ العرض<input id="mqDate" type="date" value="${tdy()}"></label><label>صلاحية العرض<input id="mqValid" type="date"></label></div>
+      <div class="form-grid two"><label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${tdy()}"></label><label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label></div>
       <div class="form-grid four">
-        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
-        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label>
+        <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
       </div>
       <div class="form-grid four">
-        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
-        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label>
-        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
       </div>
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
-        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
-        <label>الإجمالي<input id="mqTotal" readonly></label>
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
+        <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label>
       </div>
-      <div class="form-grid two"><label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label><label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label><label>وزن الحبة<input id="mqPiece" readonly></label><label>عدد الحبات<input id="mqPieces" readonly></label></div>
-      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
-      <br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div>
+      <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
+      <br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
 
     modal.classList.remove('hidden');
 
@@ -1384,13 +1384,13 @@ function convertQuoteToOrder(qid){
             <div class="quote-company">
               <img class="jms-real-logo" src="assets/jeddah-model-logo.jpeg" alt="Jeddah Model Industrial Co. Ltd">
               <div>
-                <h1>شركة جدة النموذجية للصناعة</h1>
+                <h1><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></h1>
                 <p>Jeddah Model Industrial Co. Ltd</p>
-                <p>عروض أسعار المنتجات البلاستيكية والتغليف</p>
+                <p data-i18n="ui_754c401a6adc">عروض أسعار المنتجات البلاستيكية والتغليف</p>
               </div>
             </div>
             <div class="quote-title-box">
-              <h2>عرض سعر</h2>
+              <h2><span data-i18n=ui_679403c38f0b>عرض سعر</span></h2>
               <div>رقم العرض: ${q.quote_no}</div>
               <div>تاريخ الإصدار: ${q.date || '-'}</div>
               <div>صالح حتى: ${q.valid_until || '-'}</div>
@@ -1399,21 +1399,21 @@ function convertQuoteToOrder(qid){
 
           <div class="quote-info-grid">
             <div class="quote-info-card">
-              <h3>بيانات العميل</h3>
+              <h3><span data-i18n=ui_8d098aea9a44>بيانات العميل</span></h3>
               <p>
-                <b>اسم العميل:</b> ${customerName(q.customer_id)}<br>
-                <b>الجوال:</b> ${c.phone || '-'}<br>
-                <b>المدينة:</b> ${c.city || '-'}<br>
-                <b>العنوان:</b> ${c.location || c.district || '-'}
+                <b data-i18n="ui_7418c6fa9fd1">اسم العميل:</b> ${customerName(q.customer_id)}<br>
+                <b data-i18n="ui_9b9aa4d7bcbf">الجوال:</b> ${c.phone || '-'}<br>
+                <b data-i18n="ui_04d639992f67">المدينة:</b> ${c.city || '-'}<br>
+                <b data-i18n="ui_378b712d4000">العنوان:</b> ${c.location || c.district || '-'}
               </p>
             </div>
             <div class="quote-info-card">
-              <h3>بيانات العرض</h3>
+              <h3><span data-i18n=ui_41c21ea6a1e3>بيانات العرض</span></h3>
               <p>
-                <b>المندوب:</b> ${repName(q.rep_id)}<br>
-                <b>الحالة:</b> ${quoteStatusText(q.status)}<br>
-                <b>شروط الدفع:</b> ${q.payment_terms || '-'}<br>
-                <b>مدة التسليم:</b> ${q.delivery_terms || '-'}
+                <b data-i18n="ui_7184f7e17194">المندوب:</b> ${repName(q.rep_id)}<br>
+                <b data-i18n="ui_02e196bdec60">الحالة:</b> <span data-i18n-text>${quoteStatusText(q.status)}</span><br>
+                <b data-i18n="ui_657ca638f19a">شروط الدفع:</b> ${q.payment_terms || '-'}<br>
+                <b data-i18n="ui_c3d8295c01fd">مدة التسليم:</b> ${q.delivery_terms || '-'}
               </p>
             </div>
           </div>
@@ -1421,16 +1421,16 @@ function convertQuoteToOrder(qid){
           <table class="quote-products-table">
             <thead>
               <tr>
-                <th>المنتج</th>
-                <th>المقاس</th>
-                <th>السماكة</th>
-                <th>اللون</th>
-                <th>الخامة</th>
-                <th>وزن الحبة</th>
-                <th>عدد الحبات</th>
-                <th>الكمية كجم</th>
-                <th>سعر الكيلو</th>
-                <th>الإجمالي</th>
+                <th data-i18n="ui_a79e304d96a1">المنتج</th>
+                <th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th>
+                <th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th>
+                <th><span data-i18n=ui_041b469dc8a9>اللون</span></th>
+                <th><span data-i18n=ui_ed10f61584eb>الخامة</span></th>
+                <th><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></th>
+                <th><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></th>
+                <th><span data-i18n=ui_2ae4ed35d5a8>الكمية كجم</span></th>
+                <th><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></th>
+                <th><span data-i18n=ui_baed6e999960>الإجمالي</span></th>
               </tr>
             </thead>
             <tbody>
@@ -1451,27 +1451,27 @@ function convertQuoteToOrder(qid){
 
           <div class="quote-summary">
             <div class="quote-terms">
-              <h3>الشروط والملاحظات</h3>
+              <h3><span data-i18n=ui_09a25fdc5194>الشروط والملاحظات</span></h3>
               <ul>
-                <li>الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
-                <li>مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
-                <li>مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
-                <li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
+                <li data-i18n="ui_ec8ff4abd8e6">الأسعار أعلاه حسب المواصفات الموضحة في هذا العرض.</li>
+                <li data-i18n="ui_e673af421dfc">مدة صلاحية العرض حتى التاريخ الموضح أعلاه.</li>
+                <li data-i18n="ui_0574a5b181bf">مدة التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li>
+                <li data-i18n="ui_e0e1593e1e56">أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li>
                 <li>${q.notes || 'لا توجد ملاحظات إضافية.'}</li>
               </ul>
             </div>
             <div class="quote-totals">
-              <div class="quote-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div>
-              <div class="quote-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div>
-              <div class="quote-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div>
+              <div class="quote-total-row"><span><span data-i18n=ui_76165bc3874a>الإجمالي قبل الضريبة</span></span><b>${fmt(subtotal)} ريال</b></div>
+              <div class="quote-total-row"><span><span data-i18n=ui_834b90058142>ضريبة القيمة المضافة 15%</span></span><b>${fmt(vat)} ريال</b></div>
+              <div class="quote-total-row final"><span><span data-i18n=ui_63c2f6768cf8>الإجمالي النهائي</span></span><b>${fmt(grand)} ريال</b></div>
             </div>
           </div>
 
           <div class="quote-footer">
-            <div class="quote-sign">اعتماد مدير المبيعات</div>
-            <div class="quote-sign">ختم الشركة</div>
-            <div class="quote-qr">
-              رمز التحقق<br>
+            <div class="quote-sign" data-i18n="ui_6846ffce925c">اعتماد مدير المبيعات</div>
+            <div class="quote-sign"><span data-i18n=ui_75e4857a1bfa>ختم الشركة</span></div>
+            <div class="quote-qr"><span data-i18n="ui_28103d567ad9">
+              رمز التحقق</span><br>
               ${verifyText}<br>
               QR
             </div>
@@ -1479,11 +1479,11 @@ function convertQuoteToOrder(qid){
         </div>
 
         <div class="quote-actions-print">
-          <button class="pdf" onclick="downloadQuotePDF()">تحميل PDF</button>
-          <button onclick="window.print()">طباعة</button>
-          <button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>
+          <button class="pdf" onclick="downloadQuotePDF()"><span data-i18n=ui_afbdeced23d0>تحميل PDF</span></button>
+          <button onclick="window.print()"><span data-i18n=ui_2e00e00acffe>طباعة</span></button>
+          <button class="whatsapp" onclick="sendQuote('${q.id}')"><span data-i18n=ui_bb5b8248a080>إرسال واتساب</span></button>
           <button onclick="convertQuoteToOrder('${q.id}')">تحويل إلى طلب</button>
-          <button class="close" onclick="closeModal()">إغلاق</button>
+          <button class="close" onclick="closeModal()"><span data-i18n=ui_ca90c297b099>إغلاق</span></button>
         </div>
       </div>
     `;
@@ -1533,7 +1533,7 @@ function convertQuoteToOrder(qid){
   window.showApp = function(){
     if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
     loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
-    currentUserName.textContent=((currentUser&&currentUser.name)||""); currentUserRole.textContent=roleText((currentUser&&currentUser.role));
+    currentUserName.textContent=((currentUser&&currentUser.name)||""); (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(currentUserRole,roleText((currentUser&&currentUser.role)));
     const repAllowed=['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
     document.querySelectorAll('.nav').forEach(btn=>{
       const page=btn.dataset.page;
@@ -1563,14 +1563,14 @@ function convertQuoteToOrder(qid){
   window.renderAlerts = function(){
     if(!window.alertsList)return;
     const list=allowedCustomers().filter(c=>{const d=daysFrom(lastVisit(c.id));return d===null||d>=30});
-    alertsList.innerHTML=list.map(c=>{const d=daysFrom(lastVisit(c.id));return `<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — ${d===null?'لم تتم زيارته من قبل':('لم تتم زيارته منذ '+d+' يوم')}<div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`}).join('')||'<div class="panel">لا توجد تنبيهات</div>';
+    alertsList.innerHTML=list.map(c=>{const d=daysFrom(lastVisit(c.id));return `<div class="alert-card"><b>${c.name}</b><br>المندوب: ${repName(c.rep_id)} — ${d===null?'لم تتم زيارته من قبل':('لم تتم زيارته منذ '+d+' يوم')}<div class="row-actions"><button onclick="appointment('${c.id}')">تحديد موعد</button><button onclick="newOrder('${c.id}')">طلب جديد</button></div></div>`}).join('')||"<div class=\"panel\" data-i18n=\"ui_2b0b9a6cfb90\">لا توجد تنبيهات</div>";
   };
 
   window.renderQuoteCustomerSearch=function(){
     if(!window.mqCustomerSearchResults||!window.mqCustomerSearch)return;
     const q=(mqCustomerSearch.value||'').trim();
     const list=allowedCustomers().filter(c=>!q||`${c.name||''} ${c.phone||''} ${c.city||''} ${c.district||''}`.includes(q)).slice(0,80);
-    mqCustomerSearchResults.innerHTML=list.map(c=>`<button type="button" onclick="selectQuoteCustomer('${c.id}')">${c.name}<small>${c.phone||'-'} · ${c.city||'-'} · ${repName(c.rep_id)}</small></button>`).join('')||'<button type="button" disabled>لا يوجد عميل بهذا الاسم</button>';
+    mqCustomerSearchResults.innerHTML=list.map(c=>`<button type="button" onclick="selectQuoteCustomer('${c.id}')">${c.name}<small>${c.phone||'-'} · ${c.city||'-'} · ${repName(c.rep_id)}</small></button>`).join('')||"<button type=\"button\" disabled data-i18n=\"ui_ae29fab7acd1\">لا يوجد عميل بهذا الاسم</button>";
     mqCustomerSearchResults.classList.add('active');
   };
   window.selectQuoteCustomer=function(cid){
@@ -1589,11 +1589,11 @@ function convertQuoteToOrder(qid){
   };
   window.openQuoteForm=function(){
     ensureQuotes(); const cs=allowedCustomers(); const reps=(currentUser&&currentUser.role)==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps; const defaultRep=(currentUser&&currentUser.role)==='rep'?(currentUser&&currentUser.id):(reps[0]?.id||'');
-    modalBody.innerHTML=`<h2>إنشاء عرض سعر</h2><div class="quote-customer-mode"><label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label><label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label></div>
-    <div id="existingCustomerBox" class="form-grid two"><label>بحث باسم العميل<div class="customer-search-picker"><input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()"><div id="mqCustomerSearchResults" class="customer-search-results"></div><div id="selectedQuoteCustomer" class="selected-customer-pill"></div></div><input id="mqCustomer" type="hidden" value=""></label><label>المندوب<select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label></div>
-    <div id="newCustomerBox" class="form-grid two hidden"><label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label><label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label><label>المدينة<input id="mqNewCustomerCity" value="جدة"></label><label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label></div>
-    <div class="form-grid two"><label>تاريخ العرض<input id="mqDate" type="date" value="${safeToday()}"></label><label>صلاحية العرض<input id="mqValid" type="date"></label></div><div class="form-grid four"><label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label><label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label><label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label><label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label></div>
-    <div class="form-grid four"><label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label><label>الطول<input id="mqLength" type="number" step="0.01" placeholder="95"></label><label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label><label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label></div><div class="form-grid four"><label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label><label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="1000"></label><label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label><label>الإجمالي<input id="mqTotal" readonly></label></div><div class="form-grid two"><label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label><label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label><label>وزن الحبة<input id="mqPiece" readonly></label><label>عدد الحبات<input id="mqPieces" readonly></label></div><label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label><br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+    modalBody.innerHTML=`<h2><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></h2><div class="quote-customer-mode"><label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span><span data-i18n=ui_f8b7623c2a5f>اختيار عميل موجود</span></span></label><label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span data-i18n="ui_fdb4d8578880">إضافة عميل جديد</span></label></div>
+    <div id="existingCustomerBox" class="form-grid two"><label><span data-i18n="ui_99092d18b155">بحث باسم العميل</span><div class="customer-search-picker"><input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()" data-i18n-placeholder="ui_9fea834a4d3c"><div id="mqCustomerSearchResults" class="customer-search-results"></div><div id="selectedQuoteCustomer" class="selected-customer-pill"></div></div><input id="mqCustomer" type="hidden" value=""></label><label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label></div>
+    <div id="newCustomerBox" class="form-grid two hidden"><label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label><label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label><label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label><label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label></div>
+    <div class="form-grid two"><label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${safeToday()}"></label><label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label></div><div class="form-grid four"><label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label><label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label><label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label><label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label></div>
+    <div class="form-grid four"><label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label><label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label><label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label></div><div class="form-grid four"><label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label><label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label><label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label></div><div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div><label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label><br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
     modal.classList.remove('hidden'); ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{const el=document.getElementById(x);if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm)}}); if(cs[0]){mqCustomer.value=cs[0].id;selectedQuoteCustomer.textContent='العميل الافتراضي: '+cs[0].name;selectedQuoteCustomer.classList.add('active')} calcQuoteForm();
   };
   window.saveQuote=function(){
@@ -1604,7 +1604,7 @@ function convertQuoteToOrder(qid){
   window.renderQuotes=function(){
     if(!window.quotesList)return; ensureQuotes(); if(typeof renderQuoteFilters==='function')renderQuoteFilters(); const st=window.quoteStatusFilter?.value||'all',rep=window.quoteRepFilter?.value||'all',txt=(window.quoteSearch?.value||'').trim(); let list=allowedQuotes().filter(q=>{if(st!=='all'&&q.status!==st)return false;if(rep!=='all'&&q.rep_id!==rep)return false;const cname=customerName(q.customer_id);return !txt||String(q.quote_no).includes(txt)||cname.includes(txt)});
     if(window.quotesTotal){quotesTotal.textContent=allowedQuotes().length;quotesPending.textContent=allowedQuotes().filter(q=>q.status==='pending').length;quotesApproved.textContent=allowedQuotes().filter(q=>q.status==='approved'||q.status==='sent'||q.status==='accepted').length;quotesRejected.textContent=allowedQuotes().filter(q=>q.status==='rejected'||q.status==='cancelled').length}
-    quotesList.innerHTML=list.map(q=>{const canApprove=['admin','sales'].includes((currentUser&&currentUser.role));const canSend=q.status==='approved'||q.status==='sent'||q.status==='accepted';const canCancel=q.status==='sent'||q.status==='approved';return `<div class="quote-card-pro"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div><p>المنتج: ${safe(q.product)}<br>المقاس: ${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}<br>السماكة: ${safe(q.thickness)} ${safe(q.thickness_unit)} · الخامة: ${safe(q.material)}<br>الكمية: ${safe(q.total_kg)} كجم · سعر الكيلو: ${safe(q.price_kg)} ريال<br>${q.cancel_reason?'سبب الإلغاء: '+q.cancel_reason:''}</p><div class="quote-total-pro"><span>إجمالي العرض</span><b>${fmt(q.total_amount)} ريال</b></div><div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="cancel" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${q.status==='sent'?`<button class="approve" onclick="acceptQuote('${q.id}')">العميل وافق</button>`:''}${canCancel?`<button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${q.status==='accepted'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div></div>`}).join('')||'<div class="panel">لا توجد عروض أسعار</div>';
+    quotesList.innerHTML=list.map(q=>{const canApprove=['admin','sales'].includes((currentUser&&currentUser.role));const canSend=q.status==='approved'||q.status==='sent'||q.status==='accepted';const canCancel=q.status==='sent'||q.status==='approved';return `<div class="quote-card-pro"><div style="display:flex;justify-content:space-between;gap:10px"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span></div><p>المنتج: ${safe(q.product)}<br>المقاس: ${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}<br>السماكة: ${safe(q.thickness)} ${safe(q.thickness_unit)} · الخامة: ${safe(q.material)}<br>الكمية: ${safe(q.total_kg)} كجم · سعر الكيلو: ${safe(q.price_kg)} ريال<br>${q.cancel_reason?'سبب الإلغاء: '+q.cancel_reason:''}</p><div class="quote-total-pro"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${fmt(q.total_amount)} ريال</b></div><div class="quote-actions"><button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button>${canApprove&&q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="cancel" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}${canSend?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}${q.status==='sent'?`<button class="approve" onclick="acceptQuote('${q.id}')">العميل وافق</button>`:''}${canCancel?`<button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${q.status==='accepted'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div></div>`}).join('')||"<div class=\"panel\" data-i18n=\"ui_5d53e3cf76ec\">لا توجد عروض أسعار</div>";
   };
   window.approveQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;q.status='approved';q.approved_by=((currentUser&&currentUser.name)||"");q.approved_at=safeToday();saveDB();renderAll();alert('تم اعتماد عرض السعر')};
   window.rejectQuote=function(qid){const q=db.quotes.find(x=>x.id===qid);if(!q)return;const reason=prompt('سبب رفض المدير');if(!reason)return;q.status='rejected';q.reject_reason=reason;q.rejected_by=((currentUser&&currentUser.name)||"");q.rejected_at=safeToday();saveDB();renderAll()};
@@ -1614,7 +1614,7 @@ function convertQuoteToOrder(qid){
   window.downloadQuotePDF=function(){setTimeout(()=>window.print(),100)};
   window.viewQuote=function(qid){
     const q=db.quotes.find(x=>x.id===qid); if(!q)return; const c=customerObj(q.customer_id); const subtotal=num(q.total_amount); const vat=subtotal*.15; const grand=subtotal+vat;
-    modalBody.innerHTML=`<div class="quote-print-shell"><div class="quote-toolbar"><button class="pdf" onclick="downloadQuotePDF()">حفظ PDF / طباعة</button>${['approved','sent','accepted'].includes(q.status)?`<button class="whatsapp" onclick="sendQuote('${q.id}')">إرسال واتساب</button>`:''}${q.status==='sent'?`<button onclick="acceptQuote('${q.id}')">العميل وافق</button><button onclick="cancelQuote('${q.id}')">إلغاء العرض</button>`:''}<button onclick="closeModal()">إغلاق</button></div><div class="quote-a4"><div class="quote-a4-head"><img class="quote-a4-logo" src="${JMS_LOGO_DATA}" alt="JMS"><div class="quote-a4-company"><h1>شركة جدة النموذجية للصناعة</h1><p>Jeddah Model Industrial Co. Ltd</p><p>عروض أسعار المنتجات البلاستيكية والتغليف</p></div><div class="quote-a4-title"><h2>عرض سعر</h2><p>رقم العرض: ${safe(q.quote_no)}</p><p>تاريخ الإصدار: ${safe(q.date)}</p><p>صالح حتى: ${safe(q.valid_until)}</p></div></div><div class="quote-a4-grid"><div class="quote-a4-card"><h3>بيانات العميل</h3><p><b>اسم العميل:</b> ${customerName(q.customer_id)}<br><b>الجوال:</b> ${safe(c.phone)}<br><b>المدينة:</b> ${safe(c.city)}<br><b>العنوان:</b> ${safe(c.location||c.district)}</p></div><div class="quote-a4-card"><h3>بيانات العرض</h3><p><b>المندوب:</b> ${repName(q.rep_id)}<br><b>الحالة:</b> ${quoteStatusText(q.status)}<br><b>شروط الدفع:</b> ${safe(q.payment_terms)}<br><b>مدة التسليم:</b> ${safe(q.delivery_terms)}</p></div></div><table class="quote-a4-table"><thead><tr><th>المنتج</th><th>المقاس</th><th>السماكة</th><th>اللون</th><th>الخامة</th><th>وزن الحبة</th><th>عدد الحبات</th><th>الكمية كجم</th><th>سعر الكيلو</th><th>الإجمالي</th></tr></thead><tbody><tr><td>${safe(q.product)}</td><td>${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}</td><td>${safe(q.thickness)} ${safe(q.thickness_unit)}</td><td>${safe(q.color)}</td><td>${safe(q.material)}</td><td>${safe(q.piece_weight)}</td><td>${safe(q.pieces)}</td><td>${safe(q.total_kg)}</td><td>${safe(q.price_kg)} ريال</td><td>${fmt(subtotal)} ريال</td></tr></tbody></table><div class="quote-a4-summary"><div class="quote-a4-terms"><h3>الشروط والملاحظات</h3><ul><li>الأسعار حسب المواصفات الموضحة في هذا العرض.</li><li>صلاحية العرض حتى التاريخ الموضح أعلاه.</li><li>التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li><li>أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li><li>${q.notes||'لا توجد ملاحظات إضافية.'}</li></ul></div><div class="quote-a4-total"><div class="quote-a4-total-row"><span>الإجمالي قبل الضريبة</span><b>${fmt(subtotal)} ريال</b></div><div class="quote-a4-total-row"><span>ضريبة القيمة المضافة 15%</span><b>${fmt(vat)} ريال</b></div><div class="quote-a4-total-row final"><span>الإجمالي النهائي</span><b>${fmt(grand)} ريال</b></div></div></div><div class="quote-a4-approval"><div class="quote-a4-sign"><b>توقيع العميل</b><div class="quote-a4-line">الاسم والتوقيع</div></div><div class="quote-a4-sign"><b>اعتماد المندوب</b><div class="quote-a4-line">${repName(q.rep_id)}</div></div><div class="quote-a4-sign"><b>اعتماد مدير المبيعات</b><div class="quote-a4-line">التوقيع</div></div><div class="quote-a4-sign"><b>ختم الشركة</b><div class="quote-a4-line">الختم</div></div></div><div class="quote-a4-footer"><span>شركة جدة النموذجية للصناعة</span><span>رقم العرض: ${safe(q.quote_no)}</span><span>العرض لا يعتبر طلبًا نهائيًا إلا بعد الاعتماد.</span></div></div></div>`; modal.classList.remove('hidden');
+    modalBody.innerHTML=`<div class="quote-print-shell"><div class="quote-toolbar"><button class="pdf" onclick="downloadQuotePDF()" data-i18n="ui_754e518376a6">حفظ PDF / طباعة</button>${['approved','sent','accepted'].includes(q.status)?`<button class="whatsapp" onclick="sendQuote('${q.id}')"><span data-i18n=ui_bb5b8248a080>إرسال واتساب</span></button>`:''}${q.status==='sent'?`<button onclick="acceptQuote('${q.id}')">العميل وافق</button><button onclick="cancelQuote('${q.id}')">إلغاء العرض</button>`:''}<button onclick="closeModal()"><span data-i18n=ui_ca90c297b099>إغلاق</span></button></div><div class="quote-a4"><div class="quote-a4-head"><img class="quote-a4-logo" src="${JMS_LOGO_DATA}" alt="JMS"><div class="quote-a4-company"><h1><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></h1><p>Jeddah Model Industrial Co. Ltd</p><p data-i18n="ui_754c401a6adc">عروض أسعار المنتجات البلاستيكية والتغليف</p></div><div class="quote-a4-title"><h2><span data-i18n=ui_679403c38f0b>عرض سعر</span></h2><p>رقم العرض: ${safe(q.quote_no)}</p><p>تاريخ الإصدار: ${safe(q.date)}</p><p>صالح حتى: ${safe(q.valid_until)}</p></div></div><div class="quote-a4-grid"><div class="quote-a4-card"><h3><span data-i18n=ui_8d098aea9a44>بيانات العميل</span></h3><p><b data-i18n="ui_7418c6fa9fd1">اسم العميل:</b> ${customerName(q.customer_id)}<br><b data-i18n="ui_9b9aa4d7bcbf">الجوال:</b> ${safe(c.phone)}<br><b data-i18n="ui_04d639992f67">المدينة:</b> ${safe(c.city)}<br><b data-i18n="ui_378b712d4000">العنوان:</b> ${safe(c.location||c.district)}</p></div><div class="quote-a4-card"><h3><span data-i18n=ui_41c21ea6a1e3>بيانات العرض</span></h3><p><b data-i18n="ui_7184f7e17194">المندوب:</b> ${repName(q.rep_id)}<br><b data-i18n="ui_02e196bdec60">الحالة:</b> <span data-i18n-text>${quoteStatusText(q.status)}</span><br><b data-i18n="ui_657ca638f19a">شروط الدفع:</b> ${safe(q.payment_terms)}<br><b data-i18n="ui_c3d8295c01fd">مدة التسليم:</b> ${safe(q.delivery_terms)}</p></div></div><table class="quote-a4-table"><thead><tr><th data-i18n="ui_a79e304d96a1">المنتج</th><th><span data-i18n=ui_d32ec91fdd57>المقاس</span></th><th><span data-i18n=ui_5cccef2ccc68>السماكة</span></th><th><span data-i18n=ui_041b469dc8a9>اللون</span></th><th><span data-i18n=ui_ed10f61584eb>الخامة</span></th><th><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></th><th><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></th><th><span data-i18n=ui_2ae4ed35d5a8>الكمية كجم</span></th><th><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></th><th><span data-i18n=ui_baed6e999960>الإجمالي</span></th></tr></thead><tbody><tr><td>${safe(q.product)}</td><td>${safe(q.width)} × ${safe(q.length)} ${safe(q.size_unit)}</td><td>${safe(q.thickness)} ${safe(q.thickness_unit)}</td><td>${safe(q.color)}</td><td>${safe(q.material)}</td><td>${safe(q.piece_weight)}</td><td>${safe(q.pieces)}</td><td>${safe(q.total_kg)}</td><td>${safe(q.price_kg)} ريال</td><td>${fmt(subtotal)} ريال</td></tr></tbody></table><div class="quote-a4-summary"><div class="quote-a4-terms"><h3><span data-i18n=ui_09a25fdc5194>الشروط والملاحظات</span></h3><ul><li data-i18n="ui_1616475ccf0a">الأسعار حسب المواصفات الموضحة في هذا العرض.</li><li data-i18n="ui_ac4aa7ebd737">صلاحية العرض حتى التاريخ الموضح أعلاه.</li><li data-i18n="ui_23ab3f5b9c27">التسليم حسب جدول الإنتاج بعد اعتماد الطلب.</li><li data-i18n="ui_e0e1593e1e56">أي تعديل في المقاس أو الخامة أو الطباعة قد يغير السعر.</li><li>${q.notes||'لا توجد ملاحظات إضافية.'}</li></ul></div><div class="quote-a4-total"><div class="quote-a4-total-row"><span><span data-i18n=ui_76165bc3874a>الإجمالي قبل الضريبة</span></span><b>${fmt(subtotal)} ريال</b></div><div class="quote-a4-total-row"><span><span data-i18n=ui_834b90058142>ضريبة القيمة المضافة 15%</span></span><b>${fmt(vat)} ريال</b></div><div class="quote-a4-total-row final"><span><span data-i18n=ui_63c2f6768cf8>الإجمالي النهائي</span></span><b>${fmt(grand)} ريال</b></div></div></div><div class="quote-a4-approval"><div class="quote-a4-sign"><b><span data-i18n=ui_fc3deae1ff03>توقيع العميل</span></b><div class="quote-a4-line"><span data-i18n=ui_079474b22795>الاسم والتوقيع</span></div></div><div class="quote-a4-sign"><b data-i18n="ui_efc1d952e7e9">اعتماد المندوب</b><div class="quote-a4-line">${repName(q.rep_id)}</div></div><div class="quote-a4-sign"><b data-i18n="ui_6846ffce925c">اعتماد مدير المبيعات</b><div class="quote-a4-line" data-i18n="ui_2aeba4d09c76">التوقيع</div></div><div class="quote-a4-sign"><b><span data-i18n=ui_75e4857a1bfa>ختم الشركة</span></b><div class="quote-a4-line" data-i18n="ui_ef5eff2f6df5">الختم</div></div></div><div class="quote-a4-footer"><span><span data-i18n=ui_c981dbff26a3>شركة جدة النموذجية للصناعة</span></span><span>رقم العرض: ${safe(q.quote_no)}</span><span data-i18n="ui_eb8f99830f52">العرض لا يعتبر طلبًا نهائيًا إلا بعد الاعتماد.</span></div></div></div>`; modal.classList.remove('hidden');
   };
 })();
 
@@ -1643,7 +1643,7 @@ function convertQuoteToOrder(qid){
       document.body.appendChild(el);
     }
     el.className = "cloud-sync-status " + kind;
-    el.textContent = text;
+    if(window.JMSI18n)window.JMSI18n.setText(el,text);else el.textContent=text;
   }
 
   function configReady(){
@@ -1860,7 +1860,7 @@ function convertQuoteToOrder(qid){
         ${c.name || '-'}
         <small>${c.phone || '-'} · ${c.city || '-'} · ${typeof repName==='function'?repName(c.rep_id):'-'}</small>
       </button>
-    `).join('') || `<button type="button" disabled>لا يوجد عميل بهذا البحث</button>`;
+    `).join('') || `<button type="button" disabled data-i18n="ui_11edf2091508">لا يوجد عميل بهذا البحث</button>`;
     results.classList.add('active');
   }
 
@@ -1960,63 +1960,63 @@ function convertQuoteToOrder(qid){
     ensureDbShape();
     db.quotes ||= [];
     const defaultRep = currentUser && (currentUser&&currentUser.role) === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || '');
-    modalBody.innerHTML = `<h2>إنشاء عرض سعر</h2>
+    modalBody.innerHTML = `<h2><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></h2>
       <div class="quote-customer-mode">
-        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
-        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span><span data-i18n=ui_f8b7623c2a5f>اختيار عميل موجود</span></span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span data-i18n="ui_fdb4d8578880">إضافة عميل جديد</span></label>
       </div>
 
       <div id="existingCustomerBox" class="form-grid two">
         <label>بحث عن العميل ${searchCustomerHtml('mq', defaultCustomerId, 'mqRep')}</label>
-        <label>المندوب<select id="mqRep">${repOptions(defaultRep)}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${repOptions(defaultRep)}</select></label>
       </div>
 
       <div id="newCustomerBox" class="form-grid two hidden">
-        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
-        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
-        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
-        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+        <label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label>
+        <label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label>
+        <label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label>
       </div>
 
       <div class="form-grid two">
-        <label>تاريخ العرض<input id="mqDate" type="date" value="${typeof today==='function'?today():new Date().toISOString().slice(0,10)}"></label>
-        <label>صلاحية العرض<input id="mqValid" type="date"></label>
+        <label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${typeof today==='function'?today():new Date().toISOString().slice(0,10)}"></label>
+        <label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label>
       </div>
 
       <div class="form-grid four">
-        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب"></label>
-        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label>
+        <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
       </div>
 
       <div class="form-grid four">
-        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
-        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="90"></label>
-        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="90"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label>
       </div>
 
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="2000"></label>
-        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01"></label>
-        <label>كثافة الخامة<input id="mqDensity" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="2000"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
+        <label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>
       </div>
 
       <div class="form-grid three">
-        <label>وزن الحبة<input id="mqPiece" class="jms-calc-output" readonly></label>
-        <label>عدد الحبات<input id="mqPieces" class="jms-calc-output" readonly></label>
-        <label>الإجمالي<input id="mqTotal" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" class="jms-calc-output" readonly></label>
       </div>
 
       <div class="form-grid two">
-        <label>شروط الدفع<input id="mqPayment" value="حسب الاتفاق"></label>
-        <label>مدة التسليم<input id="mqDelivery" value="حسب جدول الإنتاج"></label>
+        <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label>
+        <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
       </div>
-      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل"></label>
-      <div class="jms-pro-note">يتم حساب وزن الحبة وعدد الحبات تلقائيًا بمجرد إدخال المقاسات والسماكة والكمية.</div>
-      <br><button class="primary" type="button" onclick="saveQuote()">حفظ وإرساله للمدير للاعتماد</button>`;
+      <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
+      <div class="jms-pro-note" data-i18n="ui_9871fc3dd000">يتم حساب وزن الحبة وعدد الحبات تلقائيًا بمجرد إدخال المقاسات والسماكة والكمية.</div>
+      <br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
     modal.classList.remove('hidden');
     attachAutoCalc(['mqWidth','mqLength','mqSizeUnit','mqThickness','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'], window.jmsCalcQuote);
   };
@@ -2069,15 +2069,15 @@ function convertQuoteToOrder(qid){
     const canSend=q.status==='approved'||q.status==='sent';
     const canConvert=q.status==='accepted'||q.status==='approved'||q.status==='sent';
     return `<div class="quote-card">
-      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
-      <div class="quote-lines"><div><span>المنتج</span><b>${q.product||'-'}</b></div><div><span>المقاس</span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div><div><span>السماكة</span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div><div><span>الخامة</span><b>${q.material||'-'}</b></div><div><span>الكمية</span><b>${q.total_kg||'-'} كجم</b></div><div><span>سعر الكيلو</span><b>${q.price_kg||'-'} ريال</b></div><div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div><div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div></div>
-      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span></div>
+      <div class="quote-lines"><div><span data-i18n="ui_a79e304d96a1">المنتج</span><b>${q.product||'-'}</b></div><div><span><span data-i18n=ui_d32ec91fdd57>المقاس</span></span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div><div><span><span data-i18n=ui_5cccef2ccc68>السماكة</span></span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div><div><span><span data-i18n=ui_ed10f61584eb>الخامة</span></span><b>${q.material||'-'}</b></div><div><span><span data-i18n=ui_935e21853946>الكمية</span></span><b>${q.total_kg||'-'} كجم</b></div><div><span><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></span><b>${q.price_kg||'-'} ريال</b></div><div><span><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></span><b>${q.piece_weight||'-'}</b></div><div><span><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></span><b>${q.pieces||'-'}</b></div></div>
+      <div class="quote-total"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
       ${q.cancel_reason?`<div class="alert-card">سبب الإلغاء: ${q.cancel_reason}</div>`:''}
       ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
       <div class="quote-actions">
-        <button onclick="viewQuote('${q.id}')">عرض</button>
-        ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}
-        ${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}
+        <button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button>
+        ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="reject" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}
+        ${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}
         ${q.status==='sent'?`<button class="accept" onclick="acceptQuote('${q.id}')">العميل وافق</button><button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}
         ${canConvert && q.status!=='cancelled' && q.status!=='rejected'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}
       </div>
@@ -2109,37 +2109,37 @@ function convertQuoteToOrder(qid){
   window.openOrderForm = function(defaultCustomerId=''){
     ensureDbShape();
     const defaultRep = currentUser && (currentUser&&currentUser.role) === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || '');
-    modalBody.innerHTML = `<h2>طلب تصنيع جديد</h2>
+    modalBody.innerHTML = `<h2><span data-i18n=ui_caaf49d2224d>طلب تصنيع جديد</span></h2>
       <div class="form-grid two">
         <label>بحث عن العميل ${searchCustomerHtml('o', defaultCustomerId, 'oRep')}</label>
-        <label>المندوب<select id="oRep">${repOptions(defaultRep)}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="oRep">${repOptions(defaultRep)}</select></label>
       </div>
       <div class="form-grid four">
-        <label>المنتج<select id="oProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="oMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="oColor" placeholder="شفاف / أبيض / أسود"></label>
-        <label>حالة الطلب<select id="oStatus"><option>جديد</option><option>بانتظار اعتماد المدير</option><option>قيد الإنتاج</option><option>جاهز للتسليم</option><option>تم التسليم</option></select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="oProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="oMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="oColor" placeholder="شفاف / أبيض / أسود" data-i18n-placeholder="ui_2ea240cb14a8"></label>
+        <label><span data-i18n=ui_f64c293b15d4>حالة الطلب</span><select id="oStatus"><option data-i18n=ui_d51f9d8dbcc0>جديد</option><option data-i18n=ui_1f1f12a82497>بانتظار اعتماد المدير</option><option data-i18n=ui_ce850ccc8082>قيد الإنتاج</option><option data-i18n=ui_0e624bd7f756>جاهز للتسليم</option><option data-i18n=ui_5f7b65d54230>تم التسليم</option></select></label>
       </div>
       <div class="form-grid four">
-        <label>العرض<input id="oWidth" type="number" step="0.01" placeholder="65"></label>
-        <label>الطول<input id="oLength" type="number" step="0.01" placeholder="90"></label>
-        <label>وحدة المقاس<select id="oSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="oThickness" type="number" step="0.01" placeholder="75"></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="oWidth" type="number" step="0.01" placeholder="65"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="oLength" type="number" step="0.01" placeholder="90"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="oSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="oThickness" type="number" step="0.01" placeholder="75"></label>
       </div>
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="oThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="oKg" type="number" step="0.01" placeholder="2000"></label>
-        <label>سعر الكيلو<input id="oPriceKg" type="number" step="0.01"></label>
-        <label>كثافة الخامة<input id="oDensity" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="oThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="oKg" type="number" step="0.01" placeholder="2000"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="oPriceKg" type="number" step="0.01"></label>
+        <label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="oDensity" class="jms-calc-output" readonly></label>
       </div>
       <div class="form-grid three">
-        <label>وزن الحبة<input id="oPiece" class="jms-calc-output" readonly></label>
-        <label>عدد الحبات<input id="oPieces" class="jms-calc-output" readonly></label>
-        <label>قيمة الطلب<input id="oTotal" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="oPiece" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="oPieces" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_293d2a0c3d30>قيمة الطلب</span><input id="oTotal" class="jms-calc-output" readonly></label>
       </div>
-      <label>ملاحظات الإنتاج<input id="oNotes" placeholder="ملاحظات للمدير أو الإنتاج"></label>
-      <div class="jms-pro-note">طلب التصنيع يستخدم نفس حاسبة عرض السعر ويحسب وزن الحبة وعدد الحبات تلقائيًا.</div>
-      <br><button class="primary" type="button" onclick="saveOrderFromModal()">حفظ طلب التصنيع</button>`;
+      <label><span data-i18n="ui_649b45176eb2">ملاحظات الإنتاج</span><input id="oNotes" placeholder="ملاحظات للمدير أو الإنتاج" data-i18n-placeholder="ui_0b91a35c256b"></label>
+      <div class="jms-pro-note" data-i18n="ui_fca9c83accdd">طلب التصنيع يستخدم نفس حاسبة عرض السعر ويحسب وزن الحبة وعدد الحبات تلقائيًا.</div>
+      <br><button class="primary" type="button" onclick="saveOrderFromModal()" data-i18n="ui_773b01559aba">حفظ طلب التصنيع</button>`;
     modal.classList.remove('hidden');
     attachAutoCalc(['oWidth','oLength','oSizeUnit','oThickness','oThicknessUnit','oMaterial','oKg','oPriceKg'], window.jmsCalcOrder);
   };
@@ -2238,71 +2238,71 @@ function convertQuoteToOrder(qid){
     ensure();
     const isEdit = !!q;
     const defaultRep = q?.rep_id || (currentUser?.role === 'rep' ? (currentUser&&currentUser.id) : (db.reps[0]?.id || ''));
-    return `<h2>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
+    return `<h2 data-i18n-text>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
       <div class="quote-customer-mode">
-        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span>اختيار عميل موجود</span></label>
-        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span>إضافة عميل جديد</span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="existing" checked onchange="toggleQuoteCustomerMode()"><span><span data-i18n=ui_f8b7623c2a5f>اختيار عميل موجود</span></span></label>
+        <label><input type="radio" name="quoteCustomerMode" value="new" onchange="toggleQuoteCustomerMode()"><span data-i18n="ui_fdb4d8578880">إضافة عميل جديد</span></label>
       </div>
 
       <div id="existingCustomerBox" class="form-grid two">
-        <label>بحث عن العميل
-          <div class="jms-search-box">
+        <label><span data-i18n="ui_41cd67826b2a">بحث عن العميل
+          </span><div class="jms-search-box">
             <input id="mqCustomerSearch" autocomplete="off" placeholder="اكتب اسم العميل أو الجوال أو المدينة..."
               oninput="jmsSearchCustomers('mqCustomerSearch','mqCustomerResults','mqCustomer','mqCustomerPill','mqRep')"
-              onfocus="jmsSearchCustomers('mqCustomerSearch','mqCustomerResults','mqCustomer','mqCustomerPill','mqRep')">
+              onfocus="jmsSearchCustomers('mqCustomerSearch','mqCustomerResults','mqCustomer','mqCustomerPill','mqRep')" data-i18n-placeholder="ui_b2836afedf88">
             <div id="mqCustomerResults" class="jms-search-results"></div>
             <input type="hidden" id="mqCustomer">
             <div id="mqCustomerPill"></div>
           </div>
         </label>
-        <label>المندوب<select id="mqRep">${getRepOptions(defaultRep)}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${getRepOptions(defaultRep)}</select></label>
       </div>
 
       <div id="newCustomerBox" class="form-grid two hidden">
-        <label>اسم العميل الجديد<input id="mqNewCustomerName" placeholder="اسم العميل"></label>
-        <label>جوال العميل<input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
-        <label>المدينة<input id="mqNewCustomerCity" value="جدة"></label>
-        <label>الحي / الموقع<input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع"></label>
+        <label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label>
+        <label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label>
+        <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label>
+        <label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label>
       </div>
 
       <div class="form-grid two">
-        <label>تاريخ العرض<input id="mqDate" type="date" value="${q?.date || q?.quote_date || tdy()}"></label>
-        <label>صلاحية العرض<input id="mqValid" type="date" value="${q?.valid_until || ''}"></label>
+        <label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${q?.date || q?.quote_date || tdy()}"></label>
+        <label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date" value="${q?.valid_until || ''}"></label>
       </div>
 
       <div class="form-grid four">
-        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" value="${q?.color || ''}"></label>
-        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" value="${q?.color || ''}"></label>
+        <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
       </div>
 
       <div class="form-grid four">
-        <label>العرض<input id="mqWidth" type="number" step="0.01" placeholder="65" value="${q?.width || ''}"></label>
-        <label>الطول<input id="mqLength" type="number" step="0.01" placeholder="90" value="${q?.length || ''}"></label>
-        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="mqThickness" type="number" step="0.01" placeholder="75" value="${q?.thickness || ''}"></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65" value="${q?.width || ''}"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="90" value="${q?.length || ''}"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75" value="${q?.thickness || ''}"></label>
       </div>
 
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" placeholder="2000" value="${q?.total_kg || ''}"></label>
-        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg || ''}"></label>
-        <label>كثافة الخامة<input id="mqDensity" class="jms-calc-output" readonly></label>
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="2000" value="${q?.total_kg || ''}"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg || ''}"></label>
+        <label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>
       </div>
 
       <div class="form-grid three">
-        <label>وزن الحبة<input id="mqPiece" class="jms-calc-output" readonly value="${q?.piece_weight || ''}"></label>
-        <label>عدد الحبات<input id="mqPieces" class="jms-calc-output" readonly value="${q?.pieces || ''}"></label>
-        <label>الإجمالي<input id="mqTotal" class="jms-calc-output" readonly value="${q?.total_amount || ''}"></label>
+        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly value="${q?.piece_weight || ''}"></label>
+        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly value="${q?.pieces || ''}"></label>
+        <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" class="jms-calc-output" readonly value="${q?.total_amount || ''}"></label>
       </div>
 
       <div class="form-grid two">
-        <label>شروط الدفع<input id="mqPayment" value="${q?.payment_terms || 'حسب الاتفاق'}"></label>
-        <label>مدة التسليم<input id="mqDelivery" value="${q?.delivery_terms || 'حسب جدول الإنتاج'}"></label>
+        <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="${q?.payment_terms || 'حسب الاتفاق'}"></label>
+        <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${q?.delivery_terms || window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
       </div>
-      <label>ملاحظات<input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" value="${q?.notes || ''}"></label>
-      <div class="jms-required-hint">لا يمكن حفظ أو إرسال عرض السعر إذا كانت الخانات الأساسية فارغة.</div>
+      <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" value="${q?.notes || ''}"></label>
+      <div class="jms-required-hint" data-i18n="ui_cbc05ab820c1">لا يمكن حفظ أو إرسال عرض السعر إذا كانت الخانات الأساسية فارغة.</div>
       <br><button class="primary" type="button" onclick="${isEdit?`updateQuote('${q.id}')`:'saveQuote()'}">${isEdit?'حفظ التعديل وإرجاعه للاعتماد':'حفظ وإرساله للمدير للاعتماد'}</button>`;
   }
 
@@ -2472,26 +2472,26 @@ function convertQuoteToOrder(qid){
     const canSend=q.status==='approved'||q.status==='sent';
     const canConvert=q.status==='accepted'||q.status==='approved'||q.status==='sent';
     return `<div class="quote-card">
-      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date}</p></div><span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span></div>
       <div class="quote-lines">
-        <div><span>المنتج</span><b>${q.product||'-'}</b></div>
-        <div><span>المقاس</span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div>
-        <div><span>السماكة</span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div>
-        <div><span>الخامة</span><b>${q.material||'-'}</b></div>
-        <div><span>الكمية</span><b>${q.total_kg||'-'} كجم</b></div>
-        <div><span>سعر الكيلو</span><b>${q.price_kg||'-'} ريال</b></div>
-        <div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div>
-        <div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div>
+        <div><span data-i18n="ui_a79e304d96a1">المنتج</span><b>${q.product||'-'}</b></div>
+        <div><span><span data-i18n=ui_d32ec91fdd57>المقاس</span></span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div>
+        <div><span><span data-i18n=ui_5cccef2ccc68>السماكة</span></span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div>
+        <div><span><span data-i18n=ui_ed10f61584eb>الخامة</span></span><b>${q.material||'-'}</b></div>
+        <div><span><span data-i18n=ui_935e21853946>الكمية</span></span><b>${q.total_kg||'-'} كجم</b></div>
+        <div><span><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></span><b>${q.price_kg||'-'} ريال</b></div>
+        <div><span><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></span><b>${q.piece_weight||'-'}</b></div>
+        <div><span><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></span><b>${q.pieces||'-'}</b></div>
       </div>
-      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
+      <div class="quote-total"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
       ${q.cancel_reason?`<div class="alert-card">سبب الإلغاء: ${q.cancel_reason}</div>`:''}
       ${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
       <div class="quote-actions">
-        <button onclick="viewQuote('${q.id}')">عرض</button>
-        ${canEdit?`<button class="edit" onclick="editQuote('${q.id}')">تعديل</button>`:''}
+        <button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button>
+        ${canEdit?`<button class="edit" onclick="editQuote('${q.id}')"><span data-i18n=ui_113d570d6555>تعديل</span></button>`:''}
         ${canApprove && ['approved','sent','accepted'].includes(q.status)?`<button class="revision" onclick="returnQuoteForEdit('${q.id}')">إرجاع للمراجعة</button>`:''}
-        ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}
-        ${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}
+        ${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="reject" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}
+        ${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}
         ${q.status==='sent'?`<button class="accept" onclick="acceptQuote('${q.id}')">العميل وافق</button><button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}
         ${canConvert && q.status!=='cancelled' && q.status!=='rejected'?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}
       </div>
@@ -2537,39 +2537,39 @@ function convertQuoteToOrder(qid){
     ensure();
     const isEdit=!!q;
     const defaultRep=q?.rep_id || (currentUser?.role==='rep'?(currentUser&&currentUser.id):(db.reps[0]?.id||''));
-    modalBody.innerHTML = `<h2>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
+    modalBody.innerHTML = `<h2 data-i18n-text>${isEdit?'تعديل عرض سعر':'إنشاء عرض سعر'}</h2>
       <div class="form-grid two">
-        <label>العميل<select id="mqCustomer"><option value="">اختر العميل</option>${customerOptions(q?.customer_id || '')}</select></label>
-        <label>المندوب<select id="mqRep">${repsOptions(defaultRep)}</select></label>
-        <label>تاريخ العرض<input id="mqDate" type="date" value="${q?.date || q?.quote_date || tdy()}"></label>
-        <label>صلاحية العرض<input id="mqValid" type="date" value="${q?.valid_until || ''}"></label>
+        <label><span data-i18n=ui_a042411e90be>العميل</span><select id="mqCustomer"><option value="" data-i18n="ui_efac3d2cdb26">اختر العميل</option>${customerOptions(q?.customer_id || '')}</select></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${repsOptions(defaultRep)}</select></label>
+        <label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${q?.date || q?.quote_date || tdy()}"></label>
+        <label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date" value="${q?.valid_until || ''}"></label>
       </div>
       <div class="form-grid four">
-        <label>المنتج<select id="mqProduct"><option>أكياس رول</option><option>أكياس شيت</option><option>أكياس تي شيرت</option><option>شرنك</option><option>فيلم</option><option>أكياس نفايات</option></select></label>
-        <label>الخامة<select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX">خلطة</option></select></label>
-        <label>اللون<input id="mqColor" value="${q?.color||''}"></label>
-        <label>الطباعة<select id="mqPrint"><option>بدون طباعة</option><option>وجه واحد</option><option>وجهين</option></select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label>
+        <label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label>
+        <label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" value="${q?.color||''}"></label>
+        <label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label>
       </div>
       <div class="form-grid four">
-        <label>العرض<input id="mqWidth" type="number" step="0.01" value="${q?.width||''}"></label>
-        <label>الطول<input id="mqLength" type="number" step="0.01" value="${q?.length||''}"></label>
-        <label>وحدة المقاس<select id="mqSizeUnit"><option value="cm">سم</option><option value="mm">مم</option></select></label>
-        <label>السماكة<input id="mqThickness" type="number" step="0.01" value="${q?.thickness||''}"></label>
+        <label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" value="${q?.width||''}"></label>
+        <label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" value="${q?.length||''}"></label>
+        <label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" value="${q?.thickness||''}"></label>
       </div>
       <div class="form-grid four">
-        <label>وحدة السماكة<select id="mqThicknessUnit"><option value="micron">ميكرون</option><option value="mm">مم</option></select></label>
-        <label>كمية الطلب بالكيلو<input id="mqKg" type="number" step="0.01" value="${q?.total_kg||''}"></label>
-        <label>سعر الكيلو<input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg||''}"></label>
-        <label>الإجمالي<input id="mqTotal" readonly value="${q?.total_amount||''}"></label>
+        <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
+        <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" value="${q?.total_kg||''}"></label>
+        <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg||''}"></label>
+        <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly value="${q?.total_amount||''}"></label>
       </div>
       <div class="form-grid two">
-        <label>وزن الحبة<input id="mqPiece" readonly value="${q?.piece_weight||''}"></label>
-        <label>عدد الحبات<input id="mqPieces" readonly value="${q?.pieces||''}"></label>
-        <label>شروط الدفع<input id="mqPayment" value="${q?.payment_terms||'حسب الاتفاق'}"></label>
-        <label>مدة التسليم<input id="mqDelivery" value="${q?.delivery_terms||'حسب جدول الإنتاج'}"></label>
+        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly value="${q?.piece_weight||''}"></label>
+        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly value="${q?.pieces||''}"></label>
+        <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="${q?.payment_terms||'حسب الاتفاق'}"></label>
+        <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${q?.delivery_terms||window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
       </div>
-      <label>ملاحظات<input id="mqNotes" value="${q?.notes||''}"></label>
-      <br><button class="primary" type="button" onclick="${isEdit?`forceUpdateQuote('${q.id}')`:'forceSaveQuote()'}">${isEdit?'حفظ التعديل وإرجاعه للاعتماد':'حفظ وإرساله للاعتماد'}</button>`;
+      <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" value="${q?.notes||''}"></label>
+      <br><button class="primary" type="button" onclick="${isEdit?`forceUpdateQuote('${q.id}')`:'forceSaveQuote()'}"><span data-i18n-text>${isEdit?'حفظ التعديل وإرجاعه للاعتماد':'حفظ وإرساله للاعتماد'}</span></button>`;
     modal.classList.remove('hidden');
     fillSelect('mqProduct', q?.product); fillSelect('mqMaterial', q?.material); fillSelect('mqPrint', q?.print); fillSelect('mqSizeUnit', q?.size_unit || 'cm'); fillSelect('mqThicknessUnit', q?.thickness_unit || 'micron');
     ['mqWidth','mqLength','mqSizeUnit','mqThickness','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',calcIfPossible); el.addEventListener('change',calcIfPossible); } });
@@ -2598,11 +2598,11 @@ function convertQuoteToOrder(qid){
     const canApprove=canManager();
     const canConvert=q.status==='approved'||q.status==='sent'||q.status==='accepted';
     return `<div class="quote-card">
-      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}">${quoteStatusText(q.status)}</span></div>
-      <div class="quote-lines"><div><span>المنتج</span><b>${q.product||'-'}</b></div><div><span>المقاس</span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div><div><span>السماكة</span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div><div><span>الخامة</span><b>${q.material||'-'}</b></div><div><span>الكمية</span><b>${q.total_kg||'-'} كجم</b></div><div><span>سعر الكيلو</span><b>${q.price_kg||'-'} ريال</b></div><div><span>وزن الحبة</span><b>${q.piece_weight||'-'}</b></div><div><span>عدد الحبات</span><b>${q.pieces||'-'}</b></div></div>
-      <div class="quote-total"><span>إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
+      <div class="quote-head"><div><h3>عرض رقم ${q.quote_no}</h3><p>${customerName(q.customer_id)} · ${repName(q.rep_id)} · ${q.date||'-'}</p></div><span class="quote-status ${q.status}"><span data-i18n-text>${quoteStatusText(q.status)}</span></span></div>
+      <div class="quote-lines"><div><span data-i18n="ui_a79e304d96a1">المنتج</span><b>${q.product||'-'}</b></div><div><span><span data-i18n=ui_d32ec91fdd57>المقاس</span></span><b>${q.width||'-'} × ${q.length||'-'} ${q.size_unit||''}</b></div><div><span><span data-i18n=ui_5cccef2ccc68>السماكة</span></span><b>${q.thickness||'-'} ${q.thickness_unit||''}</b></div><div><span><span data-i18n=ui_ed10f61584eb>الخامة</span></span><b>${q.material||'-'}</b></div><div><span><span data-i18n=ui_935e21853946>الكمية</span></span><b>${q.total_kg||'-'} كجم</b></div><div><span><span data-i18n=ui_0696d91556d4>سعر الكيلو</span></span><b>${q.price_kg||'-'} ريال</b></div><div><span><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span></span><b>${q.piece_weight||'-'}</b></div><div><span><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span></span><b>${q.pieces||'-'}</b></div></div>
+      <div class="quote-total"><span data-i18n="ui_fc253ec59271">إجمالي العرض</span><b>${q.total_amount||0} ريال</b></div>
       ${q.cancel_reason?`<div class="alert-card">سبب الإلغاء: ${q.cancel_reason}</div>`:''}${q.reject_reason?`<div class="alert-card">سبب الرفض: ${q.reject_reason}</div>`:''}
-      <div class="quote-actions"><button onclick="viewQuote('${q.id}')">عرض</button><button class="edit" onclick="editQuote('${q.id}')">تعديل</button>${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')">اعتماد</button><button class="reject" onclick="rejectQuote('${q.id}')">رفض</button>`:''}${canApprove && ['approved','sent','accepted'].includes(q.status)?`<button class="revision" onclick="returnQuoteForEdit('${q.id}')">إرجاع للمراجعة</button>`:''}${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')">إرسال للعميل</button>`:''}${q.status==='sent'?`<button class="accept" onclick="acceptQuote('${q.id}')">العميل وافق</button><button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div>
+      <div class="quote-actions"><button onclick="viewQuote('${q.id}')"><span data-i18n=ui_3824e18ca83b>عرض</span></button><button class="edit" onclick="editQuote('${q.id}')"><span data-i18n=ui_113d570d6555>تعديل</span></button>${canApprove && q.status==='pending'?`<button class="approve" onclick="approveQuote('${q.id}')"><span data-i18n=ui_eb323e9d28df>اعتماد</span></button><button class="reject" onclick="rejectQuote('${q.id}')"><span data-i18n=ui_eb3b1bcc04e5>رفض</span></button>`:''}${canApprove && ['approved','sent','accepted'].includes(q.status)?`<button class="revision" onclick="returnQuoteForEdit('${q.id}')">إرجاع للمراجعة</button>`:''}${q.status==='approved'?`<button class="send" onclick="sendQuote('${q.id}')"><span data-i18n=ui_0f5a518dd8d6>إرسال للعميل</span></button>`:''}${q.status==='sent'?`<button class="accept" onclick="acceptQuote('${q.id}')">العميل وافق</button><button class="cancel" onclick="cancelQuote('${q.id}')">إلغاء - العميل لم يوافق</button>`:''}${canConvert?`<button class="convert" onclick="convertQuoteToOrder('${q.id}')">تحويل لطلب</button>`:''}</div>
     </div>`;
   };
 
@@ -2612,7 +2612,7 @@ function convertQuoteToOrder(qid){
     if(window.quotesTotal) quotesTotal.textContent=all.length; if(window.quotesPending) quotesPending.textContent=all.filter(q=>q.status==='pending').length; if(window.quotesApproved) quotesApproved.textContent=all.filter(q=>q.status==='approved').length; if(window.quotesRejected) quotesRejected.textContent=all.filter(q=>q.status==='rejected').length;
     const st=window.quoteStatusFilter?.value||'all'; const rep=window.quoteRepFilter?.value||'all'; const txt=(window.quoteSearch?.value||'').trim();
     const list=all.filter(q=>{ if(st!=='all' && q.status!==st) return false; if(rep!=='all' && q.rep_id!==rep) return false; if(txt && !String(q.quote_no).includes(txt) && !customerName(q.customer_id).includes(txt)) return false; return true; });
-    quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || '<div class="panel">لا توجد عروض أسعار</div>';
+    quotesList.innerHTML=list.map(q=>quoteCard(q)).join('') || "<div class=\"panel\" data-i18n=\"ui_5d53e3cf76ec\">لا توجد عروض أسعار</div>";
   };
 
   const oldSend = window.sendQuote;
@@ -2678,20 +2678,20 @@ function convertQuoteToOrder(qid){
 
   window.openRepForm = function(){
     if(!roleIsManager()) return alert('إضافة المناديب للمدير فقط');
-    modalBody.innerHTML = `<h2>إضافة مندوب</h2>
+    modalBody.innerHTML = `<h2><span data-i18n=ui_2cd7ef25fd17>إضافة مندوب</span></h2>
       <div class="form-grid two">
-        <label>اسم المندوب<input id="mrName" placeholder="اسم المندوب"></label>
-        <label>الجوال<input id="mrPhone" placeholder="05xxxxxxxx"></label>
-        <label>الإيميل<input id="mrEmail" placeholder="rep@jms.local"></label>
-        <label>كلمة مرور مؤقتة<input id="mrPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة"></label>
-        <label>السيارة<input id="mrCar" placeholder="مثال: تويوتا رايز"></label>
-        <label>المنطقة<input id="mrArea" value="جدة"></label>
-        <label>الهدف الشهري<input id="mrTarget" type="number" placeholder="مثال: 100000"></label>
-        <label>الحالة
-          <select id="mrStatus"><option value="active">نشط</option><option value="disabled">موقوف</option></select>
+        <label><span data-i18n="ui_336a418f5408">اسم المندوب</span><input id="mrName" placeholder="اسم المندوب" data-i18n-placeholder="ui_336a418f5408"></label>
+        <label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="mrPhone" placeholder="05xxxxxxxx"></label>
+        <label><span data-i18n="ui_3a9cc967f7f4">الإيميل</span><input id="mrEmail" placeholder="rep@jms.local"></label>
+        <label><span data-i18n=ui_eff5589e03e0>كلمة مرور مؤقتة</span><input id="mrPass" type="password" autocomplete="new-password" placeholder="اكتب كلمة مرور مؤقتة" data-i18n-placeholder=ui_0a9a73d5552f></label>
+        <label><span data-i18n="ui_2df96cfc8726">السيارة</span><input id="mrCar" placeholder="مثال: تويوتا رايز" data-i18n-placeholder="ui_7f74d5a21aa7"></label>
+        <label><span data-i18n=ui_f0a55225689d>المنطقة</span><input id="mrArea" value="جدة"></label>
+        <label><span data-i18n="ui_6155608a3a87">الهدف الشهري</span><input id="mrTarget" type="number" placeholder="مثال: 100000" data-i18n-placeholder="ui_01c313f30635"></label>
+        <label><span data-i18n=ui_c3a4749caed4>الحالة</span>
+          <select id="mrStatus"><option value="active" data-i18n="ui_629e90b3af3d">نشط</option><option value="disabled" data-i18n="ui_e858894dedb7">موقوف</option></select>
         </label>
       </div>
-      <br><button class="primary" onclick="saveRep()">حفظ المندوب</button>`;
+      <br><button class="primary" onclick="saveRep()" data-i18n="ui_dc37d5ee42d0">حفظ المندوب</button>`;
     modal.classList.remove('hidden');
   };
 
@@ -2817,26 +2817,26 @@ function convertQuoteToOrder(qid){
           <span class="rep-status ${status}">${statusText(status)}</span>
         </div>
         <div class="rep-metrics">
-          <div><b>${todayVisits(r.id)}</b><span>زيارات اليوم</span></div>
-          <div><b>${todayQuotes(r.id)}</b><span>عروض اليوم</span></div>
-          <div><b>${todayOrders(r.id)}</b><span>طلبات اليوم</span></div>
+          <div><b>${todayVisits(r.id)}</b><span><span data-i18n=ui_17a927751b7b>زيارات اليوم</span></span></div>
+          <div><b>${todayQuotes(r.id)}</b><span data-i18n="ui_56ff7f34ed9c">عروض اليوم</span></div>
+          <div><b>${todayOrders(r.id)}</b><span data-i18n="ui_b8916003ab84">طلبات اليوم</span></div>
         </div>
         <div class="rep-location-box">
-          <b>الدوام:</b> ${att?('بدأ '+timeOnly(att.start_at)):'خارج الدوام'}<br>
-          <b>آخر موقع:</b> ${loc?`${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}`:'لا يوجد'}<br>
-          <b>آخر تحديث:</b> ${loc?timeOnly(loc.created_at):'-'}
+          <b data-i18n="ui_4f6c037483d8">الدوام:</b> ${att?('بدأ '+timeOnly(att.start_at)):'خارج الدوام'}<br>
+          <b data-i18n="ui_3cd242f1058d">آخر موقع:</b> ${loc?`${Number(loc.lat).toFixed(5)}, ${Number(loc.lng).toFixed(5)}`:'لا يوجد'}<br>
+          <b data-i18n="ui_0faa545d60a5">آخر تحديث:</b> ${loc?timeOnly(loc.created_at):'-'}
           ${loc?`<br><a class="rep-map-link" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank">فتح على خرائط Google</a>`:''}
         </div>
         <div class="rep-actions">
-          ${canControl?`<button class="start" onclick="startRepWork('${r.id}')">بدء الدوام</button>`:''}
-          ${canControl?`<button class="stop" onclick="endRepWork('${r.id}')">إنهاء الدوام</button>`:''}
-          ${canControl?`<button class="loc" onclick="updateRepLocation('${r.id}')">تحديث الموقع</button>`:''}
-          ${canControl?`<button class="visit" onclick="markRepInVisit('${r.id}')">في زيارة</button>`:''}
+          ${canControl?`<button class="start" onclick="startRepWork('${r.id}')"><span data-i18n=ui_146c2608cdc1>بدء الدوام</span></button>`:''}
+          ${canControl?`<button class="stop" onclick="endRepWork('${r.id}')"><span data-i18n=ui_fb5a44f4307f>إنهاء الدوام</span></button>`:''}
+          ${canControl?`<button class="loc" onclick="updateRepLocation('${r.id}')"><span data-i18n=ui_62a429114f0c>تحديث الموقع</span></button>`:''}
+          ${canControl?`<button class="visit" onclick="markRepInVisit('${r.id}')"><span data-i18n=ui_c35296755ca2>في زيارة</span></button>`:''}
           ${canControl?`<button onclick="markRepBackOnDuty('${r.id}')">رجوع للطريق</button>`:''}
           <button onclick="openRepLocation('${r.id}')">عرض الموقع</button>
         </div>
       </div>`;
-    }).join('') || '<div class="panel">لا يوجد مناديب</div>';
+    }).join('') || "<div class=\"panel\" data-i18n=\"ui_ed40b98787c6\">لا يوجد مناديب</div>";
   };
 
   // Add quick self panel on customers page for reps
@@ -2848,11 +2848,11 @@ function convertQuoteToOrder(qid){
       const panel=document.createElement('div');
       panel.id='repSelfPanel';
       panel.className='rep-self-panel';
-      panel.innerHTML=`<b>لوحة المندوب السريعة</b><br>
+      panel.innerHTML=`<b data-i18n="ui_472a644d7c48">لوحة المندوب السريعة</b><br>
         الحالة الحالية: ${statusText(status)}
         <div class="rep-actions">
-          <button class="start" onclick="startRepWork('${(currentUser&&currentUser.id)}')">بدء الدوام</button>
-          <button class="stop" onclick="endRepWork('${(currentUser&&currentUser.id)}')">إنهاء الدوام</button>
+          <button class="start" onclick="startRepWork('${(currentUser&&currentUser.id)}')"><span data-i18n=ui_146c2608cdc1>بدء الدوام</span></button>
+          <button class="stop" onclick="endRepWork('${(currentUser&&currentUser.id)}')"><span data-i18n=ui_fb5a44f4307f>إنهاء الدوام</span></button>
           <button class="loc" onclick="updateRepLocation('${(currentUser&&currentUser.id)}')">تحديث موقعي</button>
           <button class="visit" onclick="markRepInVisit('${(currentUser&&currentUser.id)}')">أنا في زيارة</button>
         </div>`;
@@ -2932,36 +2932,36 @@ function convertQuoteToOrder(qid){
     ensureVisitData();
     const reps=allowedReps();
     const customers=(typeof allowedCustomers==='function'?allowedCustomers():db.customers);
-    modalBody.innerHTML = `<h2>بدء زيارة ذكية</h2>
+    modalBody.innerHTML = `<h2 data-i18n="ui_fc3177c60d17">بدء زيارة ذكية</h2>
       <div class="form-grid two">
-        <label>العميل
+        <label><span data-i18n=ui_a042411e90be>العميل</span>
           <select id="svCustomer">
-            <option value="">اختر العميل</option>
+            <option value="" data-i18n="ui_efac3d2cdb26">اختر العميل</option>
             ${customers.map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${c.name}</option>`).join('')}
           </select>
         </label>
-        <label>المندوب
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span>
           <select id="svRep">
             ${reps.map(r=>`<option value="${r.id}" ${r.id===currentUser?.id?'selected':''}>${r.name}</option>`).join('')}
           </select>
         </label>
-        <label>نوع الزيارة
-          <select id="svType">
-            <option value="scheduled">زيارة مجدولة</option>
-            <option value="new_order">طلب جديد</option>
-            <option value="collection">تحصيل</option>
-            <option value="follow_up">متابعة</option>
+        <label><span data-i18n="ui_88abbe88bb01">نوع الزيارة
+          </span><select id="svType">
+            <option value="scheduled" data-i18n="ui_ee7d53bc129b">زيارة مجدولة</option>
+            <option value="new_order" data-i18n="ui_6d43782b2c9f">طلب جديد</option>
+            <option value="collection" data-i18n=ui_68f752e279d8>تحصيل</option>
+            <option value="follow_up" data-i18n="ui_322b7b613468">متابعة</option>
           </select>
         </label>
-        <label>موعد الزيارة القادمة
-          <input id="svNextDate" type="date">
+        <label><span data-i18n="ui_06e6f22d9ec0">موعد الزيارة القادمة
+          </span><input id="svNextDate" type="date">
         </label>
       </div>
-      <label>ملاحظات الوصول
-        <input id="svStartNotes" placeholder="ملاحظة مختصرة عند بداية الزيارة">
+      <label><span data-i18n="ui_0b730bbdf3c9">ملاحظات الوصول
+        </span><input id="svStartNotes" placeholder="ملاحظة مختصرة عند بداية الزيارة" data-i18n-placeholder="ui_2c58adb00d28">
       </label>
-      <div class="smart-note">سيتم تسجيل وقت الوصول وموقع GPS إن سمح المتصفح بذلك.</div>
-      <br><button class="primary" onclick="startSmartVisit()">تسجيل الوصول وبدء الزيارة</button>`;
+      <div class="smart-note" data-i18n="ui_e4b0e3d79107">سيتم تسجيل وقت الوصول وموقع GPS إن سمح المتصفح بذلك.</div>
+      <br><button class="primary" onclick="startSmartVisit()" data-i18n="ui_cdf548cce9ab">تسجيل الوصول وبدء الزيارة</button>`;
     modal.classList.remove('hidden');
   };
 
@@ -3007,29 +3007,29 @@ function convertQuoteToOrder(qid){
     modalBody.innerHTML = `<div class="visit-end-sheet">
       <div class="visit-end-heading">
         <span class="visit-end-icon">✓</span>
-        <div><h2>انتهت الزيارة بإيش؟</h2><p>${customerNm(v.customer_id)}</p></div>
+        <div><h2 data-i18n="ui_3dabf9f7d428">انتهت الزيارة بإيش؟</h2><p>${customerNm(v.customer_id)}</p></div>
       </div>
       <input id="evResult" type="hidden" value="">
-      <div class="visit-outcome-grid" role="radiogroup" aria-label="نتيجة الزيارة">
-        <button type="button" class="visit-outcome quote" data-result="quote" onclick="selectVisitOutcome(this,'quote')"><span>📄</span><b>طلب عرض سعر</b></button>
-        <button type="button" class="visit-outcome sale" data-result="sale" onclick="selectVisitOutcome(this,'sale')"><span>🛍️</span><b>تم أخذ طلب</b></button>
-        <button type="button" class="visit-outcome collection" data-result="collection" onclick="selectVisitOutcome(this,'collection')"><span>💵</span><b>تم التحصيل</b></button>
-        <button type="button" class="visit-outcome postponed" data-result="postponed" onclick="selectVisitOutcome(this,'postponed')"><span>📅</span><b>متابعة لاحقًا</b></button>
-        <button type="button" class="visit-outcome no-manager" data-result="no_manager" onclick="selectVisitOutcome(this,'no_manager')"><span>👤</span><b>المسؤول غير موجود</b></button>
-        <button type="button" class="visit-outcome closed" data-result="closed" onclick="selectVisitOutcome(this,'closed')"><span>🔒</span><b>العميل مغلق</b></button>
-        <button type="button" class="visit-outcome none" data-result="none" onclick="selectVisitOutcome(this,'none')"><span>✏️</span><b>نتيجة أخرى</b></button>
+      <div class="visit-outcome-grid" role="radiogroup" aria-label="نتيجة الزيارة" data-i18n-aria-label="ui_a432ea868381">
+        <button type="button" class="visit-outcome quote" data-result="quote" onclick="selectVisitOutcome(this,'quote')"><span>📄</span><b><span data-i18n=ui_e725c837eb30>طلب عرض سعر</span></b></button>
+        <button type="button" class="visit-outcome sale" data-result="sale" onclick="selectVisitOutcome(this,'sale')"><span>🛍️</span><b data-i18n="ui_1e3e550a6120">تم أخذ طلب</b></button>
+        <button type="button" class="visit-outcome collection" data-result="collection" onclick="selectVisitOutcome(this,'collection')"><span>💵</span><b data-i18n="ui_334b855ceb29">تم التحصيل</b></button>
+        <button type="button" class="visit-outcome postponed" data-result="postponed" onclick="selectVisitOutcome(this,'postponed')"><span>📅</span><b data-i18n="ui_7ee69a1005e4">متابعة لاحقًا</b></button>
+        <button type="button" class="visit-outcome no-manager" data-result="no_manager" onclick="selectVisitOutcome(this,'no_manager')"><span>👤</span><b data-i18n="ui_3f724e1f1014">المسؤول غير موجود</b></button>
+        <button type="button" class="visit-outcome closed" data-result="closed" onclick="selectVisitOutcome(this,'closed')"><span>🔒</span><b><span data-i18n=ui_3b7ffc4c5091>العميل مغلق</span></b></button>
+        <button type="button" class="visit-outcome none" data-result="none" onclick="selectVisitOutcome(this,'none')"><span>✏️</span><b data-i18n="ui_6c3314831921">نتيجة أخرى</b></button>
       </div>
       <div id="evNextDateWrap" class="visit-end-field ${v.next_visit_date?'':'hidden'}">
-        <label for="evNextDate">موعد المتابعة القادمة</label>
+        <label for="evNextDate" data-i18n="ui_ad9fefd8c797">موعد المتابعة القادمة</label>
         <input id="evNextDate" type="date" value="${v.next_visit_date||''}">
       </div>
       <div class="visit-end-field">
-        <label for="evNotes">ملاحظة <small>(اختياري)</small></label>
-        <textarea id="evNotes" rows="2" placeholder="اكتب ملاحظة قصيرة إذا احتجت">${v.notes||''}</textarea>
+        <label for="evNotes"><span data-i18n=ui_0be7afd7e65f>ملاحظة</span> <small data-i18n="ui_e0defd369d84">(اختياري)</small></label>
+        <textarea id="evNotes" rows="2" placeholder="اكتب ملاحظة قصيرة إذا احتجت" data-i18n-placeholder="ui_ae72bbe94bcf">${v.notes||''}</textarea>
       </div>
-      <p class="visit-end-error hidden" id="evResultError">اختر نتيجة الزيارة أولًا</p>
+      <p class="visit-end-error hidden" id="evResultError" data-i18n="ui_8f6c7b3a306b">اختر نتيجة الزيارة أولًا</p>
       <button class="primary visit-end-save" onclick="saveEndSmartVisit('${visitId}')">حفظ وإنهاء الزيارة</button>
-      <div class="visit-end-gps">سيُسجل وقت وموقع المغادرة تلقائيًا</div>
+      <div class="visit-end-gps" data-i18n="ui_d29d964f7b2b">سيُسجل وقت وموقع المغادرة تلقائيًا</div>
     </div>`;
     modal.classList.remove('hidden');
   };
@@ -3058,7 +3058,7 @@ function convertQuoteToOrder(qid){
     const notes=document.getElementById('evNotes')?.value||'';
     const nextDate=document.getElementById('evNextDate')?.value||'';
     const saveButton=document.querySelector('.visit-end-save');
-    if(saveButton){saveButton.disabled=true;saveButton.textContent='جاري الحفظ...';}
+    if(saveButton){saveButton.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(saveButton,"جاري الحفظ...");}
 
     // Finish immediately. GPS is optional and must never block a representative.
     v.checkout_at=nowIso();
@@ -3120,7 +3120,7 @@ function convertQuoteToOrder(qid){
     ensureVisitData();
     if(window.smartVisitRepFilter){
       const old=smartVisitRepFilter.value||'all';
-      smartVisitRepFilter.innerHTML = `<option value="all">كل المناديب</option>` + allowedReps().map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+      smartVisitRepFilter.innerHTML = `<option value="all" data-i18n="ui_2ad3f8552c55">كل المناديب</option>` + allowedReps().map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
       smartVisitRepFilter.value = old;
     }
     const todayList=allowedVisitList().filter(v=>String(v.date||'').startsWith(tdy()));
@@ -3158,21 +3158,21 @@ function convertQuoteToOrder(qid){
           <span class="visit-status ${isOpen?'open':'closed'}">${isOpen?'مفتوحة':'منتهية'}</span>
         </div>
         <div class="visit-lines">
-          <div><span>وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
-          <div><span>وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
-          <div><span>مدة الزيارة</span><b>${v.duration_minutes||0} دقيقة</b></div>
-          <div><span>الزيارة القادمة</span><b>${v.next_visit_date||'-'}</b></div>
+          <div><span data-i18n="ui_b838ce9d2065">وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
+          <div><span data-i18n="ui_fcc600c8f7cf">وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
+          <div><span data-i18n="ui_c35dd167e4af">مدة الزيارة</span><b>${v.duration_minutes||0} دقيقة</b></div>
+          <div><span data-i18n="ui_18b635ce6426">الزيارة القادمة</span><b>${v.next_visit_date||'-'}</b></div>
         </div>
         <div class="smart-note">${v.notes||'لا توجد ملاحظات'}</div>
         <div class="visit-actions">
-          ${isOpen?`<button class="end" onclick="endSmartVisit('${v.id}')">إنهاء الزيارة</button>`:''}
+          ${isOpen?`<button class="end" onclick="endSmartVisit('${v.id}')"><span data-i18n=ui_85f1fa591da1>إنهاء الزيارة</span></button>`:''}
           <button class="route" onclick="openCustomerRoute('${v.customer_id}')">فتح موقع العميل</button>
           <button onclick="openVisitOnMap('${v.id}','checkin')">موقع الوصول</button>
           ${v.checkout_at?`<button onclick="openVisitOnMap('${v.id}','checkout')">موقع المغادرة</button>`:''}
-          ${v.result==='quote'?`<button class="quote" onclick="openQuoteForm('${v.customer_id}')">إنشاء عرض سعر</button>`:''}
+          ${v.result==='quote'?`<button class="quote" onclick="openQuoteForm('${v.customer_id}')"><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></button>`:''}
         </div>
       </div>`;
-    }).join('') || '<div class="panel">لا توجد زيارات</div>';
+    }).join('') || "<div class=\"panel\" data-i18n=\"ui_55de59bbcb63\">لا توجد زيارات</div>";
   };
 
   // Override customer "تمت الزيارة" to smart visit when possible
@@ -3282,7 +3282,7 @@ function convertQuoteToOrder(qid){
       const el=document.getElementById(id);
       if(!el) return;
       const old=el.value || 'all';
-      el.innerHTML = `<option value="all">كل المناديب</option>` + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+      el.innerHTML = `<option value="all" data-i18n="ui_2ad3f8552c55">كل المناديب</option>` + reps.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
       if(isRep()) el.value=(currentUser&&currentUser.id);
       else el.value = [...el.options].some(o=>o.value===old) ? old : 'all';
     });
@@ -3328,7 +3328,7 @@ function convertQuoteToOrder(qid){
     return `<div class="late-line">
       <b>${esc(c.name||'-')}</b><br>
       المندوب: ${esc(rn(c.rep_id))} — آخر زيارة: ${esc(visitDate||'لم يزر')}${visitDate?` — منذ: ${esc(delay)} يوم`:''}
-      <div class="row-actions"><button onclick="visit('${esc(c.id)}')">تسجيل زيارة</button><button onclick="appointment('${esc(c.id)}')">موعد</button><button onclick="newOrder('${esc(c.id)}')">طلب جديد</button></div>
+      <div class="row-actions"><button onclick="visit('${esc(c.id)}')"><span data-i18n=ui_dd5f9783f90a>تسجيل زيارة</span></button><button onclick="appointment('${esc(c.id)}')">موعد</button><button onclick="newOrder('${esc(c.id)}')">طلب جديد</button></div>
     </div>`;
   }
   function renderLegacyVisitsReport(list){
@@ -3336,7 +3336,7 @@ function convertQuoteToOrder(qid){
     const customersEl=document.getElementById('notVisitedList');
     if(!visitsEl || !customersEl) return;
 
-    visitsEl.innerHTML=list.map(visitCard).join('') || '<div class="ok-line">لا توجد زيارات في هذه الفترة</div>';
+    visitsEl.innerHTML=list.map(visitCard).join('') || "<div class=\"ok-line\" data-i18n=\"ui_1afe107c3bf0\">لا توجد زيارات في هذه الفترة</div>";
 
     const customers=customerScopeForReport();
     const latestByCustomer=new Map();
@@ -3356,7 +3356,7 @@ function convertQuoteToOrder(qid){
     }
     const titleEl=document.getElementById('visitCustomersReportTitle');
     if(titleEl) titleEl.textContent=title;
-    customersEl.innerHTML=rows.map(c=>customerReportCard(c,latestByCustomer.get(c.id))).join('') || '<div class="ok-line">لا يوجد عملاء في هذا التقرير</div>';
+    customersEl.innerHTML=rows.map(c=>customerReportCard(c,latestByCustomer.get(c.id))).join('') || "<div class=\"ok-line\" data-i18n=\"ui_3b198c0c2876\">لا يوجد عملاء في هذا التقرير</div>";
   }
   function visitCard(v){
     const open=!v.checkout_at;
@@ -3364,21 +3364,21 @@ function convertQuoteToOrder(qid){
     const locOut = v.checkout_lat && v.checkout_lng;
     return `<div class="visit-report-card ${open?'open':''}">
       <h3>${cn(v.customer_id)}</h3>
-      <p>${rn(v.rep_id)} · ${v.date} · <b>${open?'زيارة مفتوحة':'زيارة منتهية'}</b></p>
+      <p>${rn(v.rep_id)} · ${v.date} · <b data-i18n-text>${open?'زيارة مفتوحة':'زيارة منتهية'}</b></p>
       <span class="visit-result">${resultText(v.result)}</span>
       <div class="visit-report-meta">
-        <div><span>وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
-        <div><span>وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
-        <div><span>مدة الزيارة</span><b>${v.duration_minutes || 0} دقيقة</b></div>
-        <div><span>الزيارة القادمة</span><b>${v.next_visit_date || '-'}</b></div>
+        <div><span data-i18n="ui_b838ce9d2065">وقت الوصول</span><b>${timeStr(v.checkin_at)}</b></div>
+        <div><span data-i18n="ui_fcc600c8f7cf">وقت المغادرة</span><b>${timeStr(v.checkout_at)}</b></div>
+        <div><span data-i18n="ui_c35dd167e4af">مدة الزيارة</span><b>${v.duration_minutes || 0} دقيقة</b></div>
+        <div><span data-i18n="ui_18b635ce6426">الزيارة القادمة</span><b>${v.next_visit_date || '-'}</b></div>
       </div>
       <div class="smart-note">${v.notes || 'لا توجد ملاحظات'}</div>
       <div class="visit-report-actions">
-        ${open?`<button onclick="endSmartVisit('${v.id}')">إنهاء الزيارة</button>`:''}
+        ${open?`<button onclick="endSmartVisit('${v.id}')"><span data-i18n=ui_85f1fa591da1>إنهاء الزيارة</span></button>`:''}
         ${locIn?`<button class="map" onclick="window.open('https://www.google.com/maps?q=${v.checkin_lat},${v.checkin_lng}','_blank')">موقع الوصول</button>`:''}
         ${locOut?`<button class="map" onclick="window.open('https://www.google.com/maps?q=${v.checkout_lat},${v.checkout_lng}','_blank')">موقع المغادرة</button>`:''}
-        <button class="map" onclick="openCustomerRoute('${v.customer_id}')">موقع العميل</button>
-        <button class="quote" onclick="openQuoteForm('${v.customer_id}')">عرض سعر</button>
+        <button class="map" onclick="openCustomerRoute('${v.customer_id}')"><span data-i18n=ui_1a57fafdefde>موقع العميل</span></button>
+        <button class="quote" onclick="openQuoteForm('${v.customer_id}')"><span data-i18n=ui_679403c38f0b>عرض سعر</span></button>
       </div>
     </div>`;
   }
@@ -3394,7 +3394,7 @@ function convertQuoteToOrder(qid){
       if(v.result==='quote') map[v.rep_id].quotes++;
     });
     const rows=Object.entries(map).sort((a,b)=>b[1].visits-a[1].visits);
-    box.innerHTML = rows.map(([rep,m])=>`<div class="rep-performance-row"><b>${rn(rep)}</b><span>${m.visits} زيارة · ${m.customers.size} عميل · ${m.quotes} عروض · ${m.minutes} دقيقة</span></div>`).join('') || '<p>لا يوجد أداء في الفترة المحددة</p>';
+    box.innerHTML = rows.map(([rep,m])=>`<div class="rep-performance-row"><b>${rn(rep)}</b><span>${m.visits} زيارة · ${m.customers.size} عميل · ${m.quotes} عروض · ${m.minutes} دقيقة</span></div>`).join('') || "<p data-i18n=\"ui_3a4a29872980\">لا يوجد أداء في الفترة المحددة</p>";
   }
 
   window.renderSmartVisits = function(){
@@ -3403,11 +3403,11 @@ function convertQuoteToOrder(qid){
     const list=filteredVisits();
     updateStats(list);
     if(window.smartVisitsGrid){
-      smartVisitsGrid.innerHTML = list.map(visitCard).join('') || '<div class="panel">لا توجد زيارات حسب الفلتر المحدد</div>';
+      smartVisitsGrid.innerHTML = list.map(visitCard).join('') || "<div class=\"panel\" data-i18n=\"ui_a8ce9578b481\">لا توجد زيارات حسب الفلتر المحدد</div>";
     }
     if(window.visitLog || window.visitsLog){
       const el=window.visitLog || window.visitsLog;
-      el.innerHTML = list.map(visitCard).join('') || '<div class="panel">لا توجد زيارات حسب الفلتر المحدد</div>';
+      el.innerHTML = list.map(visitCard).join('') || "<div class=\"panel\" data-i18n=\"ui_a8ce9578b481\">لا توجد زيارات حسب الفلتر المحدد</div>";
     }
     renderLegacyVisitsReport(list);
     renderPerformance(list);
@@ -3449,136 +3449,6 @@ function convertQuoteToOrder(qid){
   };
 
   setTimeout(renderSmartVisits, 500);
-})();
-
-
-
-/* SAFE USER LANGUAGE MODULE - no core override */
-(function(){
-  const KEY = 'jms_safe_lang';
-  const T = {
-    'لوحة التحكم':'Dashboard',
-    'العملاء':'Customers',
-    'عروض الأسعار':'Quotations',
-    'الزيارات الذكية':'Smart Visits',
-    'المناديب':'Representatives',
-    'طلبات التصنيع':'Production Orders',
-    'المستخدمون':'Users',
-    'تسجيل الخروج':'Logout',
-    'إدارة المناديب':'Representatives Management',
-    'إضافة مندوب':'Add Representative',
-    'تحديث':'Refresh',
-    'بدء الدوام':'Start Work',
-    'إنهاء الدوام':'End Work',
-    'تحديث الموقع':'Update Location',
-    'في زيارة':'In Visit',
-    'خارج الدوام':'Off Duty',
-    'على الدوام':'On Duty',
-    'زيارات اليوم':'Today Visits',
-    'عروض اليوم':'Today Quotes',
-    'طلبات اليوم':'Today Orders',
-    'كل المناديب':'All Representatives',
-    'بحث':'Search',
-    'الحالة':'Status',
-    'المنطقة':'Area',
-    'إجراء':'Action',
-    'بدء زيارة':'Start Visit',
-    'إنهاء الزيارة':'End Visit',
-    'وقت الوصول':'Check-in Time',
-    'وقت المغادرة':'Check-out Time',
-    'مدة الزيارة':'Visit Duration',
-    'نتيجة الزيارة':'Visit Result',
-    'عرض سعر':'Quotation',
-    'إنشاء عرض سعر':'Create Quotation',
-    'تعديل':'Edit',
-    'عرض':'View',
-    'اعتماد':'Approve',
-    'رفض':'Reject',
-    'إرسال للعميل':'Send to Customer',
-    'تحويل لطلب':'Convert to Order',
-    'العميل':'Customer',
-    'المندوب':'Representative',
-    'المنتج':'Product',
-    'الخامة':'Material',
-    'اللون':'Color',
-    'العرض':'Width',
-    'الطول':'Length',
-    'السماكة':'Thickness',
-    'الإجمالي':'Total',
-    'ملاحظات':'Notes'
-  };
-  const R = Object.fromEntries(Object.entries(T).map(([a,e])=>[e,a]));
-
-  function lang(){
-    const uid = window.currentUser?.id || window.currentUser?.email || 'guest';
-    return localStorage.getItem(KEY + '_' + uid) || localStorage.getItem(KEY) || 'ar';
-  }
-  function saveLang(v){
-    const uid = window.currentUser?.id || window.currentUser?.email || 'guest';
-    localStorage.setItem(KEY + '_' + uid, v);
-    localStorage.setItem(KEY, v);
-  }
-  function trText(txt, target){
-    const clean = String(txt || '').trim();
-    if(!clean) return txt;
-    if(target === 'en' && T[clean]) return String(txt).replace(clean, T[clean]);
-    if(target === 'ar' && R[clean]) return String(txt).replace(clean, R[clean]);
-    return txt;
-  }
-  function translateElement(el, target){
-    if(!el || el.dataset.noTranslate === '1') return;
-    if(!el.dataset.originalText && el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE){
-      el.dataset.originalText = el.textContent;
-    }
-    if(el.dataset.originalText){
-      const base = target === 'ar' ? (R[el.dataset.originalText] || el.dataset.originalText) : el.dataset.originalText;
-      el.textContent = trText(base, target);
-    }
-  }
-  function apply(){
-    const target = lang();
-    document.documentElement.lang = target === 'en' ? 'en' : 'ar';
-    document.documentElement.dir = target === 'en' ? 'ltr' : 'rtl';
-    document.querySelectorAll('.nav,button,th,label,h1,h2,h3,span').forEach(el=>translateElement(el,target));
-    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{
-      if(!el.dataset.originalPlaceholder) el.dataset.originalPlaceholder = el.placeholder;
-      const base = target === 'ar' ? (R[el.dataset.originalPlaceholder] || el.dataset.originalPlaceholder) : el.dataset.originalPlaceholder;
-      el.placeholder = trText(base,target);
-    });
-    document.querySelectorAll('.jms-safe-lang button').forEach(b=>b.classList.toggle('active', b.dataset.lang === target));
-  }
-  function addSwitcher(){
-    if(document.getElementById('jmsSafeLang')) return;
-    const side = document.querySelector('aside') || document.querySelector('.sidebar') || document.body;
-    const box = document.createElement('div');
-    box.id='jmsSafeLang';
-    box.className='jms-safe-lang';
-    box.innerHTML='<button type="button" data-lang="ar">عربي</button><button type="button" data-lang="en">English</button>';
-    box.querySelectorAll('button').forEach(btn=>{
-      btn.onclick = function(){
-        saveLang(this.dataset.lang);
-        apply();
-      };
-    });
-    side.insertBefore(box, side.children[1] || null);
-  }
-  window.applySafeLanguage = function(){ addSwitcher(); apply(); };
-
-  // Only hook after rendering without replacing core functions destructively.
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(window.applySafeLanguage, 700);
-    document.addEventListener('click', function(){ setTimeout(window.applySafeLanguage, 150); }, true);
-  });
-
-  const oldRenderAll = window.renderAll;
-  if(typeof oldRenderAll === 'function' && !window.__safeLangRenderPatched){
-    window.__safeLangRenderPatched = true;
-    window.renderAll = function(){
-      const r = oldRenderAll.apply(this, arguments);
-      setTimeout(window.applySafeLanguage, 100);
-      return r;
-    };
-  }
 })();
 
 
@@ -3697,22 +3567,22 @@ function convertQuoteToOrder(qid){
   window.openCustomerImport = function(){
     if(!currentUser || currentUser.role!=='admin') return alert('استيراد العملاء متاح فقط لمدير النظام');
     ensureImportData();
-    modalBody.innerHTML = `<h2>استيراد العملاء من Excel / CSV</h2>
-      <div class="import-help">
-        ارفع ملف Excel أو CSV يحتوي على أعمدة مثل:<br>
+    modalBody.innerHTML = `<h2 data-i18n="ui_2d691a14a899">استيراد العملاء من Excel / CSV</h2>
+      <div class="import-help"><span data-i18n="ui_645944fff618">
+        ارفع ملف Excel أو CSV يحتوي على أعمدة مثل:</span><br>
         <b>name, phone, city, district, location, category, rep_email, rep_id, debt_balance, notes, lat, lng</b><br>
         النظام يمنع التكرار إذا كان رقم الجوال مكررًا أو الاسم والمدينة مكررين.
       </div>
       <div class="import-drop">
-        <b>اختر ملف العملاء</b>
+        <b data-i18n="ui_bace89eb7cd4">اختر ملف العملاء</b>
         <input id="customerImportFile" type="file" accept=".xlsx,.xls,.csv">
-        <small>يفضل استخدام القالب الجاهز ثم تعبئته.</small>
+        <small data-i18n="ui_1eb8b22bf045">يفضل استخدام القالب الجاهز ثم تعبئته.</small>
       </div>
       <div class="import-actions">
-        <button class="template" onclick="downloadCustomerTemplate()">تحميل قالب العملاء</button>
-        <button class="import" onclick="runCustomerImport()">استيراد الآن</button>
+        <button class="template" onclick="downloadCustomerTemplate()" data-i18n="ui_9835d50cd038">تحميل قالب العملاء</button>
+        <button class="import" onclick="runCustomerImport()" data-i18n="ui_211d26d81c8b">استيراد الآن</button>
       </div>
-      <div id="customerImportResult" class="import-result">لم يتم الاستيراد بعد.</div>`;
+      <div id="customerImportResult" class="import-result" data-i18n="ui_42a0d57c778b">لم يتم الاستيراد بعد.</div>`;
     modal.classList.remove('hidden');
   };
 
@@ -3720,7 +3590,7 @@ function convertQuoteToOrder(qid){
     ensureImportData();
     const file=document.getElementById('customerImportFile')?.files?.[0];
     if(!file) return alert('اختر ملف Excel أو CSV أولاً');
-    customerImportResult.textContent='جاري قراءة الملف...';
+    (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(customerImportResult,"جاري قراءة الملف...");
     readFile(file,(rows,err)=>{
       if(err){ customerImportResult.textContent='خطأ: '+err; return; }
       let added=0, updated=0, skipped=0;
@@ -3762,7 +3632,7 @@ function convertQuoteToOrder(qid){
     btn.id='customerImportButton';
     btn.className='primary customer-import-btn';
     btn.type='button';
-    btn.textContent='استيراد العملاء';
+    (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"استيراد العملاء");
     btn.onclick=openCustomerImport;
     const actionBox=head.querySelector('.head-actions') || head;
     actionBox.appendChild(btn);
@@ -3780,14 +3650,10 @@ function convertQuoteToOrder(qid){
 
 /* FIELD SALES UPGRADE: safe language + routes + WhatsApp survey */
 (function(){
-  const LANG_KEY='jms_field_lang';
-  const T={'العملاء':'Customers','المناديب':'Representatives','الزيارات الذكية':'Smart Visits','عروض الأسعار':'Quotations','طلبات التصنيع':'Production Orders','استيراد العملاء':'Import Customers','بدء الدوام':'Start Work','إنهاء الدوام':'End Work','تحديث الموقع':'Update Location','مسار اليوم':'Today Route','فتح المسار':'Open Route','رسالة تقييم':'Satisfaction Message','إرسال واتساب':'Send WhatsApp','العربية':'Arabic','العميل':'Customer','المندوب':'Representative','الجوال':'Mobile','المدينة':'City','الموقع':'Location','موقع العميل':'Customer Location','زيارات اليوم':'Today Visits'};
-  const R=Object.fromEntries(Object.entries(T).map(([a,e])=>[e,a]));
-  function curLang(){const uid=window.currentUser?.id||window.currentUser?.email||'guest';return localStorage.getItem(LANG_KEY+'_'+uid)||localStorage.getItem(LANG_KEY)||'ar'}
-  window.setFieldLang=function(v){const uid=window.currentUser?.id||window.currentUser?.email||'guest';localStorage.setItem(LANG_KEY+'_'+uid,v);localStorage.setItem(LANG_KEY,v);applyFieldLang()}
-  function tr(s,l){const x=String(s||'').trim();if(!x)return s;if(l==='en'&&T[x])return String(s).replace(x,T[x]);if(l==='ar'&&R[x])return String(s).replace(x,R[x]);return s}
-  window.applyFieldLang=function(){const l=curLang();document.documentElement.dir=l==='en'?'ltr':'rtl';document.documentElement.lang=l;document.querySelectorAll('.nav,button,span,b,small,label,h1,h2,h3,p,th').forEach(el=>{if(el.childNodes.length===1&&el.childNodes[0].nodeType===Node.TEXT_NODE){if(!el.dataset.baseText)el.dataset.baseText=el.textContent;const base=l==='ar'?(R[el.dataset.baseText]||el.dataset.baseText):el.dataset.baseText;el.textContent=tr(base,l)}});document.querySelectorAll('.safe-lang-mini button').forEach(b=>b.classList.toggle('active',b.dataset.lang===l))}
-  function addLangBox(){if(document.getElementById('fieldLangBox'))return;const side=document.querySelector('aside')||document.querySelector('.sidebar')||document.body;const box=document.createElement('div');box.id='fieldLangBox';box.className='safe-lang-mini';box.innerHTML=`<button data-lang="ar" type="button">العربية</button><button data-lang="en" type="button">English</button>`;box.querySelectorAll('button').forEach(btn=>btn.onclick=function(){setFieldLang(this.dataset.lang)});side.insertBefore(box,side.children[1]||null)}
+  // Language preferences and rendering are owned by the account localization module.
+  window.setFieldLang = value => window.JMSI18n?.setLanguage(value);
+  window.applyFieldLang = () => window.JMSI18n?.refresh();
+  function addLangBox(){ window.JMSI18n?.mount(); }
   function ensure(){db.customers ||= [];db.reps ||= [];db.visits ||= [];db.repRoutes ||= [];db.satisfaction ||= []}
   function rid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
   function tdy(){return(typeof today==='function')?today():new Date().toISOString().slice(0,10)}
@@ -3795,10 +3661,10 @@ function convertQuoteToOrder(qid){
   window.openCustomerMap=function(id){const c=db.customers.find(x=>x.id===id);if(!c)return alert('لم يتم العثور على العميل');window.open(`https://www.google.com/maps/search/?api=1&query=${mapQuery(c)}`,'_blank')}
   window.openRepRoute=function(repId){ensure();const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,10);if(!cs.length)return alert('لا يوجد عملاء مربوطين بهذا المندوب');const dest=mapQuery(cs[cs.length-1]);const way=cs.slice(0,-1).map(mapQuery).join('|');window.open(`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${dest}${way?`&waypoints=${way}`:''}&travelmode=driving`,'_blank')}
   window.saveRepRoute=function(repId){ensure();const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,20);db.repRoutes.unshift({id:rid(),rep_id:repId,date:tdy(),customer_ids:cs.map(c=>c.id),created_at:new Date().toISOString()});if(typeof save==='function')save();if(typeof renderAll==='function')renderAll();alert('تم حفظ مسار اليوم للمندوب')}
-  window.openRoutesPanel=function(repId=''){ensure();const reps=currentUser?.role==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;const selected=repId||currentUser?.id||reps[0]?.id||'';modalBody.innerHTML=`<h2>مسارات المناديب</h2><label>المندوب<select id="routeRep">${reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join('')}</select></label><div class="field-upgrade-actions"><button class="route" onclick="saveRepRoute(routeRep.value)">حفظ مسار اليوم</button><button class="map" onclick="openRepRoute(routeRep.value)">فتح المسار في Google Maps</button></div><div id="routeCustomerList"></div>`;modal.classList.remove('hidden');routeRep.onchange=renderRouteCustomers;renderRouteCustomers()}
-  window.renderRouteCustomers=function(){const repId=document.getElementById('routeRep')?.value;const box=document.getElementById('routeCustomerList');if(!box)return;const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,20);box.innerHTML=cs.map((c,i)=>`<div class="customer-route-card"><b>${i+1}. ${c.name}</b><small>${c.phone||'-'} · ${c.city||'-'} · ${c.location||c.district||'-'}</small><div class="field-upgrade-actions"><button class="map" onclick="openCustomerMap('${c.id}')">موقع العميل</button></div></div>`).join('')||'<div class="panel">لا يوجد عملاء لهذا المندوب</div>'}
+  window.openRoutesPanel=function(repId=''){ensure();const reps=currentUser?.role==='rep'?db.reps.filter(r=>r.id===(currentUser&&currentUser.id)):db.reps;const selected=repId||currentUser?.id||reps[0]?.id||'';modalBody.innerHTML=`<h2 data-i18n="ui_c7f2a1d3e06c">مسارات المناديب</h2><label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="routeRep">${reps.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${r.name}</option>`).join('')}</select></label><div class="field-upgrade-actions"><button class="route" onclick="saveRepRoute(routeRep.value)" data-i18n="ui_03ec6cd87a56">حفظ مسار اليوم</button><button class="map" onclick="openRepRoute(routeRep.value)" data-i18n="ui_131aee81e866">فتح المسار في Google Maps</button></div><div id="routeCustomerList"></div>`;modal.classList.remove('hidden');routeRep.onchange=renderRouteCustomers;renderRouteCustomers()}
+  window.renderRouteCustomers=function(){const repId=document.getElementById('routeRep')?.value;const box=document.getElementById('routeCustomerList');if(!box)return;const cs=db.customers.filter(c=>c.rep_id===repId).slice(0,20);box.innerHTML=cs.map((c,i)=>`<div class="customer-route-card"><b>${i+1}. ${c.name}</b><small>${c.phone||'-'} · ${c.city||'-'} · ${c.location||c.district||'-'}</small><div class="field-upgrade-actions"><button class="map" onclick="openCustomerMap('${c.id}')"><span data-i18n=ui_1a57fafdefde>موقع العميل</span></button></div></div>`).join('')||"<div class=\"panel\" data-i18n=\"ui_d7d56ae83891\">لا يوجد عملاء لهذا المندوب</div>"}
   window.sendSatisfactionWhatsApp=function(customerId,visitId=''){const c=db.customers.find(x=>x.id===customerId);if(!c)return alert('لم يتم العثور على العميل');const phone=String(c.phone||'').replace(/\D/g,'');if(!phone)return alert('لا يوجد رقم جوال للعميل');const sa=phone.startsWith('966')?phone:('966'+phone.replace(/^0/,''));const msg='السلام عليكم%0Aنشكر لكم التعامل مع شركة جدة النموذجية للصناعة.%0Aنأمل تقييم خدمتنا وزيارة المندوب من 1 إلى 5:%0A⭐⭐⭐⭐⭐%0Aملاحظاتكم تهمنا.';db.satisfaction.unshift({id:rid(),customer_id:customerId,visit_id:visitId,date:tdy(),phone:sa,status:'sent',created_at:new Date().toISOString()});if(typeof save==='function')save();window.open(`https://wa.me/${sa}?text=${msg}`,'_blank')}
-  function addButtons(){const head=document.querySelector('#repsControl .page-head .head-actions')||document.querySelector('#repsControl .page-head');if(head&&!document.getElementById('routesPanelButton')){const b=document.createElement('button');b.id='routesPanelButton';b.className='primary';b.textContent='مسار اليوم';b.onclick=()=>openRoutesPanel();head.appendChild(b)}document.querySelectorAll('.customer-card').forEach(card=>{if(card.querySelector('.field-upgrade-actions'))return;const name=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===name);if(!c)return;const div=document.createElement('div');div.className='field-upgrade-actions';div.innerHTML=`<button class="map" onclick="openCustomerMap('${c.id}')">موقع العميل</button><button class="wa" onclick="sendSatisfactionWhatsApp('${c.id}')">رسالة تقييم</button>`;card.appendChild(div)});document.querySelectorAll('.visit-report-card,.visit-card').forEach(card=>{if(card.querySelector('.wa-survey-added'))return;const title=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===title);if(!c)return;const actions=card.querySelector('.visit-report-actions,.visit-actions')||card;const b=document.createElement('button');b.className='wa wa-survey-added';b.textContent='رسالة تقييم';b.onclick=()=>sendSatisfactionWhatsApp(c.id);actions.appendChild(b)})}
+  function addButtons(){const head=document.querySelector('#repsControl .page-head .head-actions')||document.querySelector('#repsControl .page-head');if(head&&!document.getElementById('routesPanelButton')){const b=document.createElement('button');b.id='routesPanelButton';b.className='primary';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"مسار اليوم");b.onclick=()=>openRoutesPanel();head.appendChild(b)}document.querySelectorAll('.customer-card').forEach(card=>{if(card.querySelector('.field-upgrade-actions'))return;const name=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===name);if(!c)return;const div=document.createElement('div');div.className='field-upgrade-actions';div.innerHTML=`<button class="map" onclick="openCustomerMap('${c.id}')"><span data-i18n=ui_1a57fafdefde>موقع العميل</span></button><button class="wa" onclick="sendSatisfactionWhatsApp('${c.id}')"><span data-i18n=ui_94944b789e50>رسالة تقييم</span></button>`;card.appendChild(div)});document.querySelectorAll('.visit-report-card,.visit-card').forEach(card=>{if(card.querySelector('.wa-survey-added'))return;const title=card.querySelector('h3')?.textContent?.trim();const c=db.customers.find(x=>x.name===title);if(!c)return;const actions=card.querySelector('.visit-report-actions,.visit-actions')||card;const b=document.createElement('button');b.className='wa wa-survey-added';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"رسالة تقييم");b.onclick=()=>sendSatisfactionWhatsApp(c.id);actions.appendChild(b)})}
   const oldRenderAll=window.renderAll;window.renderAll=function(){if(typeof oldRenderAll==='function')oldRenderAll();setTimeout(()=>{addLangBox();applyFieldLang();addButtons()},150)}
   const oldShowApp=window.showApp;if(typeof oldShowApp==='function'){window.showApp=function(){oldShowApp();setTimeout(()=>{addLangBox();applyFieldLang();addButtons()},200)}}
   setTimeout(()=>{addLangBox();applyFieldLang();addButtons()},800)
@@ -3861,10 +3727,10 @@ function convertQuoteToOrder(qid){
       more.id = 'more_' + id;
       more.className = 'customer-more-menu';
       more.innerHTML = `
-        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">إرسال تقييم واتساب</button>` : `<button type="button" disabled>لا يوجد رقم جوال</button>`}
+        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">إرسال تقييم واتساب</button>` : `<button type="button" disabled data-i18n="ui_4cc63e1989ce">لا يوجد رقم جوال</button>`}
         <button type="button" onclick="openCustomerMap('${id}')">فتح موقع العميل</button>
-        <button type="button" onclick="quickVisit('${id}')">تسجيل زيارة</button>
-        <button type="button" onclick="openQuoteForm('${id}')">إنشاء عرض سعر</button>
+        <button type="button" onclick="quickVisit('${id}')"><span data-i18n=ui_dd5f9783f90a>تسجيل زيارة</span></button>
+        <button type="button" onclick="openQuoteForm('${id}')"><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></button>
       `;
       card.appendChild(actions);
       card.appendChild(more);
@@ -3976,16 +3842,16 @@ function convertQuoteToOrder(qid){
         <button type="button" class="order" onclick="openQuoteForm('${id}')">طلب جديد</button>
         <button type="button" class="meeting" onclick="appointment('${id}')">موعد</button>
         <button type="button" class="collection" onclick="collect('${id}')">التحصيل</button>
-        <button type="button" class="note" onclick="note('${id}')">ملاحظة</button>
-        <button type="button" class="map" onclick="openCustomerMap('${id}')">موقع العميل</button>
+        <button type="button" class="note" onclick="note('${id}')"><span data-i18n=ui_0be7afd7e65f>ملاحظة</span></button>
+        <button type="button" class="map" onclick="openCustomerMap('${id}')"><span data-i18n=ui_1a57fafdefde>موقع العميل</span></button>
         <button type="button" class="edit" onclick="editCustomerPro('${id}')">تعديل العميل</button>
-        <button type="button" class="more" onclick="toggleCustomerMore('${id}')">المزيد</button>
+        <button type="button" class="more" onclick="toggleCustomerMore('${id}')"><span data-i18n=ui_478c486f3efe>المزيد</span></button>
       `;
       const more = document.createElement('div');
       more.id = 'more_' + id;
       more.className = 'customer-more-menu';
       more.innerHTML = `
-        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">💬 رسالة تقييم واتساب</button>` : `<button type="button" disabled>💬 لا يوجد رقم جوال</button>`}
+        ${hasPhone ? `<button type="button" onclick="sendSatisfactionWhatsApp('${id}')">💬 رسالة تقييم واتساب</button>` : `<button type="button" disabled data-i18n="ui_cc79d55f6872">💬 لا يوجد رقم جوال</button>`}
         <button type="button" onclick="openQuoteForm('${id}')">📄 إنشاء عرض سعر</button>
       `;
       card.appendChild(actions);
@@ -4057,20 +3923,20 @@ function convertQuoteToOrder(qid){
     const c = getCustomer(customerId);
     if(!c){ alert('لم يتم العثور على العميل'); return; }
     const reps = db.reps || [];
-    modalBody.innerHTML = `<h2>تعديل العميل</h2>
+    modalBody.innerHTML = `<h2 data-i18n="ui_d21f656a885f">تعديل العميل</h2>
       <div class="form-grid two">
-        <label>اسم العميل<input id="ecName" value="${String(c.name||'').replace(/"/g,'&quot;')}"></label>
-        <label>الجوال<input id="ecPhone" value="${String(c.phone||c.mobile||'').replace(/"/g,'&quot;')}"></label>
-        <label>المدينة<input id="ecCity" value="${String(c.city||'جدة').replace(/"/g,'&quot;')}"></label>
-        <label>المندوب<select id="ecRep">${reps.map(r=>`<option value="${r.id}" ${r.id===c.rep_id?'selected':''}>${r.name}</option>`).join('')}</select></label>
-        <label>الموقع<input id="ecLocation" value="${String(c.location||c.district||'').replace(/"/g,'&quot;')}"></label>
-        <label>تصنيف العميل<input id="ecCategory" value="${String(c.category||'عميل').replace(/"/g,'&quot;')}"></label>
-        <label>المديونية<input id="ecDebt" type="number" value="${Number(c.debt_balance||0)}"></label>
-        <label>الحالة<select id="ecStatus"><option value="active" ${c.status!=='inactive'?'selected':''}>نشط</option><option value="inactive" ${c.status==='inactive'?'selected':''}>غير نشط</option></select></label>
+        <label><span data-i18n="ui_70771eb8320f">اسم العميل</span><input id="ecName" value="${String(c.name||'').replace(/"/g,'&quot;')}"></label>
+        <label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="ecPhone" value="${String(c.phone||c.mobile||'').replace(/"/g,'&quot;')}"></label>
+        <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="ecCity" value="${String(c.city||'جدة').replace(/"/g,'&quot;')}"></label>
+        <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="ecRep">${reps.map(r=>`<option value="${r.id}" ${r.id===c.rep_id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+        <label><span data-i18n=ui_8937faa1e41f>الموقع</span><input id="ecLocation" value="${String(c.location||c.district||'').replace(/"/g,'&quot;')}"></label>
+        <label><span data-i18n="ui_af813b88a2c9">تصنيف العميل</span><input id="ecCategory" value="${String(c.category||'عميل').replace(/"/g,'&quot;')}"></label>
+        <label><span data-i18n="ui_8ef13d3ef3ca">المديونية</span><input id="ecDebt" type="number" value="${Number(c.debt_balance||0)}"></label>
+        <label><span data-i18n=ui_c3a4749caed4>الحالة</span><select id="ecStatus"><option value="active" ${c.status!=='inactive'?'selected':''}>نشط</option><option value="inactive" ${c.status==='inactive'?'selected':''}>غير نشط</option></select></label>
       </div>
-      <label>ملاحظات العميل<textarea id="ecNotes" rows="3">${String(c.notes||'').replace(/</g,'&lt;')}</textarea></label>
+      <label><span data-i18n="ui_110aa6f60385">ملاحظات العميل</span><textarea id="ecNotes" rows="3">${String(c.notes||'').replace(/</g,'&lt;')}</textarea></label>
       <br><button class="primary" onclick="saveCustomerEditPro('${customerId}')">حفظ التعديل</button>
-      <button onclick="closeModal()">إلغاء</button>`;
+      <button onclick="closeModal()"><span data-i18n=ui_9a30dc2a96b8>إلغاء</span></button>`;
     modal.classList.remove('hidden');
   };
 
@@ -4091,113 +3957,6 @@ function convertQuoteToOrder(qid){
     renderAll();
   };
 })();
-
-/* ARABIC STABLE LOCK: force full Arabic UI */
-(function(){
-  const AR = {
-    'Dashboard':'لوحة التحكم',
-    'Customers':'العملاء',
-    'Representatives':'المناديب',
-    'Smart Visits':'الزيارات الذكية',
-    'Production Orders':'طلبات التصنيع',
-    'Quotations':'عروض الأسعار',
-    'Logout':'تسجيل الخروج',
-    'Create Quotation':'إنشاء عرض سعر',
-    'Start Work':'بدء الدوام',
-    'End Work':'إنهاء الدوام',
-    'Update Location':'تحديث موقعي',
-    'I am in Visit':'أنا في زيارة',
-    'Current User':'المستخدم الحالي',
-    'System Admin':'مدير النظام',
-    'Sales Manager':'مدير المبيعات',
-    'Representative':'مندوب',
-    'Search by customer name, mobile or city':'ابحث باسم العميل أو الجوال أو المدينة',
-    'Customer':'العميل',
-    'Product':'المنتج',
-    'Thickness':'السماكة',
-    'Material':'الخامة',
-    'Quantity':'الكمية',
-    'Price':'السعر',
-    'Total':'الإجمالي',
-    'Approved':'معتمد',
-    'Pending Approval':'بانتظار الاعتماد',
-    'All Quotes':'كل العروض',
-    'Status':'الحالة',
-    'Rep':'المندوب',
-    'Search':'بحث',
-    'Add Customer':'إضافة عميل',
-    'Import Customers':'استيراد العملاء'
-  };
-
-  function forceArabic(){
-    document.documentElement.lang = 'ar';
-    document.documentElement.dir = 'rtl';
-    if(document.body) document.body.dir = 'rtl';
-
-    // remove or hide all language switchers
-    document.querySelectorAll('#jmsSafeLang,#fieldLangBox,#jmsMainLangSwitch,.jms-lang-switch,.safe-lang-mini').forEach(x=>x.remove());
-
-    // translate simple text nodes
-    const els = document.querySelectorAll('button,a,span,b,small,label,h1,h2,h3,p,th,td,option');
-    els.forEach(el=>{
-      if(el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE){
-        const txt = el.textContent.trim();
-        if(AR[txt]) el.textContent = el.textContent.replace(txt, AR[txt]);
-      }
-    });
-
-    // translate placeholders
-    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el=>{
-      const p = el.getAttribute('placeholder') || '';
-      if(AR[p]) el.setAttribute('placeholder', AR[p]);
-      if(p.includes('customer') || p.includes('mobile') || p.includes('city')){
-        el.setAttribute('placeholder','ابحث باسم العميل أو الجوال أو المدينة');
-      }
-    });
-
-    // hard fixes for common page titles/buttons
-    document.querySelectorAll('h1,h2').forEach(el=>{
-      const t=el.textContent.trim();
-      if(t === 'Customers') el.textContent='العملاء';
-      if(t === 'Dashboard') el.textContent='لوحة التحكم';
-      if(t === 'Quotations') el.textContent='عروض الأسعار';
-    });
-
-    document.querySelectorAll('button').forEach(btn=>{
-      const t=btn.textContent.trim();
-      if(t === 'Start Work') btn.textContent='بدء الدوام';
-      if(t === 'End Work') btn.textContent='إنهاء الدوام';
-      if(t === 'Create Quotation') btn.textContent='إنشاء عرض سعر';
-      if(t === 'Logout') btn.textContent='تسجيل الخروج';
-    });
-  }
-
-  // Disable previous language functions so they never switch to English again
-  window.setFieldLang = function(){ forceArabic(); };
-  window.setJmsLanguage = function(){ forceArabic(); };
-  window.applyFieldLang = forceArabic;
-  window.applyJmsLanguage = forceArabic;
-
-  const oldRenderAll = window.renderAll;
-  window.renderAll = function(){
-    if(typeof oldRenderAll === 'function') oldRenderAll();
-    setTimeout(forceArabic,150);
-  };
-
-  const oldShowApp = window.showApp;
-  if(typeof oldShowApp === 'function'){
-    window.showApp = function(){
-      oldShowApp();
-      setTimeout(forceArabic,150);
-    };
-  }
-
-  document.addEventListener('DOMContentLoaded', forceArabic);
-  document.addEventListener('click', ()=>setTimeout(forceArabic,50), true);
-  setTimeout(forceArabic,300);
-})();
-
-
 
 /* JMS AI CLEAN PAGE ENGINE */
 function jmsAiDateOf(x){return String(x.date||x.created_at||x.checkin_at||x.quote_date||x.order_date||'').slice(0,10)}
@@ -4382,12 +4141,12 @@ function jmsAiAppendTools(){
   row.id='jmsAiToolsRow';
   row.className='jms-ai-tools';
   row.innerHTML=`
-    <button class="blue" onclick="askJmsAI('خطة زيارات اليوم')">خطة زيارات</button>
-    <button class="orange" onclick="askJmsAI('أولوية التحصيل')">أولوية التحصيل</button>
-    <button onclick="askJmsAI('أفضل العملاء')">أفضل العملاء</button>
-    <button onclick="askJmsAI('متابعة العروض المعلقة')">متابعة العروض</button>
-    <button class="green" onclick="jmsAiCopyLast()">نسخ آخر تقرير</button>
-    <button onclick="jmsAiPrintReport()">طباعة</button>
+    <button class="blue" onclick="askJmsAI('خطة زيارات اليوم')" data-i18n="ui_05d2e917f65a">خطة زيارات</button>
+    <button class="orange" onclick="askJmsAI('أولوية التحصيل')" data-i18n="ui_b3cbc1f529f6">أولوية التحصيل</button>
+    <button onclick="askJmsAI('أفضل العملاء')" data-i18n="ui_416ed136a554">أفضل العملاء</button>
+    <button onclick="askJmsAI('متابعة العروض المعلقة')" data-i18n="ui_059fac250df0">متابعة العروض</button>
+    <button class="green" onclick="jmsAiCopyLast()" data-i18n="ui_be3af3d615ce">نسخ آخر تقرير</button>
+    <button onclick="jmsAiPrintReport()"><span data-i18n=ui_2e00e00acffe>طباعة</span></button>
   `;
   const chat=document.querySelector('.jms-ai-chat');
   if(chat)chat.insertBefore(row, chat.querySelector('.jms-ai-input'));
@@ -4419,7 +4178,7 @@ function jmsAiCopyLast(){
 function jmsAiPrintReport(){
   const txt=jmsAiLastText || document.getElementById('jmsAiBody')?.innerText || '';
   const w=window.open('','_blank');
-  w.document.write(`<html dir="rtl"><head><title>JMS AI Report</title><style>body{font-family:Tahoma,Arial;padding:30px;line-height:1.9;white-space:pre-line}</style></head><body><h2>تقرير JMS AI</h2>${txt.replace(/</g,'&lt;')}</body></html>`);
+  w.document.write(`<html dir="rtl"><head><title>JMS AI Report</title><style>body{font-family:Tahoma,Arial;padding:30px;line-height:1.9;white-space:pre-line}</style></head><body><h2 data-i18n="ui_5beed31b7127">تقرير JMS AI</h2>${txt.replace(/</g,'&lt;')}</body></html>`);
   w.document.close();
   w.print();
 }
@@ -4461,7 +4220,7 @@ askJmsAI = async function(q){
   if(!body)return;
 
   body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg user">${q}</div>`);
-  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot" id="jmsAiLoading">جارٍ تحليل السؤال...</div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot" id="jmsAiLoading" data-i18n="ui_6635b9428afe">جارٍ تحليل السؤال...</div>`);
   body.scrollTop=body.scrollHeight;
   if(input)input.value='';
 
@@ -4484,7 +4243,7 @@ askJmsAI = async function(q){
     const loading=document.getElementById('jmsAiLoading');
     if(loading) loading.remove();
     const local = (typeof jmsAiAnswer==='function') ? jmsAiAnswer(q) : 'تعذر الاتصال بالـ Backend.';
-    body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${local}<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend، تم استخدام التحليل المحلي.</div></div>`);
+    body.insertAdjacentHTML('beforeend',`<div class="jms-ai-msg bot">${local}<div class="jms-ai-backend-status warn" data-i18n="ui_9ba40a1a3711">تعذر الاتصال بالـ Backend، تم استخدام التحليل المحلي.</div></div>`);
   }
   body.scrollTop=body.scrollHeight;
 };
@@ -4517,8 +4276,8 @@ function jmsAiAppendBackendTools(){
   if(!row || row.dataset.backend==='1')return;
   row.dataset.backend='1';
   row.insertAdjacentHTML('beforeend',`
-    <button class="backend" onclick="askJmsAI('ابحث برا عن أسعار مواد التصنيع HDPE و LLDPE اليوم')">بحث خارجي تصنيع</button>
-    <button class="backend" onclick="askJmsAI('حلل لي إنتاج المصنع والمبيعات واقترح قرارات')">تحليل إداري متقدم</button>
+    <button class="backend" onclick="askJmsAI('ابحث برا عن أسعار مواد التصنيع HDPE و LLDPE اليوم')" data-i18n="ui_9c02d9e4818d">بحث خارجي تصنيع</button>
+    <button class="backend" onclick="askJmsAI('حلل لي إنتاج المصنع والمبيعات واقترح قرارات')" data-i18n="ui_6a9842ed096a">تحليل إداري متقدم</button>
   `);
 }
 
@@ -4573,7 +4332,7 @@ askJmsAI = async function(q){
   if(!body) return;
 
   body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg user">${q}</div>`);
-  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinkingFinal">جارٍ الاتصال بـ JMS AI...</div>`);
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinkingFinal" data-i18n="ui_221fe80f89b9">جارٍ الاتصال بـ JMS AI...</div>`);
   body.scrollTop = body.scrollHeight;
   if(input) input.value = "";
 
@@ -4590,7 +4349,7 @@ askJmsAI = async function(q){
   } catch(e) {
     const thinking = document.getElementById("jmsAiThinkingFinal");
     if(thinking) thinking.remove();
-    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
+    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn" data-i18n="ui_5dd1a53aa868">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
   }
   body.scrollTop = body.scrollHeight;
 };
@@ -4643,7 +4402,7 @@ askJmsAI = async function(q){
   if(!body) return;
 
   body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg user">${q}</div>`);
-  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinkingFinal">جارٍ الاتصال بـ JMS AI...</div>`);
+  body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot" id="jmsAiThinkingFinal" data-i18n="ui_221fe80f89b9">جارٍ الاتصال بـ JMS AI...</div>`);
   body.scrollTop = body.scrollHeight;
   if(input) input.value = "";
 
@@ -4660,7 +4419,7 @@ askJmsAI = async function(q){
   } catch(e) {
     const thinking = document.getElementById("jmsAiThinkingFinal");
     if(thinking) thinking.remove();
-    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${window.jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
+    body.insertAdjacentHTML("beforeend", `<div class="jms-ai-msg bot">${window.jmsAiLocalAnswerFinal(q)}<div class="jms-ai-backend-status warn" data-i18n="ui_5dd1a53aa868">تعذر الاتصال بالـ Backend. تحقق من نشر ملفات api.</div></div>`);
   }
 
   body.scrollTop = body.scrollHeight;
@@ -4742,23 +4501,23 @@ askJmsAI = async function(q){
     const totalColl=collections.reduce((s,x)=>s+Number(x.amount||0),0);
     const score=scoreCustomer(c);
     const html=`<div class="jms-wow-modal">
-      <div class="jms-wow-hero"><h2>ملف العميل 360° — ${c.name}</h2><p>نظرة تنفيذية جاهزة للمندوب والإدارة قبل الاتصال أو الزيارة.</p></div>
-      <div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small>تقييم ذكي مبني على الزيارات، المديونية، الطلبات وبيانات التواصل</small></div></div>
+      <div class="jms-wow-hero"><h2>ملف العميل 360° — ${c.name}</h2><p data-i18n="ui_d66b850f1daf">نظرة تنفيذية جاهزة للمندوب والإدارة قبل الاتصال أو الزيارة.</p></div>
+      <div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small data-i18n="ui_dac895090879">تقييم ذكي مبني على الزيارات، المديونية، الطلبات وبيانات التواصل</small></div></div>
       <div class="jms-wow-kpis">
-        <div class="jms-wow-kpi"><b>${money(c.debt_balance||0)}</b><span>مديونية حالية</span></div>
-        <div class="jms-wow-kpi"><b>${lastVisitDate(id)||'-'}</b><span>آخر زيارة</span></div>
-        <div class="jms-wow-kpi"><b>${orders.length}</b><span>عدد الطلبات</span></div>
-        <div class="jms-wow-kpi"><b>${money(totalSales)}</b><span>إجمالي المبيعات</span></div>
-        <div class="jms-wow-kpi"><b>${money(totalColl)}</b><span>إجمالي التحصيل</span></div>
-        <div class="jms-wow-kpi"><b>${rep(c.rep_id)}</b><span>المندوب المسؤول</span></div>
+        <div class="jms-wow-kpi"><b>${money(c.debt_balance||0)}</b><span data-i18n="ui_007006eea04e">مديونية حالية</span></div>
+        <div class="jms-wow-kpi"><b>${lastVisitDate(id)||'-'}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div>
+        <div class="jms-wow-kpi"><b>${orders.length}</b><span data-i18n="ui_f8a847553304">عدد الطلبات</span></div>
+        <div class="jms-wow-kpi"><b>${money(totalSales)}</b><span data-i18n="ui_52f1fcac3509">إجمالي المبيعات</span></div>
+        <div class="jms-wow-kpi"><b>${money(totalColl)}</b><span data-i18n="ui_cc02489c3e75">إجمالي التحصيل</span></div>
+        <div class="jms-wow-kpi"><b>${rep(c.rep_id)}</b><span data-i18n="ui_d4486ff0e4e8">المندوب المسؤول</span></div>
       </div>
-      <div class="jms-wow-action"><b>الإجراء الذكي المقترح:</b><br>${priorityText(c)}<br><small>المدينة: ${c.city||'-'} · الجوال: ${c.phone||'-'} · موعد قادم: ${c.next_date||'-'}</small></div>
+      <div class="jms-wow-action"><b data-i18n="ui_d9f974dbde14">الإجراء الذكي المقترح:</b><br>${priorityText(c)}<br><small>المدينة: ${c.city||'-'} · الجوال: ${c.phone||'-'} · موعد قادم: ${c.next_date||'-'}</small></div>
       <div class="jms-wow-actions">
         <button class="green" onclick="jmsSmartWhatsApp('${id}','follow')">رسالة متابعة واتساب</button>
         <button class="orange" onclick="jmsSmartWhatsApp('${id}','collection')">رسالة تحصيل</button>
         <button class="blue" onclick="jmsSmartWhatsApp('${id}','thanks')">رسالة شكر وتقييم</button>
         <button class="purple" onclick="jmsCopyCustomerCard('${id}')">نسخ بطاقة العميل</button>
-        <button onclick="openQuoteForm && openQuoteForm('${id}')">إنشاء عرض سعر</button>
+        <button onclick="openQuoteForm && openQuoteForm('${id}')"><span data-i18n=ui_c8068c1ec743>إنشاء عرض سعر</span></button>
       </div>
     </div>`;
     if(window.modalBody && window.modal){ modalBody.innerHTML=html; modal.classList.remove('hidden'); }
@@ -4771,7 +4530,7 @@ askJmsAI = async function(q){
       const score=scoreCustomer(c);
       const head=card.querySelector('.customer-head')||card.firstElementChild;
       if(head){
-        head.insertAdjacentHTML('afterend',`<div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small>ملف ذكي يجذب العميل ويقوي المتابعة</small></div></div>`);
+        head.insertAdjacentHTML('afterend',`<div class="jms-wow-score" style="--score:${score}"><div class="ring"><span>${score}%</span></div><div><b>${priorityText(c)}</b><small data-i18n="ui_7377e063ea0f">ملف ذكي يجذب العميل ويقوي المتابعة</small></div></div>`);
       }
       const actions=card.querySelector('.customer-actions-clean')||card.querySelector('.customer-actions')||card;
       if(actions && !actions.querySelector('.jms-wow-btn')) actions.insertAdjacentHTML('beforeend',`<button type="button" class="jms-wow-btn" onclick="openCustomer360('${c.id}')">ملف العميل 360°</button>`);
@@ -4885,38 +4644,38 @@ askJmsAI = async function(q){
     if(!nav || !main) return;
     if(!document.querySelector('[data-page="newCustomerRadar"]')){
       const btn=document.createElement('button');
-      btn.className='nav'; btn.dataset.page='newCustomerRadar'; btn.textContent='رادار العملاء الجدد';
+      btn.className='nav'; btn.dataset.page='newCustomerRadar'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"رادار العملاء الجدد");
       nav.insertBefore(btn, nav.querySelector('[data-page="customers"]') || null);
     }
     if(!document.querySelector('[data-page="aiCommandCenter"]')){
       const btn=document.createElement('button');
-      btn.className='nav manager-only'; btn.dataset.page='aiCommandCenter'; btn.textContent='أوامر الذكاء';
+      btn.className='nav manager-only'; btn.dataset.page='aiCommandCenter'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"أوامر الذكاء");
       nav.insertBefore(btn, nav.querySelector('[data-page="jmsAI"]')?.nextSibling || null);
     }
     if(!document.getElementById('newCustomerRadar')){
       const sec=document.createElement('section'); sec.id='newCustomerRadar'; sec.className='page';
       sec.innerHTML=`
-        <div class="page-head with-action"><div><h1>رادار العملاء الجدد</h1><p>بحث ذكي عن أنشطة جديدة ظهرت في الويب أو الخرائط: افتتاحات، مواقع جديدة، كوفيهات، مطاعم، مصانع، متاجر.</p></div><div class="head-actions"><button class="primary" onclick="jmsRunRadarSearch()">بحث الآن</button><button onclick="jmsOpenManualLead()">إضافة فرصة يدوية</button></div></div>
+        <div class="page-head with-action"><div><h1 data-i18n="ui_63be0beb9355">رادار العملاء الجدد</h1><p data-i18n="ui_10c69ec71828">بحث ذكي عن أنشطة جديدة ظهرت في الويب أو الخرائط: افتتاحات، مواقع جديدة، كوفيهات، مطاعم، مصانع، متاجر.</p></div><div class="head-actions"><button class="primary" onclick="jmsRunRadarSearch()" data-i18n="ui_22107d04d1e0">بحث الآن</button><button onclick="jmsOpenManualLead()" data-i18n="ui_ffcf32167d55">إضافة فرصة يدوية</button></div></div>
         <div class="panel"><div class="jms-radar-toolbar">
-          <label>المدينة / المنطقة<input id="radarCity" value="جدة" placeholder="جدة، مكة، الصناعية الثانية"></label>
-          <label>الحي / القرب من<input id="radarDistrict" placeholder="مثال: الخمرة، الصناعية الثانية، بحرة"></label>
-          <label>النشاط<select id="radarIndustry"><option>مطاعم وكوفيهات جديدة</option><option>مصانع غذائية جديدة</option><option>متاجر إلكترونية جديدة</option><option>مصانع مياه وتمور</option><option>شركات شحن وتغليف</option><option>محلات حلويات ومخابز</option><option>مغاسل وفنادق</option><option>مخصص</option></select></label>
-          <label>كلمات إضافية<input id="radarKeywords" placeholder="افتتاح، opening soon، new"></label>
-          <label>عدد النتائج<select id="radarLimit"><option>8</option><option selected>12</option><option>20</option></select></label>
-          <button class="jms-growth-btn blue" onclick="jmsRunRadarSearch()">🔎 بحث ذكي بالويب</button>
-          <button class="jms-growth-btn green" onclick="jmsRadarSaveSearch()">حفظ إعداد البحث</button>
-        </div><div class="jms-radar-note">التنبيه: النتائج من مصادر عامة وتحتاج تحقق قبل الزيارة. النظام لا يسحب أرقام خاصة؛ يستخدم بيانات منشورة فقط. إذا دخل المندوب الحي، يبحث الرادار عن فرص قريبة من نطاقه.</div></div>
-        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="radarTotal">0</b><span>فرص محفوظة</span></div><div class="jms-growth-card"><b id="radarHot">0</b><span>فرص قوية</span></div><div class="jms-growth-card"><b id="radarContacted">0</b><span>تم التواصل</span></div><div class="jms-growth-card"><b id="radarConverted">0</b><span>تحولت لعميل</span></div></div>
+          <label><span data-i18n="ui_7772cd3c6e51">المدينة / المنطقة</span><input id="radarCity" value="جدة" placeholder="جدة، مكة، الصناعية الثانية" data-i18n-placeholder="ui_1b331913fb58"></label>
+          <label><span data-i18n="ui_d2ecc34edc1f">الحي / القرب من</span><input id="radarDistrict" placeholder="مثال: الخمرة، الصناعية الثانية، بحرة" data-i18n-placeholder="ui_28c24a62925a"></label>
+          <label><span data-i18n="ui_7d72e4a54516">النشاط</span><select id="radarIndustry"><option value="مطاعم وكوفيهات جديدة" data-i18n="ui_cfee938887a3">مطاعم وكوفيهات جديدة</option><option value="مصانع غذائية جديدة" data-i18n="ui_65344ec6692b">مصانع غذائية جديدة</option><option value="متاجر إلكترونية جديدة" data-i18n="ui_444201ba7d2f">متاجر إلكترونية جديدة</option><option value="مصانع مياه وتمور" data-i18n="ui_09bf12cc511a">مصانع مياه وتمور</option><option value="شركات شحن وتغليف" data-i18n="ui_3130df71ba8c">شركات شحن وتغليف</option><option value="محلات حلويات ومخابز" data-i18n="ui_4a2e2ad068bf">محلات حلويات ومخابز</option><option value="مغاسل وفنادق" data-i18n="ui_327b7b93cb8e">مغاسل وفنادق</option><option value="مخصص" data-i18n="ui_17c28aaaa777">مخصص</option></select></label>
+          <label><span data-i18n="ui_2c5fae39f73d">كلمات إضافية</span><input id="radarKeywords" placeholder="افتتاح، opening soon، new" data-i18n-placeholder="ui_04a2380d00dd"></label>
+          <label><span data-i18n="ui_fca48e21573c">عدد النتائج</span><select id="radarLimit"><option>8</option><option selected>12</option><option>20</option></select></label>
+          <button class="jms-growth-btn blue" onclick="jmsRunRadarSearch()" data-i18n="ui_d1cb71e7ec52">🔎 بحث ذكي بالويب</button>
+          <button class="jms-growth-btn green" onclick="jmsRadarSaveSearch()" data-i18n="ui_dc473afd97d4">حفظ إعداد البحث</button>
+        </div><div class="jms-radar-note" data-i18n="ui_eb8f9ad34181">التنبيه: النتائج من مصادر عامة وتحتاج تحقق قبل الزيارة. النظام لا يسحب أرقام خاصة؛ يستخدم بيانات منشورة فقط. إذا دخل المندوب الحي، يبحث الرادار عن فرص قريبة من نطاقه.</div></div>
+        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="radarTotal">0</b><span data-i18n="ui_2ada924b7cff">فرص محفوظة</span></div><div class="jms-growth-card"><b id="radarHot">0</b><span data-i18n="ui_7e4ceb827a1b">فرص قوية</span></div><div class="jms-growth-card"><b id="radarContacted">0</b><span data-i18n="ui_b323a3771b12">تم التواصل</span></div><div class="jms-growth-card"><b id="radarConverted">0</b><span data-i18n="ui_afa105355162">تحولت لعميل</span></div></div>
         <div id="radarStatus"></div><div id="radarLeadList" class="jms-lead-list"></div>`;
       main.appendChild(sec);
     }
     if(!document.getElementById('aiCommandCenter')){
       const sec=document.createElement('section'); sec.id='aiCommandCenter'; sec.className='page';
       sec.innerHTML=`
-        <div class="page-head with-action"><div><h1>أوامر الذكاء الاصطناعي</h1><p>مهام اليوم، تقييم العملاء، مخاطر التحصيل، فرص البيع، ذكاء عروض الأسعار.</p></div><div class="head-actions"><button class="primary" onclick="jmsRenderAiCommandCenter()">تحديث التحليل</button><button onclick="jmsPrintAiCommandReport()">طباعة التقرير</button></div></div>
-        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="aiTodayTasksCount">0</b><span>مهام ذكية اليوم</span></div><div class="jms-growth-card"><b id="aiRiskCount">0</b><span>مخاطر تحصيل</span></div><div class="jms-growth-card"><b id="aiOpportunityCount">0</b><span>فرص بيع</span></div><div class="jms-growth-card"><b id="aiQuoteRiskCount">0</b><span>عروض تحتاج مراجعة</span></div></div>
-        <div class="jms-ai-command-row"><div class="jms-ai-insight"><h3>مهام اليوم المقترحة</h3><div id="aiTodayTasks"></div></div><div class="jms-ai-insight"><h3>خطر التحصيل</h3><div id="aiCollectionRisks"></div></div><div class="jms-ai-insight"><h3>فرص البيع والمتابعة</h3><div id="aiSalesOpportunities"></div></div><div class="jms-ai-insight"><h3>ذكاء عروض الأسعار</h3><div id="aiQuoteIntelligence"></div></div></div>
-        <div class="panel" style="margin-top:14px"><div class="panel-head"><b>تقييم العملاء الذكي</b><span>حسب الزيارات، الطلبات، المديونية، اكتمال البيانات</span></div><div id="aiCustomerScoreTable"></div></div>`;
+        <div class="page-head with-action"><div><h1 data-i18n="ui_0b2db06865b2">أوامر الذكاء الاصطناعي</h1><p data-i18n="ui_f9fa72d3be4f">مهام اليوم، تقييم العملاء، مخاطر التحصيل، فرص البيع، ذكاء عروض الأسعار.</p></div><div class="head-actions"><button class="primary" onclick="jmsRenderAiCommandCenter()" data-i18n="ui_8cf12923dfda">تحديث التحليل</button><button onclick="jmsPrintAiCommandReport()" data-i18n="ui_9f6fbeb7a29b">طباعة التقرير</button></div></div>
+        <div class="jms-growth-grid"><div class="jms-growth-card"><b id="aiTodayTasksCount">0</b><span data-i18n="ui_f9284e3092ae">مهام ذكية اليوم</span></div><div class="jms-growth-card"><b id="aiRiskCount">0</b><span data-i18n="ui_4e03fdceeee9">مخاطر تحصيل</span></div><div class="jms-growth-card"><b id="aiOpportunityCount">0</b><span data-i18n="ui_75f5e0ab37b4">فرص بيع</span></div><div class="jms-growth-card"><b id="aiQuoteRiskCount">0</b><span data-i18n="ui_1ecef074a20a">عروض تحتاج مراجعة</span></div></div>
+        <div class="jms-ai-command-row"><div class="jms-ai-insight"><h3 data-i18n="ui_edcfdbb4d482">مهام اليوم المقترحة</h3><div id="aiTodayTasks"></div></div><div class="jms-ai-insight"><h3 data-i18n="ui_65a93a27db60">خطر التحصيل</h3><div id="aiCollectionRisks"></div></div><div class="jms-ai-insight"><h3 data-i18n="ui_7b58f4819e8c">فرص البيع والمتابعة</h3><div id="aiSalesOpportunities"></div></div><div class="jms-ai-insight"><h3 data-i18n="ui_f9853aa4e724">ذكاء عروض الأسعار</h3><div id="aiQuoteIntelligence"></div></div></div>
+        <div class="panel" style="margin-top:14px"><div class="panel-head"><b data-i18n="ui_7eb50f7959bf">تقييم العملاء الذكي</b><span data-i18n="ui_528cacba4e8d">حسب الزيارات، الطلبات، المديونية، اكتمال البيانات</span></div><div id="aiCustomerScoreTable"></div></div>`;
       main.appendChild(sec);
     }
     document.querySelectorAll('.nav').forEach(btn=>{
@@ -4989,7 +4748,7 @@ askJmsAI = async function(q){
     const keywords= district ? `${baseKeywords} ${district} قريب nearby near me` : baseKeywords;
     const limit=Number(document.getElementById('radarLimit')?.value||12);
     const status=document.getElementById('radarStatus');
-    if(status) status.innerHTML='<div class="jms-thinking">جارٍ البحث في الويب عن فرص جديدة... قد يستغرق 20 إلى 40 ثانية.</div>';
+    if(status) status.innerHTML="<div class=\"jms-thinking\" data-i18n=\"ui_f468ab83f835\">جارٍ البحث في الويب عن فرص جديدة... قد يستغرق 20 إلى 40 ثانية.</div>";
     try{
       const res=await fetch('/api/new-customer-radar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city,industry,keywords,limit,existingCustomers:(db.customers||[]).map(c=>c.name).slice(0,300)})});
       const data=await res.json().catch(()=>({ok:false,error:'bad_response'}));
@@ -4999,7 +4758,7 @@ askJmsAI = async function(q){
       }else{
         if(status) status.innerHTML=`<div class="jms-radar-note">تعذر البحث الخارجي: ${esc(data.error||data.answer||'تأكد من OPENAI_API_KEY')}. يمكنك إضافة الفرص يدويًا أو البحث من JMS AI.</div>`;
       }
-    }catch(e){ if(status) status.innerHTML=`<div class="jms-radar-note">تعذر الاتصال بواجهة البحث. تأكد أنك رفعت ملف api/new-customer-radar.js.</div>`; }
+    }catch(e){ if(status) status.innerHTML=`<div class="jms-radar-note" data-i18n="ui_90e296d5b827">تعذر الاتصال بواجهة البحث. تأكد أنك رفعت ملف api/new-customer-radar.js.</div>`; }
     renderNewCustomerRadar();
   };
   window.jmsRadarSaveSearch=function(){
@@ -5008,12 +4767,12 @@ askJmsAI = async function(q){
   };
   window.jmsOpenManualLead=function(){
     const reps=(db.reps||[]);
-    modalBody.innerHTML=`<h2>إضافة فرصة عميل جديد</h2><div class="form-grid two">
-      <label>اسم النشاط<input id="mlName" placeholder="اسم العميل أو النشاط"></label><label>النشاط<input id="mlType" placeholder="مطعم، كوفي، مصنع..."></label>
-      <label>المدينة<input id="mlCity" value="جدة"></label><label>الحي<input id="mlArea"></label>
-      <label>الجوال<input id="mlPhone" placeholder="9665..."></label><label>رابط الموقع<input id="mlWebsite"></label>
-      <label>رابط خرائط Google<input id="mlMaps"></label><label>المندوب<select id="mlRep"><option value="">بدون تعيين</option>${reps.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
-    </div><label>سبب الفرصة<textarea id="mlReason" rows="3">نشاط جديد يحتاج أكياس أو تغليف.</textarea></label><br><button class="primary" onclick="jmsSaveManualLead()">حفظ الفرصة</button>`;
+    modalBody.innerHTML=`<h2 data-i18n="ui_5a233909df5f">إضافة فرصة عميل جديد</h2><div class="form-grid two">
+      <label><span data-i18n="ui_b71805234268">اسم النشاط</span><input id="mlName" placeholder="اسم العميل أو النشاط" data-i18n-placeholder="ui_97d5b072a798"></label><label><span data-i18n="ui_7d72e4a54516">النشاط</span><input id="mlType" placeholder="مطعم، كوفي، مصنع..." data-i18n-placeholder="ui_ba27ef5f9cb8"></label>
+      <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mlCity" value="جدة"></label><label><span data-i18n=ui_0a6767f7377b>الحي</span><input id="mlArea"></label>
+      <label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="mlPhone" placeholder="9665..."></label><label><span data-i18n="ui_41542329e949">رابط الموقع</span><input id="mlWebsite"></label>
+      <label><span data-i18n="ui_231b76947023">رابط خرائط Google</span><input id="mlMaps"></label><label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mlRep"><option value="" data-i18n="ui_78b1ffb96c84">بدون تعيين</option>${reps.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+    </div><label><span data-i18n="ui_5b81c06338ff">سبب الفرصة</span><textarea id="mlReason" rows="3">نشاط جديد يحتاج أكياس أو تغليف.</textarea></label><br><button class="primary" onclick="jmsSaveManualLead()" data-i18n="ui_8d7d4d14f9b5">حفظ الفرصة</button>`;
     modal.classList.remove('hidden');
   };
   window.jmsSaveManualLead=function(){
@@ -5049,8 +4808,8 @@ askJmsAI = async function(q){
     box.innerHTML=list.map(l=>{
       const score=Number(l.score||leadScore(l));
       const statusText={new:'جديد',contacted:'تم التواصل',interested:'مهتم',not_interested:'غير مهتم',converted:'تحول إلى عميل'}[l.status]||l.status||'جديد';
-      return `<div class="jms-lead-card"><div class="jms-lead-head"><div><h3>${esc(l.name)}</h3><div class="jms-lead-meta"><span>${esc(l.business_type)}</span><span>${esc(l.city||'')}</span><span>${esc(l.area||'')}</span><span>المندوب: ${esc(repLabel(l.assigned_rep_id))}</span></div></div><span class="jms-score-pill ${scoreClass(score)}">${score}%</span></div><div><span class="jms-badge ${score>=75?'hot':'ok'}">${statusText}</span> <span class="jms-mini-muted">${esc(l.evidence||'فرصة تجارية من مصدر عام أو إدخال يدوي')}</span></div><p>${esc(l.fit_reason||'نشاط مناسب لمنتجات التغليف والأكياس.')}</p><div class="jms-lead-actions"><button class="primary" onclick="jmsLeadConvertToCustomer('${l.id}')">تحويل لعميل</button><button class="green" onclick="jmsLeadWhatsApp('${l.id}')">واتساب</button><button onclick="jmsLeadCopyMessage('${l.id}')">نسخ الرسالة</button><button onclick="jmsLeadSetStatus('${l.id}','contacted')">تم التواصل</button><button onclick="jmsLeadSetStatus('${l.id}','interested')">مهتم</button><button onclick="jmsLeadAssign('${l.id}')">تعيين مندوب</button>${l.maps_url?`<button class="blue" onclick="window.open('${esc(l.maps_url)}','_blank')">الخريطة</button>`:''}${l.website?`<button onclick="window.open('${esc(l.website)}','_blank')">الموقع</button>`:''}${l.source_url?`<button onclick="window.open('${esc(l.source_url)}','_blank')">المصدر</button>`:''}</div></div>`;
-    }).join('') || '<div class="panel">لا توجد فرص محفوظة. اضغط بحث الآن أو أضف فرصة يدوية.</div>';
+      return `<div class="jms-lead-card"><div class="jms-lead-head"><div><h3>${esc(l.name)}</h3><div class="jms-lead-meta"><span>${esc(l.business_type)}</span><span>${esc(l.city||'')}</span><span>${esc(l.area||'')}</span><span>المندوب: ${esc(repLabel(l.assigned_rep_id))}</span></div></div><span class="jms-score-pill ${scoreClass(score)}">${score}%</span></div><div><span class="jms-badge ${score>=75?'hot':'ok'}">${statusText}</span> <span class="jms-mini-muted">${esc(l.evidence||'فرصة تجارية من مصدر عام أو إدخال يدوي')}</span></div><p>${esc(l.fit_reason||'نشاط مناسب لمنتجات التغليف والأكياس.')}</p><div class="jms-lead-actions"><button class="primary" onclick="jmsLeadConvertToCustomer('${l.id}')">تحويل لعميل</button><button class="green" onclick="jmsLeadWhatsApp('${l.id}')">واتساب</button><button onclick="jmsLeadCopyMessage('${l.id}')">نسخ الرسالة</button><button onclick="jmsLeadSetStatus('${l.id}','contacted')">تم التواصل</button><button onclick="jmsLeadSetStatus('${l.id}','interested')">مهتم</button><button onclick="jmsLeadAssign('${l.id}')">تعيين مندوب</button>${l.maps_url?`<button class="blue" onclick="window.open('${esc(l.maps_url)}','_blank')">الخريطة</button>`:''}${l.website?`<button onclick="window.open('${esc(l.website)}','_blank')"><span data-i18n=ui_8937faa1e41f>الموقع</span></button>`:''}${l.source_url?`<button onclick="window.open('${esc(l.source_url)}','_blank')">المصدر</button>`:''}</div></div>`;
+    }).join('') || "<div class=\"panel\" data-i18n=\"ui_6eb0dbfb1152\">لا توجد فرص محفوظة. اضغط بحث الآن أو أضف فرصة يدوية.</div>";
   };
 
   function customerAiScore(c){
@@ -5089,19 +4848,19 @@ askJmsAI = async function(q){
     const table=document.getElementById('aiCustomerScoreTable');
     if(table){
       const rows=(db.customers||[]).map(c=>({c,score:customerAiScore(c),label:customerAiLabel(c)})).sort((a,b)=>b.score-a.score).slice(0,25);
-      table.innerHTML=`<table class="jms-ai-table"><tr><th>العميل</th><th>التقييم</th><th>الحالة</th><th>آخر زيارة</th><th>مديونية</th><th>إجراء</th></tr>${rows.map(r=>`<tr><td>${esc(r.c.name)}</td><td><span class="jms-score-pill ${scoreClass(r.score)}">${r.score}%</span></td><td>${esc(r.label)}</td><td>${lastVisitDate(r.c.id)||'-'}</td><td>${sar(r.c.debt_balance||0)}</td><td><button class="jms-growth-btn gray" onclick="jmsOpenCustomer360Growth('${r.c.id}')">ملف 360</button></td></tr>`).join('')}</table>`;
+      table.innerHTML=`<table class="jms-ai-table"><tr><th><span data-i18n=ui_a042411e90be>العميل</span></th><th data-i18n="ui_800984180746">التقييم</th><th><span data-i18n=ui_c3a4749caed4>الحالة</span></th><th data-i18n="ui_f9fd43b0460f">آخر زيارة</th><th data-i18n="ui_9d061763061c">مديونية</th><th><span data-i18n=ui_8b2c85333b99>إجراء</span></th></tr>${rows.map(r=>`<tr><td>${esc(r.c.name)}</td><td><span class="jms-score-pill ${scoreClass(r.score)}">${r.score}%</span></td><td>${esc(r.label)}</td><td>${lastVisitDate(r.c.id)||'-'}</td><td>${sar(r.c.debt_balance||0)}</td><td><button class="jms-growth-btn gray" onclick="jmsOpenCustomer360Growth('${r.c.id}')">ملف 360</button></td></tr>`).join('')}</table>`;
     }
   };
   window.jmsPrintAiCommandReport=function(){ const txt=document.getElementById('aiCommandCenter')?.innerText||''; const w=window.open('','_blank'); w.document.write(`<html dir="rtl"><head><title>JMS AI Report</title><style>body{font-family:Tahoma,Arial;line-height:1.9;padding:30px;white-space:pre-line}</style></head><body>${esc(txt)}</body></html>`); w.document.close(); w.print(); };
   window.jmsOpenCustomer360Growth=function(cid){
     const c=(db.customers||[]).find(x=>x.id===cid); if(!c)return; const score=customerAiScore(c); const tasks=buildDailyTasks().filter(t=>t.customer_id===cid); const msg=makeLeadMessage({name:c.name,business_type:c.category,phone:c.phone});
-    modalBody.innerHTML=`<h2>ملف العميل الذكي 360°</h2><div class="jms-growth-grid"><div class="jms-growth-card"><b>${esc(c.name)}</b><span>${esc(c.category||'عميل')}</span></div><div class="jms-growth-card"><b>${score}%</b><span>${esc(customerAiLabel(c))}</span></div><div class="jms-growth-card"><b>${lastVisitDate(cid)||'-'}</b><span>آخر زيارة</span></div><div class="jms-growth-card"><b>${sar(c.debt_balance||0)}</b><span>المديونية</span></div></div><div class="jms-ai-insight"><h3>الإجراء المقترح</h3><ul>${(tasks.length?tasks:[{txt:'متابعة ودية للحفاظ على العلاقة'}]).map(t=>`<li>${esc(t.txt)}</li>`).join('')}</ul></div><label>رسالة واتساب مقترحة<textarea rows="5" id="c360Msg">${esc(msg)}</textarea></label><br><button class="primary" onclick="navigator.clipboard?.writeText(c360Msg.value);alert('تم نسخ الرسالة')">نسخ الرسالة</button><button onclick="closeModal()">إغلاق</button>`; modal.classList.remove('hidden');
+    modalBody.innerHTML=`<h2 data-i18n="ui_f67a88e9a75f">ملف العميل الذكي 360°</h2><div class="jms-growth-grid"><div class="jms-growth-card"><b>${esc(c.name)}</b><span>${esc(c.category||'عميل')}</span></div><div class="jms-growth-card"><b>${score}%</b><span>${esc(customerAiLabel(c))}</span></div><div class="jms-growth-card"><b>${lastVisitDate(cid)||'-'}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div><div class="jms-growth-card"><b>${sar(c.debt_balance||0)}</b><span data-i18n="ui_8ef13d3ef3ca">المديونية</span></div></div><div class="jms-ai-insight"><h3 data-i18n="ui_ee38de2ec372">الإجراء المقترح</h3><ul>${(tasks.length?tasks:[{txt:'متابعة ودية للحفاظ على العلاقة'}]).map(t=>`<li>${esc(t.txt)}</li>`).join('')}</ul></div><label><span data-i18n="ui_b2a705686a7b">رسالة واتساب مقترحة</span><textarea rows="5" id="c360Msg">${esc(msg)}</textarea></label><br><button class="primary" onclick="navigator.clipboard?.writeText(c360Msg.value);alert('تم نسخ الرسالة')" data-i18n="ui_38df2072a74d">نسخ الرسالة</button><button onclick="closeModal()"><span data-i18n=ui_ca90c297b099>إغلاق</span></button>`; modal.classList.remove('hidden');
   };
   function enrichCustomerCards(){
     document.querySelectorAll('.customer-card').forEach(card=>{
       if(card.dataset.aiGrowth==='1') return; const name=card.querySelector('h3')?.textContent?.trim(); const c=(db.customers||[]).find(x=>String(x.name||'').trim()===name); if(!c)return; card.dataset.aiGrowth='1'; const score=customerAiScore(c);
       const div=document.createElement('div'); div.className='jms-customer-score'; div.innerHTML=`<span>${esc(customerAiLabel(c))}</span><span class="circle">${score}</span>`; const actions=card.querySelector('.customer-actions,.actions,.row-actions')||card; actions.parentNode.insertBefore(div,actions);
-      const btn=document.createElement('button'); btn.className='jms-growth-btn purple'; btn.textContent='ملف 360'; btn.onclick=()=>jmsOpenCustomer360Growth(c.id); (card.querySelector('.customer-actions,.actions,.row-actions')||card).appendChild(btn);
+      const btn=document.createElement('button'); btn.className='jms-growth-btn purple'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"ملف 360"); btn.onclick=()=>jmsOpenCustomer360Growth(c.id); (card.querySelector('.customer-actions,.actions,.row-actions')||card).appendChild(btn);
     });
   }
 
@@ -5231,7 +4990,7 @@ askJmsAI = async function(q){
         const data=await jmsPostJson('/api/auth-login',{email,password,role});
         const u=data.user;
         if(!u) return alert('بيانات الدخول غير صحيحة');
-        currentUser={id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active',permissions:{...roleDefaults(u.role),...(u.permissions||{})}};
+        currentUser={id:u.id,name:u.name,email:u.email,role:u.role,status:u.status||'active',language:u.language||'ar',permissions:{...roleDefaults(u.role),...(u.permissions||{})}};
         window.currentUser=currentUser;
         sessionStorage.setItem('jms_current_user',JSON.stringify(currentUser));
         if(data.token) sessionStorage.setItem('jms_auth_token', data.token);
@@ -5248,22 +5007,22 @@ askJmsAI = async function(q){
   window.openUserForm = function(){
     if(!can('manage_users')) return alert('إضافة المستخدمين مخصصة لمدير النظام فقط');
     const perms = roleDefaults('rep');
-    modalBody.innerHTML = `<h2>إضافة مستخدم وصلاحيات</h2>
-      <p class="muted">المستخدم يُحفظ في السيرفر، وبعدها يقدر يدخل من أي جهاز.</p>
+    modalBody.innerHTML = `<h2 data-i18n="ui_649640114052">إضافة مستخدم وصلاحيات</h2>
+      <p class="muted" data-i18n="ui_3b694b50da3a">المستخدم يُحفظ في السيرفر، وبعدها يقدر يدخل من أي جهاز.</p>
       <div class="form-grid two">
-        <label>الاسم<input id="muName" placeholder="اسم المستخدم"></label>
-        <label>البريد<input id="muEmail" type="email" placeholder="name@jms.local" autocomplete="username"></label>
-        <label>رقم الجوال / واتساب<input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
-        <label>كلمة مرور مؤقتة<input id="muPass" type="password" autocomplete="new-password" placeholder="كلمة مرور مؤقتة"></label>
-        <label>الدور<select id="muRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep">مندوب</option><option value="warehouse">مسؤول الأحبار فقط</option><option value="sales">مدير مبيعات</option><option value="admin">مدير نظام</option></select></label>
-        <label>الحالة<select id="muStatus"><option value="active">نشط</option><option value="disabled">موقوف</option></select></label>
+        <label><span data-i18n=ui_52ab09847cf8>الاسم</span><input id="muName" placeholder="اسم المستخدم" data-i18n-placeholder="ui_06668ac85e3d"></label>
+        <label><span data-i18n=ui_cb572218fea7>البريد</span><input id="muEmail" type="email" placeholder="name@jms.local" autocomplete="username"></label>
+        <label><span data-i18n=ui_45d490fda163>رقم الجوال / واتساب</span><input id="muPhone" placeholder="9665xxxxxxxx" inputmode="tel"></label>
+        <label><span data-i18n=ui_eff5589e03e0>كلمة مرور مؤقتة</span><input id="muPass" type="password" autocomplete="new-password" placeholder="كلمة مرور مؤقتة" data-i18n-placeholder=ui_eff5589e03e0></label>
+        <label><span data-i18n=ui_de69d94fee12>الدور</span><select id="muRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" data-i18n=ui_3a574081142f>مندوب</option><option value="warehouse" data-i18n=ui_e9b55280b1ae>مسؤول الأحبار فقط</option><option value="sales" data-i18n="ui_1457027fa98c">مدير مبيعات</option><option value="admin" data-i18n="ui_7419927aee59">مدير نظام</option></select></label>
+        <label><span data-i18n=ui_c3a4749caed4>الحالة</span><select id="muStatus"><option value="active" data-i18n="ui_629e90b3af3d">نشط</option><option value="disabled" data-i18n="ui_e858894dedb7">موقوف</option></select></label>
       </div>
-      <h3>الصلاحيات</h3>
+      <h3><span data-i18n=ui_3e16256d96b6>الصلاحيات</span></h3>
       <div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">
         ${permissionCheckboxes(perms)}
       </div>
-      <button class="primary" onclick="saveUser()">حفظ المستخدم في السيرفر</button>
-      <button onclick="closeModal()">إلغاء</button>`;
+      <button class="primary" onclick="saveUser()" data-i18n="ui_a64af67014ac">حفظ المستخدم في السيرفر</button>
+      <button onclick="closeModal()"><span data-i18n=ui_9a30dc2a96b8>إلغاء</span></button>`;
     modal.classList.remove('hidden');
   };
 
@@ -5304,18 +5063,18 @@ askJmsAI = async function(q){
     const u=db.users.find(x=>x.id===userId);
     if(!u) return alert('لم يتم العثور على المستخدم');
     normalizeUser(u);
-    modalBody.innerHTML=`<h2>تعديل صلاحيات المستخدم</h2>
+    modalBody.innerHTML=`<h2 data-i18n="ui_e69a5ef08a8f">تعديل صلاحيات المستخدم</h2>
       <div class="form-grid two">
-        <label>الاسم<input id="epName" value="${esc(u.name)}"></label>
-        <label>البريد<input id="epEmail" value="${esc(u.email)}"></label>
-        <label>الجوال<input id="epPhone" value="${esc(u.phone||'')}"></label>
-        <label>الدور<select id="epRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" ${u.role==='rep'?'selected':''}>مندوب</option><option value="warehouse" ${u.role==='warehouse'?'selected':''}>مسؤول الأحبار فقط</option><option value="sales" ${u.role==='sales'?'selected':''}>مدير مبيعات</option><option value="admin" ${u.role==='admin'?'selected':''}>مدير نظام</option></select></label>
-        <label>الحالة<select id="epStatus"><option value="active" ${u.status==='active'?'selected':''}>نشط</option><option value="disabled" ${u.status!=='active'?'selected':''}>موقوف</option></select></label>
+        <label><span data-i18n=ui_52ab09847cf8>الاسم</span><input id="epName" value="${esc(u.name)}"></label>
+        <label><span data-i18n=ui_cb572218fea7>البريد</span><input id="epEmail" value="${esc(u.email)}"></label>
+        <label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="epPhone" value="${esc(u.phone||'')}"></label>
+        <label><span data-i18n=ui_de69d94fee12>الدور</span><select id="epRole" onchange="jmsFillPermissionPreset(this.value)"><option value="rep" ${u.role==='rep'?'selected':''} data-i18n=ui_3a574081142f>مندوب</option><option value="warehouse" ${u.role==='warehouse'?'selected':''} data-i18n=ui_e9b55280b1ae>مسؤول الأحبار فقط</option><option value="sales" ${u.role==='sales'?'selected':''}>مدير مبيعات</option><option value="admin" ${u.role==='admin'?'selected':''}>مدير نظام</option></select></label>
+        <label><span data-i18n=ui_c3a4749caed4>الحالة</span><select id="epStatus"><option value="active" ${u.status==='active'?'selected':''}>نشط</option><option value="disabled" ${u.status!=='active'?'selected':''}>موقوف</option></select></label>
       </div>
-      <h3>الصلاحيات</h3><div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">${permissionCheckboxes(u.permissions)}</div>
-      <button class="primary" onclick="saveUserPermissions('${u.id}')">حفظ الصلاحيات</button>
-      <button onclick="resetPass('${u.id}')">تغيير كلمة المرور</button>
-      <button onclick="closeModal()">إغلاق</button>`;
+      <h3><span data-i18n=ui_3e16256d96b6>الصلاحيات</span></h3><div class="jms-permission-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:10px 0">${permissionCheckboxes(u.permissions)}</div>
+      <button class="primary" onclick="saveUserPermissions('${u.id}')"><span data-i18n=ui_ae3c6021608f>حفظ الصلاحيات</span></button>
+      <button onclick="resetPass('${u.id}')"><span data-i18n=ui_473bcc4e9b46>تغيير كلمة المرور</span></button>
+      <button onclick="closeModal()"><span data-i18n=ui_ca90c297b099>إغلاق</span></button>`;
     modal.classList.remove('hidden');
   };
   window.saveUserPermissions=async function(userId){
@@ -5352,21 +5111,21 @@ askJmsAI = async function(q){
     if(!window.usersList) return;
     normalizeAll();
     const canEdit=can('manage_permissions') || can('manage_users');
-    usersList.innerHTML = `<div class="panel"><div class="row-actions"><button class="primary" onclick="openUserForm()">إضافة مستخدم</button></div></div>`+
-    `<table><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr>${db.users.map(u=>{normalizeUser(u); const p=[]; if(u.permissions.manage_ink)p.push('مخزون الأحبار'); if(u.permissions.view_all_customers)p.push('كل العملاء'); if(u.permissions.reassign_customers)p.push('نقل العملاء'); if(u.permissions.view_reports)p.push('تقارير'); if(u.permissions.use_ai)p.push('AI'); return `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${roleLabel(u.role)}</td><td>${p.join('، ')||'-'}</td><td>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions">${canEdit?`<button onclick="openUserPermissions('${u.id}')">الصلاحيات</button><button onclick="resetPass('${u.id}')">كلمة المرور</button><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button>`:''}</div></td></tr>`}).join('')}</table>`;
+    usersList.innerHTML = `<div class="panel"><div class="row-actions"><button class="primary" onclick="openUserForm()"><span data-i18n=ui_8e8b3ae05333>إضافة مستخدم</span></button></div></div>`+
+    `<table><tr><th><span data-i18n=ui_52ab09847cf8>الاسم</span></th><th><span data-i18n=ui_cb572218fea7>البريد</span></th><th><span data-i18n=ui_de69d94fee12>الدور</span></th><th><span data-i18n=ui_3e16256d96b6>الصلاحيات</span></th><th><span data-i18n=ui_c3a4749caed4>الحالة</span></th><th data-i18n="ui_9f0a0f722601">إجراءات</th></tr>${db.users.map(u=>{normalizeUser(u); const p=[]; if(u.permissions.manage_ink)p.push('مخزون الأحبار'); if(u.permissions.view_all_customers)p.push('كل العملاء'); if(u.permissions.reassign_customers)p.push('نقل العملاء'); if(u.permissions.view_reports)p.push('تقارير'); if(u.permissions.use_ai)p.push('AI'); return `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${roleLabel(u.role)}</td><td>${p.join('، ')||'-'}</td><td data-i18n-text>${u.status==='active'?'نشط':'موقوف'}</td><td><div class="row-actions">${canEdit?`<button onclick="openUserPermissions('${u.id}')"><span data-i18n=ui_3e16256d96b6>الصلاحيات</span></button><button onclick="resetPass('${u.id}')"><span data-i18n=ui_b05d306b5591>كلمة المرور</span></button><button onclick="toggleUser('${u.id}')">${u.status==='active'?'إيقاف':'تفعيل'}</button>`:''}</div></td></tr>`}).join('')}</table>`;
   };
 
   // Customer creation/edit/assignment.
   window.openCustomerForm=function(){
     if(!can('create_customers')) return alert('لا تملك صلاحية إضافة عملاء');
     const defaultRep=currentUser?.role==='rep'?currentUser.id:(db.reps[0]?.id||'');
-    modalBody.innerHTML=`<h2>إضافة عميل</h2><div class="form-grid two">
-      <label>اسم العميل<input id="mcName"></label><label>الجوال<input id="mcPhone"></label>
-      <label>المدينة<input id="mcCity" value="جدة"></label>
-      <label>المندوب<select id="mcRep" ${can('reassign_customers')?'':'disabled'}>${repOptions(defaultRep)}</select></label>
-      <label>الموقع<input id="mcLocation"></label><label>تصنيف العميل<input id="mcCategory" value="عميل"></label>
-      <label>المديونية<input id="mcDebt" type="number" value="0"></label>
-    </div><br><button class="primary" onclick="saveCustomer()">حفظ</button><button onclick="closeModal()">إلغاء</button>`;
+    modalBody.innerHTML=`<h2><span data-i18n=ui_bf5ecb5e2537>إضافة عميل</span></h2><div class="form-grid two">
+      <label><span data-i18n="ui_70771eb8320f">اسم العميل</span><input id="mcName"></label><label><span data-i18n=ui_0b6aa9453dfb>الجوال</span><input id="mcPhone"></label>
+      <label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mcCity" value="جدة"></label>
+      <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mcRep" ${can('reassign_customers')?'':'disabled'}>${repOptions(defaultRep)}</select></label>
+      <label><span data-i18n=ui_8937faa1e41f>الموقع</span><input id="mcLocation"></label><label><span data-i18n="ui_af813b88a2c9">تصنيف العميل</span><input id="mcCategory" value="عميل"></label>
+      <label><span data-i18n="ui_8ef13d3ef3ca">المديونية</span><input id="mcDebt" type="number" value="0"></label>
+    </div><br><button class="primary" onclick="saveCustomer()"><span data-i18n=ui_ddfcaf9d0144>حفظ</span></button><button onclick="closeModal()"><span data-i18n=ui_9a30dc2a96b8>إلغاء</span></button>`;
     modal.classList.remove('hidden');
   };
   window.saveCustomer=function(){
@@ -5378,12 +5137,12 @@ askJmsAI = async function(q){
   window.openAssignCustomer=function(customerId){
     if(!can('reassign_customers')) return alert('لا تملك صلاحية نقل العملاء بين المناديب');
     const c=db.customers.find(x=>x.id===customerId); if(!c) return alert('لم يتم العثور على العميل');
-    modalBody.innerHTML=`<h2>نقل العميل لمندوب</h2>
+    modalBody.innerHTML=`<h2 data-i18n="ui_9626324a7c0b">نقل العميل لمندوب</h2>
       <p><b>${esc(c.name)}</b><br>المندوب الحالي: ${esc(repLabel(c.rep_id))}</p>
-      <label>المندوب الجديد<select id="assignRep">${repOptions(c.rep_id)}</select></label>
+      <label><span data-i18n="ui_57b0f7667042">المندوب الجديد</span><select id="assignRep">${repOptions(c.rep_id)}</select></label>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="assignOpenRecords" checked> تحديث العروض والطلبات المفتوحة لهذا العميل إلى المندوب الجديد</label>
-      <label>سبب النقل<input id="assignReason" placeholder="مثال: تغيير منطقة / تحويل متابعة"></label>
-      <br><button class="primary" onclick="saveCustomerAssignment('${customerId}')">حفظ النقل</button><button onclick="closeModal()">إلغاء</button>`;
+      <label><span data-i18n="ui_2723f5aca558">سبب النقل</span><input id="assignReason" placeholder="مثال: تغيير منطقة / تحويل متابعة" data-i18n-placeholder="ui_bbb52f43726b"></label>
+      <br><button class="primary" onclick="saveCustomerAssignment('${customerId}')">حفظ النقل</button><button onclick="closeModal()"><span data-i18n=ui_9a30dc2a96b8>إلغاء</span></button>`;
     modal.classList.remove('hidden');
   };
   window.saveCustomerAssignment=function(customerId){
@@ -5402,17 +5161,17 @@ askJmsAI = async function(q){
   };
   window.openBulkAssignCustomers=function(){
     if(!can('reassign_customers')) return alert('لا تملك صلاحية نقل العملاء');
-    modalBody.innerHTML=`<h2>نقل عدة عملاء</h2>
-      <div class="form-grid two"><label>من مندوب<select id="bulkFrom"><option value="all">كل العملاء</option>${repOptions('')}</select></label><label>إلى مندوب<select id="bulkTo">${repOptions('')}</select></label></div>
-      <button onclick="renderBulkCustomerList()">عرض العملاء</button><div id="bulkCustomerList" style="max-height:320px;overflow:auto;margin-top:10px"></div>
-      <br><button class="primary" onclick="saveBulkAssignment()">نقل المحددين</button><button onclick="closeModal()">إلغاء</button>`;
+    modalBody.innerHTML=`<h2 data-i18n="ui_539eed1eb592">نقل عدة عملاء</h2>
+      <div class="form-grid two"><label><span data-i18n="ui_1bda6976ac76">من مندوب</span><select id="bulkFrom"><option value="all" data-i18n="ui_ff5bf574dfee">كل العملاء</option>${repOptions('')}</select></label><label><span data-i18n="ui_c813377bc2ef">إلى مندوب</span><select id="bulkTo">${repOptions('')}</select></label></div>
+      <button onclick="renderBulkCustomerList()" data-i18n="ui_fd5f5a9e6131">عرض العملاء</button><div id="bulkCustomerList" style="max-height:320px;overflow:auto;margin-top:10px"></div>
+      <br><button class="primary" onclick="saveBulkAssignment()" data-i18n="ui_960e1cfe365e">نقل المحددين</button><button onclick="closeModal()"><span data-i18n=ui_9a30dc2a96b8>إلغاء</span></button>`;
     modal.classList.remove('hidden'); renderBulkCustomerList();
   };
   window.renderBulkCustomerList=function(){
     const from=document.getElementById('bulkFrom')?.value||'all';
     const list=(db.customers||[]).filter(c=>from==='all'||c.rep_id===from);
     const box=document.getElementById('bulkCustomerList'); if(!box) return;
-    box.innerHTML=list.map(c=>`<label style="display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px"><input type="checkbox" class="bulkCust" value="${esc(c.id)}"> <span><b>${esc(c.name)}</b><br><small>${esc(c.phone||'-')} · ${esc(repLabel(c.rep_id))}</small></span></label>`).join('') || '<div class="panel">لا يوجد عملاء</div>';
+    box.innerHTML=list.map(c=>`<label style="display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px"><input type="checkbox" class="bulkCust" value="${esc(c.id)}"> <span><b>${esc(c.name)}</b><br><small>${esc(c.phone||'-')} · ${esc(repLabel(c.rep_id))}</small></span></label>`).join('') || "<div class=\"panel\" data-i18n=\"ui_1027871af7c9\">لا يوجد عملاء</div>";
   };
   window.saveBulkAssignment=function(){
     const ids=[...document.querySelectorAll('.bulkCust:checked')].map(x=>x.value);
@@ -5432,15 +5191,15 @@ askJmsAI = async function(q){
       const st=(typeof customerState==='function')?customerState(c):['عميل','ok'];
       const last=(typeof lastVisit==='function')?lastVisit(c.id):'';
       return `<div class="customer-card"><div class="customer-head"><div><h3>${esc(c.name)}</h3><p>${esc(c.phone||'-')} · ${esc(c.city||'-')} · ${esc(repLabel(c.rep_id))}</p></div><span class="badge ${st[1]}">${esc(st[0])}</span></div>
-      <div class="metrics"><div><b>${typeof money==='function'?money(c.debt_balance):Number(c.debt_balance||0)}</b><span>مديونية</span></div><div><b>${esc(last||'-')}</b><span>آخر زيارة</span></div><div><b>${esc(c.next_date||'-')}</b><span>موعد</span></div></div>
+      <div class="metrics"><div><b>${typeof money==='function'?money(c.debt_balance):Number(c.debt_balance||0)}</b><span data-i18n="ui_9d061763061c">مديونية</span></div><div><b>${esc(last||'-')}</b><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span></div><div><b>${esc(c.next_date||'-')}</b><span data-i18n="ui_4c2142366eca">موعد</span></div></div>
       <div class="customer-actions">
-        <button onclick="visit('${c.id}')">تمت الزيارة</button><button onclick="newOrder('${c.id}')">طلب جديد</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="collect('${c.id}')">تحصيل</button><button onclick="note('${c.id}')">ملاحظة</button>
+        <button onclick="visit('${c.id}')">تمت الزيارة</button><button onclick="newOrder('${c.id}')">طلب جديد</button><button onclick="appointment('${c.id}')">موعد</button><button onclick="collect('${c.id}')"><span data-i18n=ui_68f752e279d8>تحصيل</span></button><button onclick="note('${c.id}')"><span data-i18n=ui_0be7afd7e65f>ملاحظة</span></button>
         ${can('edit_customers')?`<button onclick="editCustomerPro('${c.id}')">تعديل العميل</button>`:''}
         ${can('reassign_customers')?`<button class="primary" onclick="openAssignCustomer('${c.id}')">نقل لمندوب</button>`:''}
-        ${typeof openCustomerMap==='function'?`<button onclick="openCustomerMap('${c.id}')">موقع العميل</button>`:''}
+        ${typeof openCustomerMap==='function'?`<button onclick="openCustomerMap('${c.id}')"><span data-i18n=ui_1a57fafdefde>موقع العميل</span></button>`:''}
         ${typeof jmsOpenCustomer360Growth==='function'?`<button onclick="jmsOpenCustomer360Growth('${c.id}')">ملف ذكي</button>`:''}
       </div></div>`;
-    }).join('') || '<div class="panel">لا يوجد عملاء</div>';
+    }).join('') || "<div class=\"panel\" data-i18n=\"ui_1027871af7c9\">لا يوجد عملاء</div>";
   };
 
   function addManagementButtons(){
@@ -5448,12 +5207,12 @@ askJmsAI = async function(q){
       const usersPage=document.getElementById('users')||document.getElementById('usersPage');
       if(usersPage && !document.getElementById('jmsAddUserBtn')){
         const head=usersPage.querySelector('.page-head,.head-actions')||usersPage;
-        const b=document.createElement('button'); b.id='jmsAddUserBtn'; b.className='primary'; b.textContent='إضافة مستخدم وصلاحيات'; b.onclick=openUserForm; head.prepend(b);
+        const b=document.createElement('button'); b.id='jmsAddUserBtn'; b.className='primary'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"إضافة مستخدم وصلاحيات"); b.onclick=openUserForm; head.prepend(b);
       }
       const customersPage=document.getElementById('customers')||document.getElementById('customersPage');
       if(customersPage && !document.getElementById('jmsBulkAssignBtn') && can('reassign_customers')){
         const head=customersPage.querySelector('.page-head,.head-actions')||customersPage;
-        const b=document.createElement('button'); b.id='jmsBulkAssignBtn'; b.className='primary'; b.textContent='نقل عدة عملاء'; b.onclick=openBulkAssignCustomers; head.prepend(b);
+        const b=document.createElement('button'); b.id='jmsBulkAssignBtn'; b.className='primary'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"نقل عدة عملاء"); b.onclick=openBulkAssignCustomers; head.prepend(b);
       }
     }catch(e){}
   }
@@ -5549,33 +5308,33 @@ askJmsAI = async function(q){
       .jms-campaign-toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end}.jms-campaign-toolbar input,.jms-campaign-toolbar select,.jms-campaign-toolbar textarea{width:100%;border:1px solid #dbe3ef;border-radius:14px;padding:10px;background:#fff}.jms-campaign-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.jms-campaign-actions button{border:0;border-radius:14px;padding:10px 14px;background:#0f172a;color:#fff;cursor:pointer}.jms-campaign-actions button.green{background:#16a34a}.jms-campaign-actions button.blue{background:#2563eb}.jms-campaign-actions button.orange{background:#ea580c}.jms-campaign-actions button.gray{background:#475569}.jms-campaign-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}.jms-campaign-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:14px;box-shadow:0 8px 26px rgba(15,23,42,.06)}.jms-campaign-card b{font-size:24px;color:#0f172a}.jms-campaign-card span{display:block;color:#64748b}.jms-campaign-table{width:100%;border-collapse:separate;border-spacing:0 8px}.jms-campaign-table th{font-size:12px;color:#64748b;text-align:right}.jms-campaign-table td{background:#fff;padding:10px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;vertical-align:top}.jms-campaign-table td:first-child{border-radius:0 14px 14px 0;border-right:1px solid #e5e7eb}.jms-campaign-table td:last-child{border-radius:14px 0 0 14px;border-left:1px solid #e5e7eb}.jms-campaign-badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#eef2ff;color:#3730a3}.jms-campaign-badge.ok{background:#dcfce7;color:#166534}.jms-campaign-badge.warn{background:#fef3c7;color:#92400e}.jms-campaign-badge.bad{background:#fee2e2;color:#991b1b}.jms-campaign-note{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:16px;padding:12px;margin:10px 0}.jms-message-preview{white-space:pre-wrap;max-width:390px;color:#334155;font-size:13px}.jms-campaign-log{display:grid;gap:8px}.jms-campaign-log-row{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px}.jms-muted{color:#64748b;font-size:12px}.jms-link-btn{border:0;border-radius:999px;background:#16a34a;color:#fff;padding:7px 10px;cursor:pointer}
     `; document.head.appendChild(st);
   }
-  function repOptions(){ return '<option value="all">كل المناديب</option>'+(db.reps||[]).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join(''); }
+  function repOptions(){ return "<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>"+(db.reps||[]).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join(''); }
   function addCampaignPage(){
     const nav=document.querySelector('.sidebar nav'); const main=document.querySelector('main.main') || document.querySelector('.main');
     if(!nav || !main) return;
     if(!document.querySelector('[data-page="whatsappCampaigns"]')){
-      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='whatsappCampaigns'; btn.textContent='حملات واتساب الذكية';
+      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='whatsappCampaigns'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"حملات واتساب الذكية");
       nav.insertBefore(btn, nav.querySelector('[data-page="jmsAI"]') || null);
     }
     if(!document.getElementById('whatsappCampaigns')){
       const sec=document.createElement('section'); sec.id='whatsappCampaigns'; sec.className='page';
       sec.innerHTML=`
-        <div class="page-head with-action"><div><h1>حملات واتساب الذكية</h1><p>الذكاء يختار العملاء، يكتب الرسائل، يعرضها عليك للموافقة، ثم يجهز الإرسال تحت تحكم المدير.</p></div><div class="head-actions"><button class="primary" onclick="jmsGenerateWhatsappCampaign()">توليد حملة</button><button onclick="jmsRenderWhatsappCampaigns()">تحديث</button></div></div>
+        <div class="page-head with-action"><div><h1 data-i18n="ui_c9cafd7e83ba">حملات واتساب الذكية</h1><p data-i18n="ui_aec21209745f">الذكاء يختار العملاء، يكتب الرسائل، يعرضها عليك للموافقة، ثم يجهز الإرسال تحت تحكم المدير.</p></div><div class="head-actions"><button class="primary" onclick="jmsGenerateWhatsappCampaign()" data-i18n="ui_cbef5d0cf39b">توليد حملة</button><button onclick="jmsRenderWhatsappCampaigns()"><span data-i18n=ui_00eab31f95b7>تحديث</span></button></div></div>
         <div class="panel"><div class="jms-campaign-toolbar">
-          <label>نوع الحملة<select id="wcType"><option value="followup">متابعة عامة</option><option value="debt">تحصيل</option><option value="inactive">إعادة تنشيط العملاء المتوقفين</option><option value="offer">عرض خاص</option><option value="visit">ترتيب زيارات</option><option value="lead">عملاء محتملين</option></select></label>
-          <label>اختيار العملاء<select id="wcSegment"><option value="all">كل العملاء</option><option value="debt">عليهم تحصيل</option><option value="late_visit">لم تتم زيارتهم 30 يوم</option><option value="inactive">متوقفين / لا يوجد طلب حديث</option><option value="hot_leads">عملاء محتملين من الرادار</option><option value="no_location">بدون موقع</option><option value="no_order_30">بدون طلب 30 يوم</option></select></label>
-          <label>المندوب<select id="wcRep">${repOptions()}</select></label>
-          <label>المدينة / الحي<input id="wcCity" placeholder="جدة، مكة، الصناعية"></label>
-          <label>عدد العملاء<select id="wcLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
-          <label>النبرة<select id="wcTone"><option value="professional">رسمية ومختصرة</option><option value="friendly">ودية</option><option value="firm">حازمة للتحصيل</option></select></label>
+          <label><span data-i18n="ui_db6a88a2c783">نوع الحملة</span><select id="wcType"><option value="followup" data-i18n="ui_0b0cd820e230">متابعة عامة</option><option value="debt" data-i18n=ui_68f752e279d8>تحصيل</option><option value="inactive" data-i18n="ui_9a6dffd6911a">إعادة تنشيط العملاء المتوقفين</option><option value="offer" data-i18n="ui_4578ba4b3d05">عرض خاص</option><option value="visit" data-i18n="ui_aa5b9d1933ce">ترتيب زيارات</option><option value="lead" data-i18n="ui_f714c6d6514b">عملاء محتملين</option></select></label>
+          <label><span data-i18n="ui_3372dcb9ddc1">اختيار العملاء</span><select id="wcSegment"><option value="all" data-i18n="ui_ff5bf574dfee">كل العملاء</option><option value="debt" data-i18n="ui_f14af9239ddf">عليهم تحصيل</option><option value="late_visit" data-i18n="ui_67f23f4bafd4">لم تتم زيارتهم 30 يوم</option><option value="inactive" data-i18n="ui_de3f6aec0d57">متوقفين / لا يوجد طلب حديث</option><option value="hot_leads" data-i18n="ui_1ba2e36a2556">عملاء محتملين من الرادار</option><option value="no_location" data-i18n="ui_e4f69befabe3">بدون موقع</option><option value="no_order_30" data-i18n="ui_fe298d6f0234">بدون طلب 30 يوم</option></select></label>
+          <label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="wcRep">${repOptions()}</select></label>
+          <label><span data-i18n="ui_a050bea30cb3">المدينة / الحي</span><input id="wcCity" placeholder="جدة، مكة، الصناعية" data-i18n-placeholder="ui_b494a0c8ba13"></label>
+          <label><span data-i18n="ui_a2b32eb430ab">عدد العملاء</span><select id="wcLimit"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
+          <label><span data-i18n="ui_d59f542b4df5">النبرة</span><select id="wcTone"><option value="professional" data-i18n="ui_6c3a64e8542e">رسمية ومختصرة</option><option value="friendly" data-i18n="ui_8385739ec533">ودية</option><option value="firm" data-i18n="ui_71ee51b665e4">حازمة للتحصيل</option></select></label>
         </div>
         <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="wcOptInOnly"> إرسال/تجهيز فقط للعملاء الموافقين على رسائل واتساب</label>
-        <label style="margin-top:12px;display:block">تعليمات خاصة للذكاء / قالب الرسالة<textarea id="wcPrompt" rows="4" placeholder="اكتب رسالة مخصصة أو استخدم المتغيرات: {{name}} {{city}} {{rep}} {{debt}}. اتركها فارغة ليكتب الذكاء رسالة مناسبة حسب نوع الحملة."></textarea></label>
-        <div class="jms-campaign-note">نظام الأمان: لا يتم الإرسال مباشرة إلا بعد اعتماد المدير. يمنع التكرار لنفس العميل خلال 7 أيام، ويستبعد العملاء بدون رقم أو الموقوفين من واتساب.</div>
-        <div class="jms-campaign-actions"><button class="blue" onclick="jmsGenerateWhatsappCampaign()">توليد ومعاينة</button><button class="green" onclick="jmsSaveWhatsappCampaignDraft()">حفظ كمسودة</button><button class="orange" onclick="jmsApproveAndSendCampaign()">اعتماد وإرسال الدفعة الجاهزة</button><button class="gray" onclick="jmsExportCampaignPreview()">نسخ القائمة</button></div></div>
-        <div class="jms-campaign-grid"><div class="jms-campaign-card"><b id="wcTotal">0</b><span>مختار</span></div><div class="jms-campaign-card"><b id="wcReady">0</b><span>جاهز للإرسال</span></div><div class="jms-campaign-card"><b id="wcBlocked">0</b><span>مستبعد</span></div><div class="jms-campaign-card"><b id="wcSentMonth">0</b><span>رسائل هذا الشهر</span></div></div>
+        <label style="margin-top:12px;display:block"><span data-i18n="ui_3cc905cf70ff">تعليمات خاصة للذكاء / قالب الرسالة</span><textarea id="wcPrompt" rows="4" placeholder="اكتب رسالة مخصصة أو استخدم المتغيرات: {{name}} {{city}} {{rep}} {{debt}}. اتركها فارغة ليكتب الذكاء رسالة مناسبة حسب نوع الحملة."></textarea></label>
+        <div class="jms-campaign-note" data-i18n="ui_4ab8c5417b9d">نظام الأمان: لا يتم الإرسال مباشرة إلا بعد اعتماد المدير. يمنع التكرار لنفس العميل خلال 7 أيام، ويستبعد العملاء بدون رقم أو الموقوفين من واتساب.</div>
+        <div class="jms-campaign-actions"><button class="blue" onclick="jmsGenerateWhatsappCampaign()" data-i18n="ui_a18a69a26c4e">توليد ومعاينة</button><button class="green" onclick="jmsSaveWhatsappCampaignDraft()" data-i18n="ui_6d148c6fb480">حفظ كمسودة</button><button class="orange" onclick="jmsApproveAndSendCampaign()" data-i18n="ui_1e760a48ed97">اعتماد وإرسال الدفعة الجاهزة</button><button class="gray" onclick="jmsExportCampaignPreview()" data-i18n="ui_b547ddd8f761">نسخ القائمة</button></div></div>
+        <div class="jms-campaign-grid"><div class="jms-campaign-card"><b id="wcTotal">0</b><span data-i18n="ui_9be394ceddee">مختار</span></div><div class="jms-campaign-card"><b id="wcReady">0</b><span data-i18n="ui_f184fcfb72fe">جاهز للإرسال</span></div><div class="jms-campaign-card"><b id="wcBlocked">0</b><span data-i18n="ui_eb0bd9ba362a">مستبعد</span></div><div class="jms-campaign-card"><b id="wcSentMonth">0</b><span data-i18n="ui_d7def7815e93">رسائل هذا الشهر</span></div></div>
         <div id="wcPreview" class="panel"></div>
-        <div class="panel" style="margin-top:14px"><div class="panel-head"><b>سجل الحملات والرسائل</b><span>كل عملية إرسال تحفظ للمراجعة</span></div><div id="wcLog" class="jms-campaign-log"></div></div>`;
+        <div class="panel" style="margin-top:14px"><div class="panel-head"><b data-i18n="ui_46426bbb4148">سجل الحملات والرسائل</b><span data-i18n="ui_18977f07f443">كل عملية إرسال تحفظ للمراجعة</span></div><div id="wcLog" class="jms-campaign-log"></div></div>`;
       main.appendChild(sec);
     }
     document.querySelectorAll('.nav').forEach(btn=>{
@@ -5594,9 +5353,9 @@ askJmsAI = async function(q){
     const set=(id,val)=>{const e=document.getElementById(id); if(e)e.textContent=val;};
     set('wcTotal',rows.length); set('wcReady',ready.length); set('wcBlocked',blocked);
     const month=todaySafe().slice(0,7); set('wcSentMonth',(db.whatsappMessageLog||[]).filter(x=>String(x.at||'').startsWith(month)).length);
-    box.innerHTML=`<div class="panel-head"><b>معاينة قبل الإرسال</b><span>${ready.length} جاهز من ${rows.length}. راجع الرسائل قبل الاعتماد.</span></div>
-      <table class="jms-campaign-table"><tr><th>العميل</th><th>الجوال</th><th>المندوب</th><th>الحالة</th><th>الرسالة</th><th>إجراء</th></tr>
-      ${rows.map(r=>`<tr><td><b>${esc(r.customer.name)}</b><br><span class="jms-muted">${esc(r.customer.city||'')} · ${esc(r.customer.category||'')}</span></td><td>${esc(r.phone||'-')}</td><td>${esc(repLabel(r.customer.rep_id))}</td><td><span class="jms-campaign-badge ${r.status.ready?'ok':'bad'}">${esc(r.status.reason)}</span></td><td><div class="jms-message-preview">${esc(r.message)}</div></td><td>${r.phone?`<button class="jms-link-btn" onclick="jmsOpenWaLink('${r.phone}',\`${esc(r.message).replace(/`/g,'&#96;')}\`)">فتح واتساب</button>`:''}<br><button onclick="jmsCopyCampaignMessage('${r.customer.id}')">نسخ</button><br><button onclick="jmsCampaignSetOptOut('${r.customer.id}',true)">إيقاف رسائل</button></td></tr>`).join('') || '<tr><td colspan="6">لا يوجد عملاء مطابقين.</td></tr>'}
+    box.innerHTML=`<div class="panel-head"><b data-i18n="ui_c647ec2e0645">معاينة قبل الإرسال</b><span>${ready.length} جاهز من ${rows.length}. راجع الرسائل قبل الاعتماد.</span></div>
+      <table class="jms-campaign-table"><tr><th><span data-i18n=ui_a042411e90be>العميل</span></th><th><span data-i18n=ui_0b6aa9453dfb>الجوال</span></th><th><span data-i18n=ui_4059aaa08477>المندوب</span></th><th><span data-i18n=ui_c3a4749caed4>الحالة</span></th><th data-i18n="ui_c957bb1d9a4a">الرسالة</th><th><span data-i18n=ui_8b2c85333b99>إجراء</span></th></tr>
+      ${rows.map(r=>`<tr><td><b>${esc(r.customer.name)}</b><br><span class="jms-muted">${esc(r.customer.city||'')} · ${esc(r.customer.category||'')}</span></td><td>${esc(r.phone||'-')}</td><td>${esc(repLabel(r.customer.rep_id))}</td><td><span class="jms-campaign-badge ${r.status.ready?'ok':'bad'}">${esc(r.status.reason)}</span></td><td><div class="jms-message-preview">${esc(r.message)}</div></td><td>${r.phone?`<button class="jms-link-btn" onclick="jmsOpenWaLink('${r.phone}',\`${esc(r.message).replace(/`/g,'&#96;')}\`)"><span data-i18n=ui_9bbb0792e149>فتح واتساب</span></button>`:''}<br><button onclick="jmsCopyCampaignMessage('${r.customer.id}')">نسخ</button><br><button onclick="jmsCampaignSetOptOut('${r.customer.id}',true)">إيقاف رسائل</button></td></tr>`).join('') || "<tr><td colspan=\"6\" data-i18n=\"ui_50b82b177eee\">لا يوجد عملاء مطابقين.</td></tr>"}
       </table>`;
   }
   window.jmsGenerateWhatsappCampaign=function(){
@@ -5633,7 +5392,7 @@ askJmsAI = async function(q){
     const rows=window.JMS_LAST_CAMPAIGN_ROWS || campaignPreviewRows(); renderPreview(rows);
     const log=document.getElementById('wcLog'); if(log){
       const campaigns=(db.whatsappCampaigns||[]).slice(0,10); const messages=(db.whatsappMessageLog||[]).slice(0,20);
-      log.innerHTML=`<h3>آخر الحملات</h3>${campaigns.map(c=>`<div class="jms-campaign-log-row"><b>${esc(c.type_label||c.type)}</b> — ${esc(c.status)} — ${c.ready_count||0}/${c.count||0}<br><span class="jms-muted">${esc(c.created_at||'')} · ${esc(c.created_by||'')}</span></div>`).join('')||'<div class="jms-muted">لا توجد حملات محفوظة.</div>'}<h3>آخر الرسائل</h3>${messages.map(m=>`<div class="jms-campaign-log-row"><b>${esc(m.customer_name)}</b> — <span class="jms-campaign-badge ${m.status==='sent'?'ok':m.status==='failed'?'bad':'warn'}">${esc(m.status)}</span><br><span class="jms-muted">${esc(m.at||'')} · ${esc(m.phone||'')}</span>${m.url?`<br><button class="jms-link-btn" onclick="window.open('${esc(m.url)}','_blank')">فتح رابط الإرسال</button>`:''}</div>`).join('')||'<div class="jms-muted">لا توجد رسائل.</div>'}`;
+      log.innerHTML=`<h3 data-i18n="ui_d2ff97c3223d">آخر الحملات</h3>${campaigns.map(c=>`<div class="jms-campaign-log-row"><b>${esc(c.type_label||c.type)}</b> — ${esc(c.status)} — ${c.ready_count||0}/${c.count||0}<br><span class="jms-muted">${esc(c.created_at||'')} · ${esc(c.created_by||'')}</span></div>`).join('')||"<div class=\"jms-muted\" data-i18n=\"ui_cdf2dd8e1b9d\">لا توجد حملات محفوظة.</div>"}<h3 data-i18n="ui_7b99f56175d8">آخر الرسائل</h3>${messages.map(m=>`<div class="jms-campaign-log-row"><b>${esc(m.customer_name)}</b> — <span class="jms-campaign-badge ${m.status==='sent'?'ok':m.status==='failed'?'bad':'warn'}">${esc(m.status)}</span><br><span class="jms-muted">${esc(m.at||'')} · ${esc(m.phone||'')}</span>${m.url?`<br><button class="jms-link-btn" onclick="window.open('${esc(m.url)}','_blank')">فتح رابط الإرسال</button>`:''}</div>`).join('')||"<div class=\"jms-muted\" data-i18n=\"ui_f020b3e0d7fd\">لا توجد رسائل.</div>"}`;
     }
   };
   window.jmsOpenWaLink=function(phone,msg){ const to=normalizePhone(phone); if(!to) return alert('لا يوجد رقم'); window.open('https://wa.me/'+to+'?text='+encodeURIComponent(msg||''),'_blank'); };
@@ -5747,19 +5506,19 @@ askJmsAI = async function(q){
     const nav=document.querySelector('aside nav') || document.querySelector('nav');
     if(!main || !nav) return;
     if(!document.querySelector('.nav[data-page="productionWorkflow"]')){
-      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='productionWorkflow'; btn.textContent='خط الإنتاج 11A';
+      const btn=document.createElement('button'); btn.className='nav manager-only'; btn.dataset.page='productionWorkflow'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"خط الإنتاج 11A");
       const ordersBtn=nav.querySelector('[data-page="orders"]');
       if(ordersBtn && ordersBtn.nextSibling) nav.insertBefore(btn, ordersBtn.nextSibling); else nav.appendChild(btn);
     }
     if(!document.getElementById('productionWorkflow')){
       const sec=document.createElement('section'); sec.id='productionWorkflow'; sec.className='page';
       sec.innerHTML=`
-        <div class="page-head with-action"><div><h1>خط الإنتاج وأوامر التصنيع</h1><p>تحويل طلب المبيعات إلى أمر تصنيع ومتابعته: اعتماد → تحويل → إنتاج → فيلم → مقص → تغليف.</p></div><div class="head-actions"><button class="primary" onclick="renderProductionWorkflow()">تحديث</button></div></div>
+        <div class="page-head with-action"><div><h1 data-i18n="ui_f2a046f2fe87">خط الإنتاج وأوامر التصنيع</h1><p data-i18n="ui_fad31cd82900">تحويل طلب المبيعات إلى أمر تصنيع ومتابعته: اعتماد → تحويل → إنتاج → فيلم → مقص → تغليف.</p></div><div class="head-actions"><button class="primary" onclick="renderProductionWorkflow()"><span data-i18n=ui_00eab31f95b7>تحديث</span></button></div></div>
         <div class="jms-prod-wrap">
-          <div class="jms-prod-kpis"><div class="jms-prod-kpi"><span>أوامر مفتوحة</span><b id="prodOpenCount">0</b></div><div class="jms-prod-kpi"><span>تحت الإنتاج</span><b id="prodActiveCount">0</b></div><div class="jms-prod-kpi"><span>جاهز للتسليم</span><b id="prodReadyCount">0</b></div><div class="jms-prod-kpi"><span>مكتمل</span><b id="prodDoneCount">0</b></div></div>
-          <div class="panel"><div class="panel-head"><b>إنشاء أمر تصنيع من طلب موجود</b><span>المندوب يدخل الطلب مختصرًا، ومدير الإنتاج يفصله فنيًا من هنا.</span></div><div class="jms-production-form"><label>طلب المبيعات<select id="prodOrderSelect"></select></label><label>ملاحظة أولية<input id="prodCreateNote" placeholder="مثلاً: تحويل بعد اعتماد المدير"></label><div style="display:flex;align-items:end"><button class="jms-prod-btn primary" onclick="createProductionFromSelectedOrder()">إنشاء أمر تصنيع</button></div></div></div>
-          <div class="panel"><div class="panel-head"><b>لوحة مراحل الإنتاج</b><span>كل مرحلة تسجل وقت واسم المستخدم والملاحظات.</span></div><div id="productionBoard" class="jms-prod-board"></div></div>
-          <div class="panel"><div class="panel-head"><b>آخر حركة في الإنتاج</b><span>سجل زمني مختصر</span></div><div id="productionTimelineShort"></div></div>
+          <div class="jms-prod-kpis"><div class="jms-prod-kpi"><span data-i18n="ui_4153ad1d7149">أوامر مفتوحة</span><b id="prodOpenCount">0</b></div><div class="jms-prod-kpi"><span data-i18n="ui_8ec653bdd3c0">تحت الإنتاج</span><b id="prodActiveCount">0</b></div><div class="jms-prod-kpi"><span><span data-i18n=ui_0e624bd7f756>جاهز للتسليم</span></span><b id="prodReadyCount">0</b></div><div class="jms-prod-kpi"><span data-i18n="ui_c2da5684d63b">مكتمل</span><b id="prodDoneCount">0</b></div></div>
+          <div class="panel"><div class="panel-head"><b data-i18n="ui_5697aa28640a">إنشاء أمر تصنيع من طلب موجود</b><span data-i18n="ui_c2caf4f7004d">المندوب يدخل الطلب مختصرًا، ومدير الإنتاج يفصله فنيًا من هنا.</span></div><div class="jms-production-form"><label><span data-i18n="ui_498831a14ef0">طلب المبيعات</span><select id="prodOrderSelect"></select></label><label><span data-i18n="ui_94aa1e2d281e">ملاحظة أولية</span><input id="prodCreateNote" placeholder="مثلاً: تحويل بعد اعتماد المدير" data-i18n-placeholder="ui_b08d466b10da"></label><div style="display:flex;align-items:end"><button class="jms-prod-btn primary" onclick="createProductionFromSelectedOrder()" data-i18n="ui_2c5c6654616e">إنشاء أمر تصنيع</button></div></div></div>
+          <div class="panel"><div class="panel-head"><b data-i18n="ui_0ec60bb8cafd">لوحة مراحل الإنتاج</b><span data-i18n="ui_6a1098b60eb7">كل مرحلة تسجل وقت واسم المستخدم والملاحظات.</span></div><div id="productionBoard" class="jms-prod-board"></div></div>
+          <div class="panel"><div class="panel-head"><b data-i18n="ui_3e873aa61d5d">آخر حركة في الإنتاج</b><span data-i18n="ui_d75e92d31b24">سجل زمني مختصر</span></div><div id="productionTimelineShort"></div></div>
         </div>`;
       main.appendChild(sec);
     }
@@ -5781,7 +5540,7 @@ askJmsAI = async function(q){
   function renderOrderSelect(){
     const sel=document.getElementById('prodOrderSelect'); if(!sel) return;
     const rows=availableOrders();
-    sel.innerHTML=rows.map(o=>`<option value="${esc(o.id)}">${esc(customerLabel(o.customer_id))} — ${esc(o.product||'-')} — ${esc(o.date||'-')} — ${moneySafe(o.amount_value||0)} ريال</option>`).join('') || '<option value="">لا توجد طلبات جديدة للتحويل</option>';
+    sel.innerHTML=rows.map(o=>`<option value="${esc(o.id)}">${esc(customerLabel(o.customer_id))} — ${esc(o.product||'-')} — ${esc(o.date||'-')} — ${moneySafe(o.amount_value||0)} ريال</option>`).join('') || "<option value=\"\" data-i18n=\"ui_2a4cb9358216\">لا توجد طلبات جديدة للتحويل</option>";
   }
   function renderKpis(){
     const ps=db.productionOrders||[];
@@ -5799,20 +5558,20 @@ askJmsAI = async function(q){
   function card(p){
     const o=baseOrder(p); const s=stageObj(p.stage);
     const tech=p.technical||{};
-    return `<div class="jms-prod-card"><h4>${s.icon} ${esc(p.production_no)}</h4><p><b>${esc(customerLabel(p.customer_id||o.customer_id))}</b> · ${esc(p.product||o.product||'-')}</p><p>المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</p><p>المندوب: ${esc(repLabel(p.rep_id||o.rep_id))} · التسليم: ${esc(p.due_date||'-')}</p><p class="jms-prod-muted">الفيلم: ${esc(tech.film_width||'-')} عرض · ${esc(tech.film_micron||tech.film_thickness||'-')} ميكرون · الرولات: ${esc(tech.roll_count||'-')}</p>${renderStageLine(p.stage)}<div class="jms-prod-actions"><button class="primary" onclick="openProductionOrder('${p.id}')">فتح</button>${canManageProduction()&&p.stage!=='delivered'?`<button onclick="advanceProductionStage('${p.id}')">المرحلة التالية</button>`:''}<button onclick="addProductionQuickNote('${p.id}')">ملاحظة</button></div></div>`;
+    return `<div class="jms-prod-card"><h4>${s.icon} ${esc(p.production_no)}</h4><p><b>${esc(customerLabel(p.customer_id||o.customer_id))}</b> · ${esc(p.product||o.product||'-')}</p><p>المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</p><p>المندوب: ${esc(repLabel(p.rep_id||o.rep_id))} · التسليم: ${esc(p.due_date||'-')}</p><p class="jms-prod-muted">الفيلم: ${esc(tech.film_width||'-')} عرض · ${esc(tech.film_micron||tech.film_thickness||'-')} ميكرون · الرولات: ${esc(tech.roll_count||'-')}</p>${renderStageLine(p.stage)}<div class="jms-prod-actions"><button class="primary" onclick="openProductionOrder('${p.id}')">فتح</button>${canManageProduction()&&p.stage!=='delivered'?`<button onclick="advanceProductionStage('${p.id}')">المرحلة التالية</button>`:''}<button onclick="addProductionQuickNote('${p.id}')"><span data-i18n=ui_0be7afd7e65f>ملاحظة</span></button></div></div>`;
   }
   function renderBoard(){
     const board=document.getElementById('productionBoard'); if(!board) return;
     const ps=db.productionOrders||[];
     board.innerHTML=STAGES.map(s=>{
       const rows=ps.filter(p=>(p.stage||'pending_manager')===s.key);
-      return `<div class="jms-prod-col"><h3><span>${s.icon} ${s.short}</span><span class="jms-prod-count">${rows.length}</span></h3>${rows.map(card).join('') || '<div class="jms-prod-muted">لا يوجد أوامر في هذه المرحلة</div>'}</div>`;
+      return `<div class="jms-prod-col"><h3><span>${s.icon} ${s.short}</span><span class="jms-prod-count">${rows.length}</span></h3>${rows.map(card).join('') || "<div class=\"jms-prod-muted\" data-i18n=\"ui_7fb73aaf514a\">لا يوجد أوامر في هذه المرحلة</div>"}</div>`;
     }).join('');
   }
   function renderTimelineShort(){
     const box=document.getElementById('productionTimelineShort'); if(!box) return;
     const rows=(db.productionLogs||[]).slice(0,12);
-    box.innerHTML=rows.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b> — ${esc(stageLabel(l.stage))}<br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc((db.productionOrders||[]).find(p=>p.id===l.production_id)?.production_no||'')}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || '<div class="jms-prod-muted">لا يوجد سجل حركة حتى الآن.</div>';
+    box.innerHTML=rows.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b> — ${esc(stageLabel(l.stage))}<br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc((db.productionOrders||[]).find(p=>p.id===l.production_id)?.production_no||'')}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || "<div class=\"jms-prod-muted\" data-i18n=\"ui_29e674de98a7\">لا يوجد سجل حركة حتى الآن.</div>";
   }
   window.renderProductionWorkflow=function(){ ensureDb(); addStyle(); addPage(); renderOrderSelect(); renderKpis(); renderBoard(); renderTimelineShort(); };
   window.createProductionFromSelectedOrder=function(){
@@ -5831,45 +5590,45 @@ askJmsAI = async function(q){
     const notes=p.notes||[];
     const statusOptions=STAGES.map(x=>`<option value="${x.key}" ${x.key===p.stage?'selected':''}>${x.label}</option>`).join('');
     const html=`<h2>أمر تصنيع ${esc(p.production_no)}</h2><p><span class="jms-prod-badge ${p.stage==='delivered'?'done':''}">${s.icon} ${esc(s.label)}</span></p>
-      <div class="jms-prod-public"><b>طلب العميل المختصر:</b><br>العميل: ${esc(customerLabel(p.customer_id||o.customer_id))} · المنتج: ${esc(p.product||o.product||'-')} · المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</div>
-      <h3>تفاصيل مدير الإنتاج / كرت التصنيع</h3>
+      <div class="jms-prod-public"><b data-i18n="ui_0e951ac2def1">طلب العميل المختصر:</b><br>العميل: ${esc(customerLabel(p.customer_id||o.customer_id))} · المنتج: ${esc(p.product||o.product||'-')} · المقاس: ${esc(p.width||o.width||'-')} × ${esc(p.length||o.length||'-')} · السماكة: ${esc(p.thickness||o.thickness||'-')} · الكمية: ${esc(p.total_kg||o.total_kg||'-')} كجم</div>
+      <h3 data-i18n="ui_3d2fb19dd0b3">تفاصيل مدير الإنتاج / كرت التصنيع</h3>
       <div class="jms-production-form">
-        <label>الحالة<select id="poStage">${statusOptions}</select></label><label>الأولوية<select id="poPriority"><option value="normal" ${p.priority==='normal'?'selected':''}>عادي</option><option value="high" ${p.priority==='high'?'selected':''}>عاجل</option><option value="hold" ${p.priority==='hold'?'selected':''}>إيقاف مؤقت</option></select></label><label>تاريخ التسليم المتوقع<input id="poDue" type="date" value="${esc(p.due_date||'')}"></label>
-        <label>نوع الإنتاج<input id="poType" value="${esc(tech.production_type||p.product||'')}"></label><label>الماكينة<input id="poMachine" value="${esc(tech.machine||'')}"></label><label>المشغل<input id="poOperator" value="${esc(tech.operator||'')}"></label>
+        <label><span data-i18n=ui_c3a4749caed4>الحالة</span><select id="poStage">${statusOptions}</select></label><label><span data-i18n="ui_4c3e5a87f1e4">الأولوية</span><select id="poPriority"><option value="normal" ${p.priority==='normal'?'selected':''}>عادي</option><option value="high" ${p.priority==='high'?'selected':''}>عاجل</option><option value="hold" ${p.priority==='hold'?'selected':''}>إيقاف مؤقت</option></select></label><label><span data-i18n="ui_43c523f8bbe1">تاريخ التسليم المتوقع</span><input id="poDue" type="date" value="${esc(p.due_date||'')}"></label>
+        <label><span data-i18n="ui_f03fbe93c77e">نوع الإنتاج</span><input id="poType" value="${esc(tech.production_type||p.product||'')}"></label><label><span data-i18n="ui_911b51916ec8">الماكينة</span><input id="poMachine" value="${esc(tech.machine||'')}"></label><label><span data-i18n="ui_d4cd0107644d">المشغل</span><input id="poOperator" value="${esc(tech.operator||'')}"></label>
       </div>
-      <h3>بيانات أمر التشغيل الورقي</h3>
+      <h3 data-i18n="ui_c5fdfab939a5">بيانات أمر التشغيل الورقي</h3>
       <div class="jms-production-form">
-        <label>رقم أمر التشغيل / OR No<input id="poOrNo" value="${esc(tech.or_no||p.production_no||'')}"></label><label>تاريخ الأمر<input id="poFormDate" value="${esc(tech.form_date||'')}" placeholder="مثال: 04/01/2026"></label><label>مدة التسليم<input id="poDeliveryTime" value="${esc(tech.delivery_time||'')}" placeholder="مثال: 3 يوم"></label>
-        <label>التعبئة / Packing<input id="poPackingSpec" value="${esc(tech.packing_spec||'')}" placeholder="مثال: SABIC BAG 20KG"></label><label>المقاس / Size<input id="poPaperSize" value="${esc(tech.paper_size||'')}" placeholder="مثال: 1/1"></label><label>المنطقة / Region<input id="poRegion" value="${esc(tech.region||'')}"></label>
-        <label>المندوب / Salesman<input id="poSalesman" value="${esc(tech.salesman||repLabel(p.rep_id||o.rep_id)||'')}"></label><label>مكان التسليم<input id="poDeliveryTo" value="${esc(tech.delivery_to||'')}"></label><label>رقم العقد<input id="poContractNo" value="${esc(tech.contract_no||'')}"></label>
-        <label>العميل<input id="poCustomerName" value="${esc(tech.customer_name||customerLabel(p.customer_id||o.customer_id)||'')}"></label><label>الكمية المطلوبة كجم<input id="poRequiredKg" value="${esc(tech.required_kg||p.total_kg||'')}"></label><label>ملاحظات البيان<input id="poStatementNote" value="${esc(tech.statement_note||'')}" placeholder="مثل: PACKING COVER"></label>
+        <label><span data-i18n="ui_a528e1bc3b2c">رقم أمر التشغيل / OR No</span><input id="poOrNo" value="${esc(tech.or_no||p.production_no||'')}"></label><label><span data-i18n="ui_400e217b3a8a">تاريخ الأمر</span><input id="poFormDate" value="${esc(tech.form_date||'')}" placeholder="مثال: 04/01/2026"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="poDeliveryTime" value="${esc(tech.delivery_time||'')}" placeholder="مثال: 3 يوم"></label>
+        <label><span data-i18n="ui_8fbedc5c04ee">التعبئة / Packing</span><input id="poPackingSpec" value="${esc(tech.packing_spec||'')}" placeholder="مثال: SABIC BAG 20KG"></label><label><span data-i18n="ui_19347ccb2789">المقاس / Size</span><input id="poPaperSize" value="${esc(tech.paper_size||'')}" placeholder="مثال: 1/1"></label><label><span data-i18n="ui_47bb6719bc2a">المنطقة / Region</span><input id="poRegion" value="${esc(tech.region||'')}"></label>
+        <label><span data-i18n="ui_76064f9abece">المندوب / Salesman</span><input id="poSalesman" value="${esc(tech.salesman||repLabel(p.rep_id||o.rep_id)||'')}"></label><label><span data-i18n="ui_c8a89fd18103">مكان التسليم</span><input id="poDeliveryTo" value="${esc(tech.delivery_to||'')}"></label><label><span data-i18n="ui_490c244f7546">رقم العقد</span><input id="poContractNo" value="${esc(tech.contract_no||'')}"></label>
+        <label><span data-i18n=ui_a042411e90be>العميل</span><input id="poCustomerName" value="${esc(tech.customer_name||customerLabel(p.customer_id||o.customer_id)||'')}"></label><label><span data-i18n="ui_82285c6e64d2">الكمية المطلوبة كجم</span><input id="poRequiredKg" value="${esc(tech.required_kg||p.total_kg||'')}"></label><label><span data-i18n="ui_2eb10207a735">ملاحظات البيان</span><input id="poStatementNote" value="${esc(tech.statement_note||'')}" placeholder="مثل: PACKING COVER"></label>
       </div>
-      <h3>مواصفات الفيلم والكيس</h3>
+      <h3 data-i18n="ui_9bcd3fbd9a7d">مواصفات الفيلم والكيس</h3>
       <div class="jms-production-form">
-        <label>نوع البلاستيك<select id="poPlasticType"><option value="">اختر</option>${['LD','HD','LLD','PP','Mix'].map(x=>`<option value="${x}" ${tech.plastic_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label>نوع الكيس<input id="poBagType" value="${esc(tech.bag_type||'')}" placeholder="مثال: HANDLE"></label><label>لون اليد<input id="poHandleColor" value="${esc(tech.handle_color||'')}" placeholder="مثال: GOLD"></label>
-        <label>موديل اليد<input id="poHandleModel" value="${esc(tech.handle_model||'')}"></label><label>نوع اليد<input id="poHandleType" value="${esc(tech.handle_type||'')}"></label><label>نوع السوليد<input id="poSolidType" value="${esc(tech.solid_type||'')}"></label>
-        <label>الطول سم<input id="poLengthCm" value="${esc(tech.length_cm||p.length||'')}"></label><label>العرض سم<input id="poWidthCm" value="${esc(tech.width_cm||p.width||'')}"></label><label>الكاست / Gusset<input id="poGusset" value="${esc(tech.gusset||'')}" placeholder="مثال: 7 + 7"></label>
-        <label>السماكة ميكرون<input id="poMicron" value="${esc(tech.micron||tech.film_micron||p.thickness||'')}"></label><label>لون البلاستيك<input id="poPlasticColor" value="${esc(tech.plastic_color||'')}" placeholder="WHITE"></label><label>الماستر باتش<input id="poMasterBatch" value="${esc(tech.master_batch||'')}"></label>
-        <label>اسم ألوان الطباعة<input id="poPrintColorName" value="${esc(tech.print_color_name||'')}"></label><label>لون الحبر<input id="poInkColor" value="${esc(tech.ink_color||'')}"></label><label>شكل الإنتاج<select id="poOutputShape"><option value="">اختر</option>${['ONE SIDE OPEN','SINGLE SHEET','TUBE','JUMBO'].map(x=>`<option value="${x}" ${tech.output_shape===x?'selected':''}>${x}</option>`).join('')}</select></label>
-        <label>عرض التيوب / الجنب<input id="poTubeWidth" value="${esc(tech.tube_width||'')}" placeholder="مثال: 54 cm"></label><label>مقاس الكيس النهائي<input id="poBagSize" value="${esc(tech.bag_size||'')}"></label><label>مكان الفتح<input id="poOpenSide" value="${esc(tech.opening_side||'')}"></label>
+        <label><span data-i18n="ui_5a9dc96a7a6b">نوع البلاستيك</span><select id="poPlasticType"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${['LD','HD','LLD','PP','Mix'].map(x=>`<option value="${x}" ${tech.plastic_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label><span data-i18n="ui_d04b92c194c1">نوع الكيس</span><input id="poBagType" value="${esc(tech.bag_type||'')}" placeholder="مثال: HANDLE"></label><label><span data-i18n="ui_d3653b82e91a">لون اليد</span><input id="poHandleColor" value="${esc(tech.handle_color||'')}" placeholder="مثال: GOLD"></label>
+        <label><span data-i18n="ui_957f955912d6">موديل اليد</span><input id="poHandleModel" value="${esc(tech.handle_model||'')}"></label><label><span data-i18n="ui_5de31787c237">نوع اليد</span><input id="poHandleType" value="${esc(tech.handle_type||'')}"></label><label><span data-i18n="ui_074e0c4fecad">نوع السوليد</span><input id="poSolidType" value="${esc(tech.solid_type||'')}"></label>
+        <label><span data-i18n="ui_62ca73eb25b6">الطول سم</span><input id="poLengthCm" value="${esc(tech.length_cm||p.length||'')}"></label><label><span data-i18n="ui_8d3d3ea79fee">العرض سم</span><input id="poWidthCm" value="${esc(tech.width_cm||p.width||'')}"></label><label><span data-i18n="ui_4bdb2177ac10">الكاست / Gusset</span><input id="poGusset" value="${esc(tech.gusset||'')}" placeholder="مثال: 7 + 7"></label>
+        <label><span data-i18n="ui_564e092eb3cd">السماكة ميكرون</span><input id="poMicron" value="${esc(tech.micron||tech.film_micron||p.thickness||'')}"></label><label><span data-i18n="ui_69ff011fe46c">لون البلاستيك</span><input id="poPlasticColor" value="${esc(tech.plastic_color||'')}" placeholder="WHITE"></label><label><span data-i18n="ui_71c8af749eb3">الماستر باتش</span><input id="poMasterBatch" value="${esc(tech.master_batch||'')}"></label>
+        <label><span data-i18n="ui_1f0488fa25e5">اسم ألوان الطباعة</span><input id="poPrintColorName" value="${esc(tech.print_color_name||'')}"></label><label><span data-i18n="ui_7d5941546e2d">لون الحبر</span><input id="poInkColor" value="${esc(tech.ink_color||'')}"></label><label><span data-i18n="ui_e3bf237c3666">شكل الإنتاج</span><select id="poOutputShape"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${['ONE SIDE OPEN','SINGLE SHEET','TUBE','JUMBO'].map(x=>`<option value="${x}" ${tech.output_shape===x?'selected':''}>${x}</option>`).join('')}</select></label>
+        <label><span data-i18n="ui_3a4b544b8934">عرض التيوب / الجنب</span><input id="poTubeWidth" value="${esc(tech.tube_width||'')}" placeholder="مثال: 54 cm"></label><label><span data-i18n="ui_dfea6fd7157a">مقاس الكيس النهائي</span><input id="poBagSize" value="${esc(tech.bag_size||'')}"></label><label><span data-i18n="ui_eb691d93efa3">مكان الفتح</span><input id="poOpenSide" value="${esc(tech.opening_side||'')}"></label>
       </div>
-      <h3>اللحام والطباعة والكليشة</h3>
+      <h3 data-i18n="ui_2efad6c34c35">اللحام والطباعة والكليشة</h3>
       <div class="jms-production-form">
-        <label>طريقة اللحام<select id="poSeal"><option value="">اختر</option>${['No Sealing','T-Shirt','Side Sealing','Bottom Sealing'].map(x=>`<option value="${x}" ${tech.seal_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label>طباعة وجه واحد<select id="poOneSidePrinting"><option value="">اختر</option><option value="yes" ${tech.one_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.one_side_printing==='no'?'selected':''}>لا</option></select></label><label>طباعة وجهين<select id="poTwoSidePrinting"><option value="">اختر</option><option value="yes" ${tech.two_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.two_side_printing==='no'?'selected':''}>لا</option></select></label>
-        <label>الطباعة خارج الكاست<select id="poPrintingOutGusset"><option value="">اختر</option><option value="yes" ${tech.printing_out_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_out_gusset==='no'?'selected':''}>لا</option></select></label><label>الطباعة داخل الكاست<select id="poPrintingInsideGusset"><option value="">اختر</option><option value="yes" ${tech.printing_inside_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_inside_gusset==='no'?'selected':''}>لا</option></select></label><label>حالة الطباعة<input id="poPrintStatus" value="${esc(tech.print_status||'')}"></label>
-        <label>الكليشة<select id="poClicheStatus"><option value="">اختر</option>${['Cancel','Additional','Correction','Exist in Factory','Old Attach','New Attach'].map(x=>`<option value="${x}" ${tech.cliche_status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Size Block<input id="poSizeBlock" value="${esc(tech.size_block||'')}" placeholder="S / M / L / XL"></label><label>ملاحظات الكليشة<input id="poClicheNotes" value="${esc(tech.cliche_notes||'')}"></label>
+        <label><span data-i18n="ui_fe463178ec94">طريقة اللحام</span><select id="poSeal"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${['No Sealing','T-Shirt','Side Sealing','Bottom Sealing'].map(x=>`<option value="${x}" ${tech.seal_type===x?'selected':''}>${x}</option>`).join('')}</select></label><label><span data-i18n="ui_6f3f3e03f956">طباعة وجه واحد</span><select id="poOneSidePrinting"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option><option value="yes" ${tech.one_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.one_side_printing==='no'?'selected':''}>لا</option></select></label><label><span data-i18n="ui_d2444fbb64a4">طباعة وجهين</span><select id="poTwoSidePrinting"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option><option value="yes" ${tech.two_side_printing==='yes'?'selected':''}>نعم</option><option value="no" ${tech.two_side_printing==='no'?'selected':''}>لا</option></select></label>
+        <label><span data-i18n="ui_7888a2ae6cf5">الطباعة خارج الكاست</span><select id="poPrintingOutGusset"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option><option value="yes" ${tech.printing_out_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_out_gusset==='no'?'selected':''}>لا</option></select></label><label><span data-i18n="ui_931cda0baf61">الطباعة داخل الكاست</span><select id="poPrintingInsideGusset"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option><option value="yes" ${tech.printing_inside_gusset==='yes'?'selected':''}>نعم</option><option value="no" ${tech.printing_inside_gusset==='no'?'selected':''}>لا</option></select></label><label><span data-i18n="ui_87f30252d34d">حالة الطباعة</span><input id="poPrintStatus" value="${esc(tech.print_status||'')}"></label>
+        <label><span data-i18n="ui_9e27306c54a0">الكليشة</span><select id="poClicheStatus"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${['Cancel','Additional','Correction','Exist in Factory','Old Attach','New Attach'].map(x=>`<option value="${x}" ${tech.cliche_status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Size Block<input id="poSizeBlock" value="${esc(tech.size_block||'')}" placeholder="S / M / L / XL"></label><label><span data-i18n="ui_a7a0996873fe">ملاحظات الكليشة</span><input id="poClicheNotes" value="${esc(tech.cliche_notes||'')}"></label>
       </div>
-      <h3>الإنتاج الفعلي والملاحظات الفنية</h3>
+      <h3 data-i18n="ui_dd4dde930cd7">الإنتاج الفعلي والملاحظات الفنية</h3>
       <div class="jms-production-form">
-        <label>عرض الفيلم<input id="poFilmWidth" value="${esc(tech.film_width||p.width||'')}"></label><label>سماكة الفيلم / ميكرون<input id="poFilmMicron" value="${esc(tech.film_micron||tech.film_thickness||p.thickness||'')}"></label><label>عدد الرولات<input id="poRollCount" value="${esc(tech.roll_count||'')}"></label>
-        <label>وزن الرول<input id="poRollWeight" value="${esc(tech.roll_weight||'')}"></label><label>الوزن المتوقع كجم<input id="poExpectedKg" value="${esc(tech.expected_kg||p.total_kg||'')}"></label><label>الوزن الفعلي كجم<input id="poActualKg" value="${esc(tech.actual_kg||'')}"></label>
-        <label>هالك كجم<input id="poWasteKg" value="${esc(tech.waste_kg||'')}"></label><label>عرض القص<input id="poCutWidth" value="${esc(tech.cut_width||p.width||'')}"></label><label>طول القص<input id="poCutLength" value="${esc(tech.cut_length||p.length||'')}"></label>
-        <label>ملاحظات الفيلم<textarea id="poFilmNotes">${esc(tech.film_notes||'')}</textarea></label><label>ملاحظات المقص<textarea id="poCuttingNotes">${esc(tech.cutting_notes||'')}</textarea></label><label>ملاحظات التغليف<textarea id="poPackingNotes">${esc(tech.packing_notes||'')}</textarea></label>
-        <label>ترتيشات / تعديلات أرض المصنع<textarea id="poFloorNotes" placeholder="أي تعديل في المقاس، السماكة، الحرارة، الخلطة، القص، أو ملاحظة للمشغل">${esc(tech.floor_notes||'')}</textarea></label>
+        <label><span data-i18n="ui_5caa808a97db">عرض الفيلم</span><input id="poFilmWidth" value="${esc(tech.film_width||p.width||'')}"></label><label><span data-i18n="ui_40eb1bcffcaa">سماكة الفيلم / ميكرون</span><input id="poFilmMicron" value="${esc(tech.film_micron||tech.film_thickness||p.thickness||'')}"></label><label><span data-i18n="ui_ec2768e54348">عدد الرولات</span><input id="poRollCount" value="${esc(tech.roll_count||'')}"></label>
+        <label><span data-i18n="ui_2bc9f627e923">وزن الرول</span><input id="poRollWeight" value="${esc(tech.roll_weight||'')}"></label><label><span data-i18n="ui_f0e6e930a8d4">الوزن المتوقع كجم</span><input id="poExpectedKg" value="${esc(tech.expected_kg||p.total_kg||'')}"></label><label><span data-i18n="ui_446eec0f64ea">الوزن الفعلي كجم</span><input id="poActualKg" value="${esc(tech.actual_kg||'')}"></label>
+        <label><span data-i18n="ui_96e757a55343">هالك كجم</span><input id="poWasteKg" value="${esc(tech.waste_kg||'')}"></label><label><span data-i18n="ui_4cd23d832b7a">عرض القص</span><input id="poCutWidth" value="${esc(tech.cut_width||p.width||'')}"></label><label><span data-i18n="ui_616e5a860f04">طول القص</span><input id="poCutLength" value="${esc(tech.cut_length||p.length||'')}"></label>
+        <label><span data-i18n="ui_f28424baa3ec">ملاحظات الفيلم</span><textarea id="poFilmNotes">${esc(tech.film_notes||'')}</textarea></label><label><span data-i18n="ui_907f660fb089">ملاحظات المقص</span><textarea id="poCuttingNotes">${esc(tech.cutting_notes||'')}</textarea></label><label><span data-i18n="ui_5092203ac01f">ملاحظات التغليف</span><textarea id="poPackingNotes">${esc(tech.packing_notes||'')}</textarea></label>
+        <label><span data-i18n="ui_4f2df92cd380">ترتيشات / تعديلات أرض المصنع</span><textarea id="poFloorNotes" placeholder="أي تعديل في المقاس، السماكة، الحرارة، الخلطة، القص، أو ملاحظة للمشغل" data-i18n-placeholder="ui_ce340b365928">${esc(tech.floor_notes||'')}</textarea></label>
       </div>
       <div class="jms-prod-actions"><button class="jms-prod-btn primary" onclick="saveProductionTechnical('${p.id}')">حفظ كرت التصنيع</button><button class="jms-prod-btn green" onclick="advanceProductionStage('${p.id}')">إرسال للمرحلة التالية</button><button class="jms-prod-btn orange" onclick="addProductionQuickNote('${p.id}')">إضافة ملاحظة / مشكلة</button></div>
-      <h3>الملاحظات الفنية</h3>${notes.map(n=>`<div class="jms-prod-note"><b>${esc(n.type||'ملاحظة')}</b> — ${esc(n.by||'')}<br><span class="jms-prod-muted">${esc(new Date(n.at).toLocaleString('ar-SA'))}</span><div>${esc(n.text||'')}</div></div>`).join('') || '<div class="jms-prod-muted">لا توجد ملاحظات فنية.</div>'}
-      <h3>سجل الحركة</h3><div class="jms-prod-timeline">${logs.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b><br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc(stageLabel(l.stage))}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || '<div class="jms-prod-muted">لا يوجد سجل.</div>'}</div>`;
+      <h3 data-i18n="ui_d8d99acb17bc">الملاحظات الفنية</h3>${notes.map(n=>`<div class="jms-prod-note"><b>${esc(n.type||'ملاحظة')}</b> — ${esc(n.by||'')}<br><span class="jms-prod-muted">${esc(new Date(n.at).toLocaleString('ar-SA'))}</span><div>${esc(n.text||'')}</div></div>`).join('') || "<div class=\"jms-prod-muted\" data-i18n=\"ui_a8a28b62976d\">لا توجد ملاحظات فنية.</div>"}
+      <h3 data-i18n="ui_61938425d5d3">سجل الحركة</h3><div class="jms-prod-timeline">${logs.map(l=>`<div class="jms-prod-log"><b>${esc(l.action)}</b><br><span>${esc(new Date(l.at).toLocaleString('ar-SA'))} · ${esc(l.by||'-')} · ${esc(stageLabel(l.stage))}</span>${l.note?`<div>${esc(l.note)}</div>`:''}</div>`).join('') || "<div class=\"jms-prod-muted\" data-i18n=\"ui_14f84324445d\">لا يوجد سجل.</div>"}</div>`;
     if(window.modalBody && window.modal){ modalBody.innerHTML=html; modal.classList.remove('hidden'); } else { alert('تعذر فتح نافذة التفاصيل'); }
   };
   window.saveProductionTechnical=function(pid){
@@ -6063,12 +5822,12 @@ askJmsAI = async function(q){
     const quotes=(db.quotes||[]).filter(quoteReady).slice(0,10);
     const orders=(db.orders||[]).filter(orderNeedsProduction).slice(0,15);
     const qHtml=quotes.map(q=>`<div class="jms-prod-card"><h4>عرض معتمد ${esc(q.quote_no||'')}</h4><p><b>${esc(customerLabel(q.customer_id))}</b> · ${esc(q.product||'-')} · ${fmt(q.total_amount||0)} ريال</p><p>المقاس: ${esc(q.width||'-')} × ${esc(q.length||'-')} · الكمية: ${esc(q.total_kg||'-')} كجم · الحالة: ${esc(q.status)}</p><div class="jms-prod-actions"><button class="primary" onclick="jms11aQuoteToProduction('${q.id}')">تحويل وإرسال للإنتاج</button></div></div>`).join('');
-    const oHtml=orders.map(o=>`<div class="jms-prod-card"><h4>طلب مبيعات جاهز للتحويل</h4><p><b>${esc(customerLabel(o.customer_id))}</b> · ${esc(o.product||'-')} · ${fmt(o.amount_value||0)} ريال</p><p>المقاس: ${esc(o.width||'-')} × ${esc(o.length||'-')} · السماكة: ${esc(o.thickness||'-')} · الكمية: ${esc(o.total_kg||'-')} كجم</p><p>الحالة الحالية: ${esc(o.status||'جديد')} · المندوب: ${esc(repLabel(o.rep_id))}</p><div class="jms-prod-actions"><button onclick="jms11aApproveOrder('${o.id}')">اعتماد المدير</button><button onclick="jms11aMarkPaid('${o.id}')">تسجيل التحويل</button><button class="primary" onclick="jms11aSendOrderToProduction('${o.id}')">إرسال للإنتاج</button></div></div>`).join('');
-    host.innerHTML=`<div class="panel-head"><b>طلبات جاهزة للتحويل للإنتاج</b><span>هنا يبدأ التشغيل الفعلي: اعتماد السعر → تسجيل التحويل → إرسال للإنتاج.</span></div>
-      <div class="jms-prod-note">إذا اعتمدت السعر أو سجلت تحويل العميل، سيظهر الطلب هنا. اضغط <b>إرسال للإنتاج</b> ليظهر فورًا في لوحة المراحل ويفتح كرت أمر التشغيل.</div>
+    const oHtml=orders.map(o=>`<div class="jms-prod-card"><h4 data-i18n="ui_64573594a1c8">طلب مبيعات جاهز للتحويل</h4><p><b>${esc(customerLabel(o.customer_id))}</b> · ${esc(o.product||'-')} · ${fmt(o.amount_value||0)} ريال</p><p>المقاس: ${esc(o.width||'-')} × ${esc(o.length||'-')} · السماكة: ${esc(o.thickness||'-')} · الكمية: ${esc(o.total_kg||'-')} كجم</p><p>الحالة الحالية: ${esc(o.status||'جديد')} · المندوب: ${esc(repLabel(o.rep_id))}</p><div class="jms-prod-actions"><button onclick="jms11aApproveOrder('${o.id}')">اعتماد المدير</button><button onclick="jms11aMarkPaid('${o.id}')">تسجيل التحويل</button><button class="primary" onclick="jms11aSendOrderToProduction('${o.id}')">إرسال للإنتاج</button></div></div>`).join('');
+    host.innerHTML=`<div class="panel-head"><b data-i18n="ui_fc0529850f5f">طلبات جاهزة للتحويل للإنتاج</b><span data-i18n="ui_aa19f259a5ba">هنا يبدأ التشغيل الفعلي: اعتماد السعر → تسجيل التحويل → إرسال للإنتاج.</span></div>
+      <div class="jms-prod-note"><span data-i18n="ui_479f9e5b36bf">إذا اعتمدت السعر أو سجلت تحويل العميل، سيظهر الطلب هنا. اضغط </span><b data-i18n="ui_feee93bf7415">إرسال للإنتاج</b> ليظهر فورًا في لوحة المراحل ويفتح كرت أمر التشغيل.</div>
       <div class="jms-prod-board">
-        <div class="jms-prod-col"><h3><span>عروض معتمدة لم تتحول</span><span class="jms-prod-count">${quotes.length}</span></h3>${qHtml || '<div class="jms-prod-muted">لا توجد عروض معتمدة تنتظر التحويل.</div>'}</div>
-        <div class="jms-prod-col"><h3><span>طلبات مبيعات بدون أمر تصنيع</span><span class="jms-prod-count">${orders.length}</span></h3>${oHtml || '<div class="jms-prod-muted">لا توجد طلبات تنتظر الإرسال للإنتاج.</div>'}</div>
+        <div class="jms-prod-col"><h3><span data-i18n="ui_60a8182268b1">عروض معتمدة لم تتحول</span><span class="jms-prod-count">${quotes.length}</span></h3>${qHtml || "<div class=\"jms-prod-muted\" data-i18n=\"ui_0dfcf531cbbc\">لا توجد عروض معتمدة تنتظر التحويل.</div>"}</div>
+        <div class="jms-prod-col"><h3><span data-i18n="ui_733144864d83">طلبات مبيعات بدون أمر تصنيع</span><span class="jms-prod-count">${orders.length}</span></h3>${oHtml || "<div class=\"jms-prod-muted\" data-i18n=\"ui_9946f64b1020\">لا توجد طلبات تنتظر الإرسال للإنتاج.</div>"}</div>
       </div>`;
   }
   const oldRenderProduction=window.renderProductionWorkflow;
@@ -6155,7 +5914,7 @@ askJmsAI = async function(q){
     if(!document.querySelector('.jms-mobile-topbar')){
       const bar=document.createElement('div');
       bar.className='jms-mobile-topbar';
-      bar.innerHTML=`<button type="button" id="jmsMobileMenuBtn" aria-label="فتح القائمة">☰</button><div><b>JMS Factory CRM</b><small id="jmsMobilePageName">القائمة والصفحات</small></div>`;
+      bar.innerHTML=`<button type="button" id="jmsMobileMenuBtn" aria-label="فتح القائمة" data-i18n-aria-label="ui_c0c346b2d168">☰</button><div><b>JMS Factory CRM</b><small id="jmsMobilePageName" data-i18n="ui_e2efda880cb1">القائمة والصفحات</small></div>`;
       app.insertBefore(bar, app.firstChild);
     }
     if(!sidebar.querySelector('.jms-mobile-close')){
@@ -6222,7 +5981,7 @@ askJmsAI = async function(q){
       const btn=document.createElement('button');
       btn.type='button';
       btn.className='jms-modal-close-btn';
-      btn.textContent='إغلاق النافذة';
+      (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"إغلاق النافذة");
       btn.onclick=closeAnyModal;
       card.insertBefore(btn, card.firstChild);
     }
@@ -6252,15 +6011,15 @@ askJmsAI = async function(q){
       const toolbar=document.querySelector('#newCustomerRadar .jms-radar-toolbar');
       if(toolbar && !document.getElementById('radarDistrict')){
         const label=document.createElement('label');
-        label.innerHTML='الحي / القرب من<input id="radarDistrict" placeholder="مثال: الخمرة، الصناعية الثانية، بحرة">';
+        label.innerHTML="الحي / القرب من<input id=\"radarDistrict\" placeholder=\"مثال: الخمرة، الصناعية الثانية، بحرة\" data-i18n-placeholder=\"ui_28c24a62925a\">";
         const city=document.getElementById('radarCity');
         if(city && city.closest('label')) city.closest('label').insertAdjacentElement('afterend',label);
         else toolbar.insertBefore(label, toolbar.firstChild);
       }
       if(currentUser && currentUser.role==='rep'){
-        const title=document.querySelector('#newCustomerRadar h1'); if(title) title.textContent='رادار العملاء القريبين';
+        const title=document.querySelector('#newCustomerRadar h1'); if(title) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(title,"رادار العملاء القريبين");
         const hint=document.querySelector('#newCustomerRadar .page-head p');
-        if(hint) hint.textContent='ابحث عن أنشطة جديدة قريبة من الحي أو موقع المندوب، ثم حوّل الفرصة إلى عميل أو افتح الخريطة للزيارة.';
+        if(hint) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(hint,"ابحث عن أنشطة جديدة قريبة من الحي أو موقع المندوب، ثم حوّل الفرصة إلى عميل أو افتح الخريطة للزيارة.");
       }
     }catch(e){}
   }
@@ -6420,7 +6179,7 @@ askJmsAI = async function(q){
       const btn=document.createElement('button');
       btn.className='nav rep-ai-only';
       btn.dataset.page='repAiAssistant';
-      btn.textContent='مساعد المندوب AI';
+      (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(btn,"مساعد المندوب AI");
       const before=nav.querySelector('[data-page="visits"]') || nav.querySelector('[data-page="customers"]')?.nextSibling;
       nav.insertBefore(btn, before || null);
       btn.addEventListener('click',()=>{
@@ -6436,9 +6195,9 @@ askJmsAI = async function(q){
       sec.id='repAiAssistant';
       sec.className='page';
       sec.innerHTML=`
-        <div class="page-head with-action"><div><h1>مساعد المندوب الذكي</h1><p>اسأل عن عملائك فقط: الدين، آخر عرض سعر، آخر زيارة، التحصيل، وترتيب الزيارات.</p></div><div class="head-actions"><button class="primary" onclick="jmsRepAiAsk('ديون عملائي')">ديون عملائي</button><button onclick="jmsRepAiAsk('عروضي المفتوحة')">عروضي المفتوحة</button></div></div>
-        <div class="jms-rep-ai-grid"><div class="jms-rep-ai-card"><b id="repAiCustomersCount">0</b><span>عملاء في نطاقك</span></div><div class="jms-rep-ai-card"><b id="repAiDebtTotal">0</b><span>إجمالي الرصيد</span></div><div class="jms-rep-ai-card"><b id="repAiOpenQuotes">0</b><span>عروض مفتوحة</span></div><div class="jms-rep-ai-card"><b id="repAiLateVisits">0</b><span>زيارات متأخرة</span></div></div>
-        <div class="panel jms-rep-ai-panel"><div class="jms-rep-ai-actions"><button onclick="jmsRepAiAsk('رتب زيارات اليوم')">رتب زيارات اليوم</button><button onclick="jmsRepAiAsk('عملاء لم تتم زيارتهم من شهر')">عملاء لم أزرهم</button><button onclick="jmsRepAiAsk('عليهم تحصيل')">أولويات التحصيل</button><button onclick="jmsRepAiAsk('اكتب رسالة متابعة')">رسالة متابعة</button></div><div id="repAiBody" class="jms-rep-ai-body"><div class="jms-ai-msg bot">اكتب اسم العميل فقط أو سؤالك مثل: <b>كتيكت</b> أو <b>كتيكت كم الدين عليه؟</b> أو <b>متى سويت عرض سعر لفلان؟</b></div></div><div class="jms-rep-ai-input"><input id="repAiInput" placeholder="مثال: كتيكت أو كتيكت كم الدين عليه؟"><button class="primary" onclick="jmsRepAiAsk()">اسأل</button></div></div>`;
+        <div class="page-head with-action"><div><h1 data-i18n="ui_25b5b3649adb">مساعد المندوب الذكي</h1><p data-i18n="ui_668ba743e486">اسأل عن عملائك فقط: الدين، آخر عرض سعر، آخر زيارة، التحصيل، وترتيب الزيارات.</p></div><div class="head-actions"><button class="primary" onclick="jmsRepAiAsk('ديون عملائي')" data-i18n="ui_35b33e0753b1">ديون عملائي</button><button onclick="jmsRepAiAsk('عروضي المفتوحة')" data-i18n="ui_9804c230754c">عروضي المفتوحة</button></div></div>
+        <div class="jms-rep-ai-grid"><div class="jms-rep-ai-card"><b id="repAiCustomersCount">0</b><span data-i18n="ui_5ad546e25283">عملاء في نطاقك</span></div><div class="jms-rep-ai-card"><b id="repAiDebtTotal">0</b><span data-i18n="ui_2c7676dbd656">إجمالي الرصيد</span></div><div class="jms-rep-ai-card"><b id="repAiOpenQuotes">0</b><span data-i18n="ui_6f12e752bd49">عروض مفتوحة</span></div><div class="jms-rep-ai-card"><b id="repAiLateVisits">0</b><span data-i18n="ui_f43deb798158">زيارات متأخرة</span></div></div>
+        <div class="panel jms-rep-ai-panel"><div class="jms-rep-ai-actions"><button onclick="jmsRepAiAsk('رتب زيارات اليوم')" data-i18n="ui_0d0360a55853">رتب زيارات اليوم</button><button onclick="jmsRepAiAsk('عملاء لم تتم زيارتهم من شهر')" data-i18n="ui_0fd8c921be2e">عملاء لم أزرهم</button><button onclick="jmsRepAiAsk('عليهم تحصيل')" data-i18n="ui_a4f02a4abd46">أولويات التحصيل</button><button onclick="jmsRepAiAsk('اكتب رسالة متابعة')" data-i18n="ui_eeff459094f5">رسالة متابعة</button></div><div id="repAiBody" class="jms-rep-ai-body"><div class="jms-ai-msg bot"><span data-i18n="ui_349a85b8aa94">اكتب اسم العميل فقط أو سؤالك مثل: </span><b data-i18n="ui_e3a973ac2e7a">كتيكت</b> أو <b data-i18n="ui_b4f9df009934">كتيكت كم الدين عليه؟</b> أو <b data-i18n="ui_707dfa484fe1">متى سويت عرض سعر لفلان؟</b></div></div><div class="jms-rep-ai-input"><input id="repAiInput" placeholder="مثال: كتيكت أو كتيكت كم الدين عليه؟" data-i18n-placeholder="ui_c3058ae42cd5"><button class="primary" onclick="jmsRepAiAsk()" data-i18n="ui_bbfa565b408e">اسأل</button></div></div>`;
       main.appendChild(sec);
     }
     injectRepAiStyle();
@@ -6513,7 +6272,7 @@ askJmsAI = async function(q){
     document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
     if(inkButton) inkButton.classList.add('active');
     if(inkPage) inkPage.classList.add('active');
-    const roleBox=document.getElementById('currentUserRole'); if(roleBox) roleBox.textContent='مسؤول مخزون الأحبار';
+    const roleBox=document.getElementById('currentUserRole'); if(roleBox) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(roleBox,"مسؤول مخزون الأحبار");
   }
   const oldShow=window.showApp;
   if(typeof oldShow==='function') window.showApp=function(){ const r=oldShow.apply(this,arguments); setTimeout(applyInkAccess,80); return r; };

@@ -160,35 +160,35 @@
     if(!currentUser || currentUser.role!=='admin') return alert('استيراد العملاء متاح فقط لمدير النظام');
     ensure();
     const repOptions=(db.reps||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
-    modalBody.innerHTML = `<h2>استيراد العملاء الذكي</h2>
-      <div class="import-help">
-        اختر المندوب قبل الاستيراد. إذا ظهر نفس العميل عند مندوب آخر، النظام <b>لن يكرر العميل</b> وسيعرضه كتعارض حتى تقرر هل هو ياسر أو عثمان.<br>
+    modalBody.innerHTML = `<h2 data-i18n="ui_8cd98da5f7da">استيراد العملاء الذكي</h2>
+      <div class="import-help"><span data-i18n="ui_437ca29d719b">
+        اختر المندوب قبل الاستيراد. إذا ظهر نفس العميل عند مندوب آخر، النظام </span><b data-i18n="ui_6014d58c160d">لن يكرر العميل</b> وسيعرضه كتعارض حتى تقرر هل هو ياسر أو عثمان.<br>
         الأعمدة المقبولة: <b>name, phone, city, district, rep_id, debt_balance, notes</b>
       </div>
       <div class="form-grid two">
-        <label>ربط العملاء على المندوب
-          <select id="importTargetRep">
-            <option value="file">حسب الملف / rep_id</option>
+        <label><span data-i18n="ui_e2ec458e1663">ربط العملاء على المندوب
+          </span><select id="importTargetRep">
+            <option value="file" data-i18n="ui_3cc8157ae2bc">حسب الملف / rep_id</option>
             ${repOptions}
           </select>
         </label>
-        <label>سياسة العميل المكرر
-          <select id="importDuplicatePolicy">
-            <option value="conflict">لا تنقل العميل إذا كان عند مندوب آخر، اعرض تعارض</option>
-            <option value="move">انقل العميل المكرر للمندوب المختار</option>
+        <label><span data-i18n="ui_77c4698368b3">سياسة العميل المكرر
+          </span><select id="importDuplicatePolicy">
+            <option value="conflict" data-i18n="ui_281751a1dbdf">لا تنقل العميل إذا كان عند مندوب آخر، اعرض تعارض</option>
+            <option value="move" data-i18n="ui_820513c40ff2">انقل العميل المكرر للمندوب المختار</option>
           </select>
         </label>
       </div>
       <div class="import-drop">
-        <b>اختر ملف العملاء</b>
+        <b data-i18n="ui_bace89eb7cd4">اختر ملف العملاء</b>
         <input id="customerImportFile" type="file" accept=".xlsx,.xls,.csv">
-        <small>مثال: اختر rep-yaser لعملاء ياسر، أو rep-osman لعملاء عثمان.</small>
+        <small data-i18n="ui_2dc9fb6e6744">مثال: اختر rep-yaser لعملاء ياسر، أو rep-osman لعملاء عثمان.</small>
       </div>
       <div class="import-actions">
-        <button class="template" onclick="downloadCustomerTemplate()">تحميل قالب العملاء</button>
-        <button class="import" onclick="runCustomerImport()">استيراد الآن</button>
+        <button class="template" onclick="downloadCustomerTemplate()" data-i18n="ui_9835d50cd038">تحميل قالب العملاء</button>
+        <button class="import" onclick="runCustomerImport()" data-i18n="ui_211d26d81c8b">استيراد الآن</button>
       </div>
-      <div id="customerImportResult" class="import-result">لم يتم الاستيراد بعد.</div>
+      <div id="customerImportResult" class="import-result" data-i18n="ui_42a0d57c778b">لم يتم الاستيراد بعد.</div>
       <div id="customerImportConflicts"></div>`;
     modal.classList.remove('hidden');
   };
@@ -199,7 +199,7 @@
     const policy=document.getElementById('importDuplicatePolicy')?.value || 'conflict';
     const result=document.getElementById('customerImportResult');
     const conflictBox=document.getElementById('customerImportConflicts');
-    result.textContent='جاري قراءة الملف...'; conflictBox.innerHTML='';
+    (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(result,"جاري قراءة الملف..."); conflictBox.innerHTML='';
     readFile(file,(rows,err)=>{
       if(err){ result.textContent='خطأ: '+err; return; }
       let added=0, updated=0, skipped=0, moved=0; const conflicts=[];
@@ -228,8 +228,8 @@
       if(typeof renderAll==='function') renderAll();
       result.textContent=`تم الاستيراد\nالمضاف: ${added}\nالمحدّث: ${updated}\nالمنقول: ${moved}\nالمتجاهل: ${skipped}\nالتعارضات: ${conflicts.length}`;
       if(conflicts.length){
-        conflictBox.innerHTML = `<div class="panel import-conflict-panel"><h3>تعارضات تحتاج مراجعة</h3><p>لم يتم إنشاء عميل مكرر. راجع هؤلاء وحدد هل يبقون على المندوب الحالي أو تنقلهم يدويًا.</p>
-          <div class="table-wrap"><table><thead><tr><th>السطر</th><th>الاسم في الملف</th><th>الجوال</th><th>موجود باسم</th><th>مندوبه الحالي</th><th>المندوب المطلوب</th><th>السبب</th></tr></thead><tbody>
+        conflictBox.innerHTML = `<div class="panel import-conflict-panel"><h3 data-i18n="ui_0af5a745b0b3">تعارضات تحتاج مراجعة</h3><p data-i18n="ui_8a4c0e2f1f79">لم يتم إنشاء عميل مكرر. راجع هؤلاء وحدد هل يبقون على المندوب الحالي أو تنقلهم يدويًا.</p>
+          <div class="table-wrap"><table><thead><tr><th data-i18n="ui_ae8adcc1e7fa">السطر</th><th data-i18n="ui_00384fb0d676">الاسم في الملف</th><th data-i18n="ui_0b6aa9453dfb">الجوال</th><th data-i18n="ui_aae2c837921a">موجود باسم</th><th data-i18n="ui_c569af036068">مندوبه الحالي</th><th data-i18n="ui_8a51335f30d4">المندوب المطلوب</th><th data-i18n="ui_c3b023d78238">السبب</th></tr></thead><tbody>
           ${conflicts.slice(0,80).map(x=>`<tr><td>${x.row}</td><td>${x.name}</td><td>${x.phone||'-'}</td><td>${x.existingName}</td><td>${repNameById(x.oldRep)}</td><td>${repNameById(x.newRep)}</td><td>${x.reason}</td></tr>`).join('')}
           </tbody></table></div>
           ${conflicts.length>80?`<small>تم عرض أول 80 تعارض فقط من ${conflicts.length}</small>`:''}
@@ -256,7 +256,7 @@
     if(!head || document.getElementById('customerRepFilter')) return;
     const wrap=document.createElement('div');
     wrap.className='customer-rep-filter';
-    wrap.innerHTML=`<select id="customerRepFilter"><option value="all">كل المناديب</option>${(db.reps||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}<option value="">بدون مندوب</option></select>`;
+    wrap.innerHTML=`<select id="customerRepFilter"><option value="all" data-i18n="ui_2ad3f8552c55">كل المناديب</option>${(db.reps||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('')}<option value="" data-i18n="ui_27ed2ef7a7cf">بدون مندوب</option></select>`;
     const sel=wrap.querySelector('select');
     sel.value=window.__customerRepFilter||'all';
     sel.onchange=function(){ window.__customerRepFilter=this.value; if(typeof renderCustomers==='function') renderCustomers(); if(typeof renderStats==='function') renderStats(); };

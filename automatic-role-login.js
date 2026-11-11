@@ -21,12 +21,12 @@
     document.querySelectorAll('.role-switch').forEach(element => element.remove());
     const form = document.getElementById('loginForm');
     if (form && !form.querySelector('.jms-auto-role-note')) {
-      form.insertAdjacentHTML('afterbegin', '<div class="jms-auto-role-note"><span>✓</span><div><b>دخول تلقائي حسب صلاحية الحساب</b><small>اكتب بريدك وكلمة المرور، وسيعرض النظام الصفحات المسموحة لك فقط.</small></div></div>');
+      form.insertAdjacentHTML('afterbegin', "<div class=\"jms-auto-role-note\"><span>✓</span><div><b data-i18n=\"ui_7aeedbe52cce\">دخول تلقائي حسب صلاحية الحساب</b><small data-i18n=\"ui_88e90efc47f2\">اكتب بريدك وكلمة المرور، وسيعرض النظام الصفحات المسموحة لك فقط.</small></div></div>");
     }
     const user = current();
     const role = document.getElementById('currentUserRole');
     const label = user?.role ? (labels[user.role] || user.role) : '';
-    if (role && label && role.textContent !== label) role.textContent = label;
+    if (role && label) { if(window.JMSI18n) window.JMSI18n.setText(role,label); else if(role.textContent!==label) role.textContent=label; }
   }
 
   function loadScript(id, src) {

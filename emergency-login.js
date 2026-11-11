@@ -31,7 +31,7 @@
     var password = passwordInput && passwordInput.value || '';
 
     if (!email || !password) { setStatus('اكتب البريد الإلكتروني وكلمة المرور', true); return; }
-    if (button) { button.disabled = true; button.textContent = 'جاري التحقق...'; }
+    if (button) { button.disabled = true; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,'جاري التحقق...'); }
     setStatus('جاري التحقق من الحساب...', false);
 
     try {
@@ -43,7 +43,7 @@
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok || !data.user || !data.token) { setStatus('البريد أو كلمة المرور غير صحيحة', true); return; }
 
-      var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role, status:data.user.status||'active', permissions:data.user.permissions||{} };
+      var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role, status:data.user.status||'active', permissions:data.user.permissions||{}, language:data.user.language==='en'?'en':'ar' };
       var userJson = JSON.stringify(user);
       sessionStorage.setItem('jms_current_user', userJson);
       sessionStorage.setItem('jms_auth_token', data.token);
@@ -60,7 +60,7 @@
     } catch (error) {
       setStatus('تعذر الاتصال بخدمة الدخول. حاول مرة أخرى.', true);
     } finally {
-      if (button) { button.disabled = false; button.textContent = 'دخول النظام'; }
+      if (button) { button.disabled = false; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,"دخول النظام"); }
       if(passwordInput) passwordInput.value='';
     }
   }

@@ -34,7 +34,7 @@
   function routeItem(cid,repId=user()?.id){return (todayRoute(repId)?.items||[]).find(i=>i.customer_id===cid)||null}
   function readReason(item){return item?.visit_reason||item?.purpose||item?.reason||''}
   function readNote(item){return item?.visit_reason_note||item?.reason_note||''}
-  function optionsHtml(value){return `<option value="">اختر سبب الزيارة</option>`+reasons.map(([v,l])=>`<option value="${v}" ${v===value?'selected':''}>${l}</option>`).join('')}
+  function optionsHtml(value){return `<option value="" data-i18n="ui_6e6e8d6d0fab">اختر سبب الزيارة</option>`+reasons.map(([v,l])=>`<option value="${v}" ${v===value?'selected':''}>${l}</option>`).join('')}
   function extractCid(row){const btn=[...row.querySelectorAll('button')].find(b=>String(b.getAttribute('onclick')||'').includes('JMSVisitPlanner.remove'));const m=String(btn?.getAttribute('onclick')||'').match(/remove\(['"]([^'"]+)['"]\)/);return m?.[1]||''}
 
   function capture(){
@@ -58,7 +58,7 @@
       const item=routeItem(cid);state[cid]||={reason:readReason(item),note:readNote(item)};
       const value=state[cid].reason||'';
       const wrap=document.createElement('div');wrap.className='jms-visit-reason-wrap';
-      wrap.innerHTML=`<label>سبب الزيارة</label><select class="jms-visit-reason-select" onchange="JMSVisitReasonPlanner.setReason('${escapeHtml(cid)}',this.value)">${optionsHtml(value)}</select><input class="jms-visit-reason-note" placeholder="اكتب سبب الزيارة" value="${escapeHtml(state[cid].note||'')}" oninput="JMSVisitReasonPlanner.setNote('${escapeHtml(cid)}',this.value)" style="display:${value==='other'?'block':'none'}">`;
+      wrap.innerHTML=`<label data-i18n="ui_be3d58fafe2b">سبب الزيارة</label><select class="jms-visit-reason-select" onchange="JMSVisitReasonPlanner.setReason('${escapeHtml(cid)}',this.value)">${optionsHtml(value)}</select><input class="jms-visit-reason-note" placeholder="اكتب سبب الزيارة" value="${escapeHtml(state[cid].note||'')}" oninput="JMSVisitReasonPlanner.setNote('${escapeHtml(cid)}',this.value)" style="display:${value==='other'?'block':'none'}">`;
       row.appendChild(wrap);
     });
   }
@@ -96,13 +96,13 @@
       const repName=repBox.querySelector('.jms-rep-report-title b')?.textContent?.trim();const rep=(dbRef().reps||[]).find(r=>r.name===repName);if(!rep)return;
       repBox.querySelectorAll('.jms-report-event').forEach(event=>{
         if(event.querySelector('.jms-report-purpose'))return;
-        const h=event.querySelector('h4');if(!h||h.textContent.includes('لم تبدأ بعد'))return;
+        const h=event.querySelector('h4');if(!h||h.textContent.includes(window.JMSI18n?.label('لم تبدأ بعد') || 'لم تبدأ بعد'))return;
         const customerName=h.childNodes[0]?.textContent?.trim()||h.textContent.trim();const c=(dbRef().customers||[]).find(x=>x.name===customerName);if(!c)return;
         const visit=(dbRef().visits||[]).filter(v=>v.rep_id===rep.id&&v.customer_id===c.id&&String(v.date||v.checkin_at||'').slice(0,10)===localDate()).sort((a,b)=>String(b.checkin_at||'').localeCompare(String(a.checkin_at||'')))[0];
         const planned=purposeFor(rep.id,c.id);const reason=visit?.type||planned?.reason;const note=planned?.note||'';if(!reason)return;
         const badge=document.createElement('span');badge.className='jms-report-purpose';badge.textContent=`سبب الزيارة: ${reasonLabel(reason)}${note?` — ${note}`:''}`;event.appendChild(badge);
       });
-      const missed=[...repBox.querySelectorAll('.jms-report-event')].find(e=>e.querySelector('h4')?.textContent.includes('لم تبدأ بعد'));
+      const missed=[...repBox.querySelectorAll('.jms-report-event')].find(e=>e.querySelector('h4')?.textContent.includes(window.JMSI18n?.label('لم تبدأ بعد') || 'لم تبدأ بعد'));
       missed?.querySelectorAll('.jms-report-meta span').forEach(span=>{if(span.dataset.reasonDone)return;const text=span.textContent.replace(/^\s*\d+\.\s*/,'').trim();const c=(dbRef().customers||[]).find(x=>x.name===text);const p=c&&purposeFor(rep.id,c.id);if(p?.reason){span.textContent+=` — ${reasonLabel(p.reason)}${p.note?` (${p.note})`:''}`;span.dataset.reasonDone='1'}})
     });
   }

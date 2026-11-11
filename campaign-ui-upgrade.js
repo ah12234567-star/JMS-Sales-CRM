@@ -132,7 +132,7 @@
     if (!preview.querySelector('.jms-preview-tools')) {
       const tools = document.createElement('div');
       tools.className = 'jms-preview-tools';
-      tools.innerHTML = '<input id="wcPreviewSearch" type="search" placeholder="ابحث باسم العميل أو الجوال أو المندوب"><select id="wcPreviewStatus"><option value="all">كل الحالات</option><option value="ready">جاهز للإرسال</option><option value="blocked">مستبعد</option></select><span class="jms-preview-count" id="wcPreviewVisible"></span>';
+      tools.innerHTML = "<input id=\"wcPreviewSearch\" type=\"search\" placeholder=\"ابحث باسم العميل أو الجوال أو المندوب\" data-i18n-placeholder=\"ui_914dc1ee6ce5\"><select id=\"wcPreviewStatus\"><option value=\"all\" data-i18n=\"ui_2743446f2b85\">كل الحالات</option><option value=\"ready\" data-i18n=\"ui_f184fcfb72fe\">جاهز للإرسال</option><option value=\"blocked\" data-i18n=\"ui_eb0bd9ba362a\">مستبعد</option></select><span class=\"jms-preview-count\" id=\"wcPreviewVisible\"></span>";
       preview.querySelector('.panel-head')?.insertAdjacentElement('afterend', tools);
       tools.querySelector('input')?.addEventListener('input', filterRows);
       tools.querySelector('select')?.addEventListener('change', filterRows);
@@ -154,8 +154,8 @@
         preview.querySelector('.jms-preview-tools')?.insertAdjacentElement('afterend', empty);
       }
       empty.innerHTML = optInOnly
-        ? '<b>لا يوجد عملاء مسجل لهم موافقة واتساب</b><span>الخيار المحدد يستبعد أي عميل لم تسجل له موافقة. يمكنك عرض جميع العملاء ثم مراجعتهم يدويًا.</span><br><button type="button" id="wcShowAllCustomers">عرض جميع العملاء</button>'
-        : '<b>لا يوجد عملاء مطابقون للاختيارات الحالية</b><span>غيّر الشريحة أو المندوب أو المدينة، ثم اضغط توليد ومعاينة.</span>';
+        ? "<b data-i18n=\"ui_10ebfc15c89c\">لا يوجد عملاء مسجل لهم موافقة واتساب</b><span data-i18n=\"ui_681c19154658\">الخيار المحدد يستبعد أي عميل لم تسجل له موافقة. يمكنك عرض جميع العملاء ثم مراجعتهم يدويًا.</span><br><button type=\"button\" id=\"wcShowAllCustomers\" data-i18n=\"ui_b0523fca1794\">عرض جميع العملاء</button>"
+        : "<b data-i18n=\"ui_7bb0e0b5f78e\">لا يوجد عملاء مطابقون للاختيارات الحالية</b><span data-i18n=\"ui_4cb00a73ed44\">غيّر الشريحة أو المندوب أو المدينة، ثم اضغط توليد ومعاينة.</span>";
       empty.querySelector('#wcShowAllCustomers')?.addEventListener('click', () => {
         const check = document.getElementById('wcOptInOnly');
         if (check) check.checked = false;
@@ -171,21 +171,21 @@
     page.classList.add('jms-campaign-pro');
     const head = page.querySelector('.page-head');
     if (head && !page.querySelector('.jms-campaign-steps')) {
-      head.insertAdjacentHTML('afterend', '<div class="jms-campaign-steps"><div class="jms-campaign-step"><span class="jms-step-no">1</span><div><b>حدد العملاء</b><span>الشريحة، المندوب والمدينة</span></div></div><div class="jms-campaign-step"><span class="jms-step-no">2</span><div><b>جهز الرسالة</b><span>اختر النوع والنبرة ثم راجع النص</span></div></div><div class="jms-campaign-step"><span class="jms-step-no">3</span><div><b>راجع وأرسل</b><span>اعتمد الجاهزين فقط وتابع السجل</span></div></div></div>');
+      head.insertAdjacentHTML('afterend', "<div class=\"jms-campaign-steps\"><div class=\"jms-campaign-step\"><span class=\"jms-step-no\">1</span><div><b data-i18n=\"ui_d7661cf992b8\">حدد العملاء</b><span data-i18n=\"ui_ea65181c0ad4\">الشريحة، المندوب والمدينة</span></div></div><div class=\"jms-campaign-step\"><span class=\"jms-step-no\">2</span><div><b data-i18n=\"ui_4ca50c096d82\">جهز الرسالة</b><span data-i18n=\"ui_0ba5e5d41858\">اختر النوع والنبرة ثم راجع النص</span></div></div><div class=\"jms-campaign-step\"><span class=\"jms-step-no\">3</span><div><b data-i18n=\"ui_f6a4cc924dbd\">راجع وأرسل</b><span data-i18n=\"ui_4cc7054241bd\">اعتمد الجاهزين فقط وتابع السجل</span></div></div></div>");
     }
     const headButtons = head?.querySelectorAll('.head-actions button');
     if (headButtons?.length > 1) {
       headButtons[0].style.display = 'none';
-      headButtons[1].textContent = 'تحديث البيانات';
+      (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(headButtons[1],"تحديث البيانات");
     }
     const builder = page.querySelector(':scope > .panel');
     const toolbar = builder?.querySelector('.jms-campaign-toolbar');
     if (toolbar && !builder.querySelector('.jms-campaign-builder-title')) {
-      toolbar.insertAdjacentHTML('beforebegin', '<div class="jms-campaign-builder-title"><b>إعداد الحملة</b><span>كل الإرسال تحت اعتماد المدير</span></div>');
+      toolbar.insertAdjacentHTML('beforebegin', "<div class=\"jms-campaign-builder-title\"><b data-i18n=\"ui_12e5133bb273\">إعداد الحملة</b><span data-i18n=\"ui_5c44378979ca\">كل الإرسال تحت اعتماد المدير</span></div>");
     }
     const actions = builder?.querySelector('.jms-campaign-actions');
     if (actions && !builder.querySelector('.jms-whatsapp-state')) {
-      actions.insertAdjacentHTML('afterend', '<div class="jms-whatsapp-state"><i></i><div><b>حالة الإرسال:</b> الإرسال التلقائي يحتاج ربط WhatsApp Cloud API. بدون الربط، يجهز النظام الرسائل وروابط واتساب للإرسال اليدوي.</div></div>');
+      actions.insertAdjacentHTML('afterend', "<div class=\"jms-whatsapp-state\"><i></i><div><b data-i18n=\"ui_8fd4be3e0617\">حالة الإرسال:</b> الإرسال التلقائي يحتاج ربط WhatsApp Cloud API. بدون الربط، يجهز النظام الرسائل وروابط واتساب للإرسال اليدوي.</div></div>");
     }
     enhancePreview();
     if (page.dataset.campaignButtonsBound !== '1') {

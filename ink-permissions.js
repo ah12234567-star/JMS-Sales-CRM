@@ -27,7 +27,7 @@
   function addWarehouseOption(select){
     if(!select || select.querySelector('option[value="warehouse"]')) return;
     const option=document.createElement('option');
-    option.value='warehouse'; option.textContent='مسؤول الأحبار فقط';
+    option.value='warehouse'; (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(option,"مسؤول الأحبار فقط");
     const sales=select.querySelector('option[value="sales"]');
     select.insertBefore(option,sales||null);
   }
@@ -111,7 +111,7 @@
     document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));
     inkButton?.classList.add('active'); inkPage?.classList.add('active');
     const roleBox=document.getElementById('currentUserRole');
-    if(roleBox) roleBox.textContent='مسؤول مخزون الأحبار';
+    if(roleBox) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(roleBox,"مسؤول مخزون الأحبار");
   }
 
   function isCreateQuoteControl(el){

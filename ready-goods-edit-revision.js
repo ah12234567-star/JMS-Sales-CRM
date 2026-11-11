@@ -41,13 +41,13 @@
   }
 
   function itemHtml(it,i){return `<div class="rgn-edit-item" data-edit-item="${i}"><div class="rgn-edit-grid">
-    <label class="rgn-edit-field"><span>الصنف</span><select data-k="type" data-i="${i}">${['أكياس بلاستيك','رول بلاستيك','كليشة','أخرى'].map(v=>`<option ${it.type===v?'selected':''}>${v}</option>`).join('')}</select></label>
-    <label class="rgn-edit-field"><span>الوصف</span><input data-k="description" data-i="${i}" value="${esc(it.description||'')}"></label>
-    <label class="rgn-edit-field"><span>المقاس</span><input data-k="size" data-i="${i}" value="${esc(it.size||'')}"></label>
-    <label class="rgn-edit-field"><span>الكمية</span><input data-k="qty" data-i="${i}" type="number" min="0" step="0.01" value="${num(it.qty)}"></label>
-    <label class="rgn-edit-field"><span>الوحدة</span><select data-k="unit" data-i="${i}">${['كجم','حبة','رول','قطعة'].map(v=>`<option ${it.unit===v?'selected':''}>${v}</option>`).join('')}</select></label>
-    <label class="rgn-edit-field"><span>التعبئة / عدد العبوات</span><input data-k="packaging_label" data-i="${i}" value="${esc(it.packaging_label||it.packaging||'')}" placeholder="24 كرتون"></label>
-    <label class="rgn-edit-field"><span>سعر الوحدة قبل الضريبة</span><input data-k="unit_price" data-i="${i}" type="number" min="0" step="0.01" value="${num(it.unit_price)}"></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_5b12a452b19e">الصنف</span><select data-k="type" data-i="${i}">${['أكياس بلاستيك','رول بلاستيك','كليشة','أخرى'].map(v=>`<option ${it.type===v?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_95023fc76e1b">الوصف</span><input data-k="description" data-i="${i}" value="${esc(it.description||'')}"></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_d32ec91fdd57">المقاس</span><input data-k="size" data-i="${i}" value="${esc(it.size||'')}"></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_935e21853946">الكمية</span><input data-k="qty" data-i="${i}" type="number" min="0" step="0.01" value="${num(it.qty)}"></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_9a08d7d4bf73">الوحدة</span><select data-k="unit" data-i="${i}">${['كجم','حبة','رول','قطعة'].map(v=>`<option ${it.unit===v?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_0c0822b00817">التعبئة / عدد العبوات</span><input data-k="packaging_label" data-i="${i}" value="${esc(it.packaging_label||it.packaging||'')}" placeholder="24 كرتون"></label>
+    <label class="rgn-edit-field"><span data-i18n="ui_6be680c1f5d5">سعر الوحدة قبل الضريبة</span><input data-k="unit_price" data-i="${i}" type="number" min="0" step="0.01" value="${num(it.unit_price)}"></label>
     <button class="rgn-edit-remove" type="button" data-remove-i="${i}">حذف</button>
   </div></div>`}
 
@@ -65,11 +65,11 @@
     document.getElementById('jmsRgnEditOverlay')?.remove();
     const ov=document.createElement('div');ov.id='jmsRgnEditOverlay';ov.className='rgn-edit-overlay';ov.innerHTML=`<div class="rgn-edit-modal" role="dialog" aria-modal="true">
       <div class="rgn-edit-head"><div><h3>تعديل ${esc(n.number||'إشعار البضاعة')}</h3><p>Rev.${Number(n.revision||0)+1} — يتم حفظ النسخة السابقة تلقائيًا في سجل التعديلات</p></div><button class="rgn-edit-close" type="button" data-close-edit>×</button></div>
-      <div class="rgn-edit-body"><div class="rgn-edit-note">أي تعديل على السعر أو الكمية أو التعبئة يُسجل كتعديل جديد مع الاحتفاظ بالقيم السابقة للمراجعة.</div>
-        <div class="rgn-edit-customer"><div class="rgn-edit-readonly"><small>العميل</small><b>${esc(n.customer_name||'-')}</b></div><div class="rgn-edit-readonly"><small>رقم الإشعار</small><b>${esc(n.number||'-')}</b></div></div>
-        <div id="rgnEditItems"></div><button class="rgn-edit-add" type="button" id="rgnEditAdd">+ إضافة صنف</button>
-        <div class="rgn-edit-summary"><div class="rgn-edit-kpi"><span>قبل الضريبة</span><b id="rgnEditSubtotal"></b></div><div class="rgn-edit-kpi"><span>الضريبة 15%</span><b id="rgnEditVat"></b></div><div class="rgn-edit-kpi"><span>شامل الضريبة</span><b id="rgnEditTotal"></b></div><div class="rgn-edit-kpi"><span>المدفوع سابقًا</span><input id="rgnEditPaid" type="number" min="0" step="0.01" value="${num(n.paid)}"></div><div class="rgn-edit-kpi"><span>المتبقي</span><b id="rgnEditRemaining"></b></div></div>
-      </div><div class="rgn-edit-foot"><button class="rgn-edit-cancel" type="button" data-close-edit>إلغاء</button><button class="rgn-edit-save" type="button" id="rgnEditSave">حفظ النسخة المعدلة</button></div></div>`;
+      <div class="rgn-edit-body"><div class="rgn-edit-note" data-i18n="ui_f1b3e64e832b">أي تعديل على السعر أو الكمية أو التعبئة يُسجل كتعديل جديد مع الاحتفاظ بالقيم السابقة للمراجعة.</div>
+        <div class="rgn-edit-customer"><div class="rgn-edit-readonly"><small data-i18n="ui_a042411e90be">العميل</small><b>${esc(n.customer_name||'-')}</b></div><div class="rgn-edit-readonly"><small data-i18n="ui_e849d4ac368f">رقم الإشعار</small><b>${esc(n.number||'-')}</b></div></div>
+        <div id="rgnEditItems"></div><button class="rgn-edit-add" type="button" id="rgnEditAdd" data-i18n="ui_743f1e98cd87">+ إضافة صنف</button>
+        <div class="rgn-edit-summary"><div class="rgn-edit-kpi"><span data-i18n="ui_b66802e70d00">قبل الضريبة</span><b id="rgnEditSubtotal"></b></div><div class="rgn-edit-kpi"><span data-i18n="ui_a6b68a4b8bd5">الضريبة 15%</span><b id="rgnEditVat"></b></div><div class="rgn-edit-kpi"><span data-i18n="ui_67a5f0d5fdf6">شامل الضريبة</span><b id="rgnEditTotal"></b></div><div class="rgn-edit-kpi"><span data-i18n="ui_db48b5760387">المدفوع سابقًا</span><input id="rgnEditPaid" type="number" min="0" step="0.01" value="${num(n.paid)}"></div><div class="rgn-edit-kpi"><span data-i18n="ui_b2127e3a35be">المتبقي</span><b id="rgnEditRemaining"></b></div></div>
+      </div><div class="rgn-edit-foot"><button class="rgn-edit-cancel" type="button" data-close-edit data-i18n="ui_9a30dc2a96b8">إلغاء</button><button class="rgn-edit-save" type="button" id="rgnEditSave" data-i18n="ui_69e19f45327c">حفظ النسخة المعدلة</button></div></div>`;
     document.body.appendChild(ov);renderEditItems();
   }
 
@@ -93,7 +93,7 @@
   function showHistory(id){
     const n=get(id);if(!n)return;const h=Array.isArray(n.revision_history)?n.revision_history:[];
     document.getElementById('jmsRgnEditOverlay')?.remove();const ov=document.createElement('div');ov.id='jmsRgnEditOverlay';ov.className='rgn-edit-overlay';
-    ov.innerHTML=`<div class="rgn-edit-modal" style="max-width:720px"><div class="rgn-edit-head"><div><h3>سجل تعديلات ${esc(n.number||'')}</h3><p>الإصدار الحالي Rev.${Number(n.revision||0)}</p></div><button class="rgn-edit-close" data-close-edit>×</button></div><div class="rgn-edit-body"><div class="rgn-history-list">${h.length?h.slice().reverse().map((x,idx)=>`<div class="rgn-history-card"><b>النسخة السابقة Rev.${Number(x.revision||0)}</b><small>${esc(x.saved_by||'')} · ${esc(new Date(x.saved_at).toLocaleString('ar-SA'))}</small><div class="rgn-history-delta">الإجمالي: ${fmt(x.total)} ريال · المدفوع: ${fmt(x.paid)} ريال · المتبقي: ${fmt(x.remaining)} ريال · الأصناف: ${(x.items||[]).length}</div></div>`).join(''):'<div class="rgn-edit-note">لا توجد تعديلات سابقة على هذا الإشعار.</div>'}</div></div><div class="rgn-edit-foot"><button class="rgn-edit-cancel" data-close-edit>إغلاق</button></div></div>`;document.body.appendChild(ov);
+    ov.innerHTML=`<div class="rgn-edit-modal" style="max-width:720px"><div class="rgn-edit-head"><div><h3>سجل تعديلات ${esc(n.number||'')}</h3><p>الإصدار الحالي Rev.${Number(n.revision||0)}</p></div><button class="rgn-edit-close" data-close-edit>×</button></div><div class="rgn-edit-body"><div class="rgn-history-list">${h.length?h.slice().reverse().map((x,idx)=>`<div class="rgn-history-card"><b>النسخة السابقة Rev.${Number(x.revision||0)}</b><small>${esc(x.saved_by||'')} · ${esc(new Date(x.saved_at).toLocaleString('ar-SA'))}</small><div class="rgn-history-delta">الإجمالي: ${fmt(x.total)} ريال · المدفوع: ${fmt(x.paid)} ريال · المتبقي: ${fmt(x.remaining)} ريال · الأصناف: ${(x.items||[]).length}</div></div>`).join(''):"<div class=\"rgn-edit-note\" data-i18n=\"ui_25ad78df91be\">لا توجد تعديلات سابقة على هذا الإشعار.</div>"}</div></div><div class="rgn-edit-foot"><button class="rgn-edit-cancel" data-close-edit data-i18n="ui_ca90c297b099">إغلاق</button></div></div>`;document.body.appendChild(ov);
   }
 
   function enhanceList(){
@@ -102,8 +102,8 @@
       const n=list[i];if(!n)return;row.dataset.noticeId=n.id;
       const numberSmall=row.querySelector('small');if(numberSmall&&Number(n.revision||0)>0&&!numberSmall.querySelector?.('.rgn-rev-badge'))numberSmall.insertAdjacentHTML('beforeend',` <span class="rgn-rev-badge">Rev.${Number(n.revision)}</span>`);
       const actions=row.querySelector('.rgn-actions');if(!actions)return;
-      if(!actions.querySelector('.rgn-edit-btn')){const b=document.createElement('button');b.className='rgn-edit-btn';b.type='button';b.textContent='تعديل';b.addEventListener('click',()=>openEdit(n.id));actions.prepend(b)}
-      if(Number(n.revision||0)>0&&!actions.querySelector('.rgn-history-btn')){const b=document.createElement('button');b.className='rgn-history-btn';b.type='button';b.textContent='السجل';b.addEventListener('click',()=>showHistory(n.id));actions.appendChild(b)}
+      if(!actions.querySelector('.rgn-edit-btn')){const b=document.createElement('button');b.className='rgn-edit-btn';b.type='button';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"تعديل");b.addEventListener('click',()=>openEdit(n.id));actions.prepend(b)}
+      if(Number(n.revision||0)>0&&!actions.querySelector('.rgn-history-btn')){const b=document.createElement('button');b.className='rgn-history-btn';b.type='button';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,'السجل');b.addEventListener('click',()=>showHistory(n.id));actions.appendChild(b)}
     });
   }
 

@@ -59,13 +59,13 @@
     }
     document.body.classList.add('jms-manager-mobile-pro');
     const pageName = document.getElementById('jmsMobilePageName');
-    if (pageName && document.getElementById('dashboard')?.classList.contains('active')) pageName.textContent = 'لوحة التحكم';
+    if (pageName && document.getElementById('dashboard')?.classList.contains('active')) (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(pageName,"لوحة التحكم");
     let nav = document.getElementById('jmsManagerBottomNav');
     if (!nav) {
       nav = document.createElement('nav');
       nav.id = 'jmsManagerBottomNav';
       nav.className = 'jms-manager-bottom-nav';
-      nav.innerHTML = `<button data-go="dashboard"><i>⌂</i><span>الرئيسية</span></button><button data-go="customers"><i>◎</i><span>العملاء</span></button><button data-go="productionWorkflow"><i>▦</i><span>الإنتاج</span></button><button data-go="quotes"><i>▤</i><span>العروض</span></button>`;
+      nav.innerHTML = `<button data-go="dashboard"><i>⌂</i><span data-i18n="ui_bfcf48307970">الرئيسية</span></button><button data-go="customers"><i>◎</i><span data-i18n="ui_813d9a8a1065">العملاء</span></button><button data-go="productionWorkflow"><i>▦</i><span data-i18n="ui_03b47ea3ac24">الإنتاج</span></button><button data-go="quotes"><i>▤</i><span data-i18n="ui_c33dc1a31d21">العروض</span></button>`;
       document.body.appendChild(nav);
       nav.querySelectorAll('button').forEach(button => button.addEventListener('click', () => go(button.dataset.go)));
     }
@@ -132,24 +132,24 @@
           <h3>${hourGreeting()}، ${esc(currentUser.name || 'مدير النظام')}</h3>
           <p>${attention ? `لديك <b>${attention}</b> مهمة تحتاج متابعة اليوم.` : 'كل الأعمال المهمة تحت السيطرة اليوم.'}</p>
         </div>
-        <div class="jms-command-score ${attention ? 'busy' : 'clear'}"><b>${attention}</b><span>تحتاج إجراء</span></div>
+        <div class="jms-command-score ${attention ? 'busy' : 'clear'}"><b>${attention}</b><span data-i18n="ui_1c3a81f7a25c">تحتاج إجراء</span></div>
       </div>
       <div class="jms-command-kpis">
-        <button onclick="jmsCommandGo('quotes')"><span class="orange">▤</span><div><b>${counts.pendingQuotes}</b><small>عروض بانتظار الاعتماد</small></div></button>
-        <button onclick="jmsCommandGo('orders')"><span class="red">!</span><div><b>${counts.incompleteOrders}</b><small>طلبات بياناتها ناقصة</small></div></button>
-        <button onclick="jmsCommandGo('customers')"><span class="blue">⌖</span><div><b>${counts.overdue}</b><small>عملاء متأخرون عن الزيارة</small></div></button>
-        ${pageAllowed('smartVisits') ? `<button onclick="jmsCommandGo('smartVisits')"><span class="green">●</span><div><b>${counts.openVisits}</b><small>زيارات مفتوحة الآن</small></div></button>` : ''}
+        <button onclick="jmsCommandGo('quotes')"><span class="orange">▤</span><div><b>${counts.pendingQuotes}</b><small data-i18n="ui_a99429b24789">عروض بانتظار الاعتماد</small></div></button>
+        <button onclick="jmsCommandGo('orders')"><span class="red">!</span><div><b>${counts.incompleteOrders}</b><small data-i18n="ui_2f59721b0790">طلبات بياناتها ناقصة</small></div></button>
+        <button onclick="jmsCommandGo('customers')"><span class="blue">⌖</span><div><b>${counts.overdue}</b><small data-i18n="ui_97534d34a289">عملاء متأخرون عن الزيارة</small></div></button>
+        ${pageAllowed('smartVisits') ? `<button onclick="jmsCommandGo('smartVisits')"><span class="green">●</span><div><b>${counts.openVisits}</b><small data-i18n="ui_ffe0d4b5c58a">زيارات مفتوحة الآن</small></div></button>` : ''}
       </div>
       <div class="jms-command-grid">
         <div class="jms-command-tasks">
-          <div class="jms-command-title"><div><b>أولويات العمل</b><small>مرتبة حسب الأهمية</small></div><span>${tasks.length}</span></div>
+          <div class="jms-command-title"><div><b data-i18n="ui_7cd52e6e168a">أولويات العمل</b><small data-i18n="ui_57545fab9cc6">مرتبة حسب الأهمية</small></div><span>${tasks.length}</span></div>
           <div class="jms-task-list">${tasks.length ? tasks.map(task => `
             <button type="button" class="jms-task" onclick="jmsCommandGo('${task.page}')">
               <i class="${task.tone}">${task.icon}</i><div><b>${esc(task.title)}</b><small>${esc(task.detail || 'فتح التفاصيل')}</small></div><em>‹</em>
-            </button>`).join('') : '<div class="jms-command-empty"><i>✓</i><b>لا توجد مهام عاجلة</b><span>الوضع ممتاز، استمر في متابعة العمل.</span></div>'}</div>
+            </button>`).join('') : "<div class=\"jms-command-empty\"><i>✓</i><b data-i18n=\"ui_1848899cefb8\">لا توجد مهام عاجلة</b><span data-i18n=\"ui_1f73065f9415\">الوضع ممتاز، استمر في متابعة العمل.</span></div>"}</div>
         </div>
         <div class="jms-command-quick">
-          <div class="jms-command-title"><div><b>إجراء سريع</b><small>ابدأ المهمة بضغطة واحدة</small></div></div>
+          <div class="jms-command-title"><div><b data-i18n="ui_bcabf824fba7">إجراء سريع</b><small data-i18n="ui_cc8dd7aee2e1">ابدأ المهمة بضغطة واحدة</small></div></div>
           <div class="jms-quick-grid">
             ${actionButton('customers','＋','إضافة عميل')}
             ${actionButton('quotes','▤','عرض سعر')}

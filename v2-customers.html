@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html data-account-page lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JMS V2 - Customers</title>
   <link rel="stylesheet" href="v2.css">
-</head>
+<link rel="stylesheet" href="/localization.css?v=20261111-1"><script defer src="/localization.js?v=20261111-1"></script></head>
 <body>
   <div class="app">
     <aside class="sidebar">
@@ -17,28 +17,28 @@
         </div>
       </div>
       <nav>
-        <button class="active">العملاء</button>
-        <button>المناديب</button>
-        <button>الزيارات</button>
-        <button>عروض الأسعار</button>
-        <button>التصنيع</button>
-        <button>التقارير</button>
+        <button class="active" data-i18n="ui_813d9a8a1065">العملاء</button>
+        <button data-i18n="ui_5e9eb4f51122">المناديب</button>
+        <button data-i18n="ui_8ba074bf9452">الزيارات</button>
+        <button data-i18n="ui_6ca2c33f29f9">عروض الأسعار</button>
+        <button data-i18n="ui_7fda14985d69">التصنيع</button>
+        <button data-i18n="ui_2157b1313ba3">التقارير</button>
       </nav>
       <div class="ai-box">
         <b>JMS AI</b>
-        <p>قريبًا: اسأل النظام عن المبيعات والمناديب والعملاء.</p>
+        <p data-i18n="ui_97fcfeb41698">قريبًا: اسأل النظام عن المبيعات والمناديب والعملاء.</p>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <h1>إدارة العملاء</h1>
-          <p>واجهة V2 تجارية قابلة للبيع — فلترة حسب المندوب، بحث سريع، وبطاقات نظيفة.</p>
+          <h1 data-i18n="ui_bff3793b5cce">إدارة العملاء</h1>
+          <p data-i18n="ui_a3857d852a2c">واجهة V2 تجارية قابلة للبيع — فلترة حسب المندوب، بحث سريع، وبطاقات نظيفة.</p>
         </div>
         <div class="top-actions">
-          <button onclick="openCustomerModal()">+ إضافة عميل</button>
-          <button class="secondary" onclick="downloadTemplate()">قالب Excel/CSV</button>
+          <button onclick="openCustomerModal()" data-i18n="ui_8df08c627c13">+ إضافة عميل</button>
+          <button class="secondary" onclick="downloadTemplate()" data-i18n="ui_797c0d613014">قالب Excel/CSV</button>
         </div>
       </header>
 
@@ -46,32 +46,32 @@
         <div>
           <span>JMS Commercial Product</span>
           <h2>Customer Intelligence Workspace</h2>
-          <p>تابع العملاء، المناديب، الزيارات، والعروض من شاشة واحدة بتصميم SaaS احترافي.</p>
+          <p data-i18n="ui_c41717fa6fc7">تابع العملاء، المناديب، الزيارات، والعروض من شاشة واحدة بتصميم SaaS احترافي.</p>
         </div>
         <div class="hero-card">
           <b id="heroCustomers">0</b>
-          <span>عميل مسجل</span>
+          <span data-i18n="ui_dd35a4cbcbf3">عميل مسجل</span>
         </div>
       </section>
 
       <section class="kpis">
-        <div><span>إجمالي العملاء</span><b id="kpiCustomers">0</b></div>
-        <div><span>حسب الفلتر</span><b id="kpiFiltered">0</b></div>
-        <div><span>زيارات اليوم</span><b id="kpiVisits">0</b></div>
-        <div><span>عروض السعر</span><b id="kpiQuotes">0</b></div>
-        <div><span>طلبات</span><b id="kpiOrders">0</b></div>
+        <div><span data-i18n="ui_f7727c92767a">إجمالي العملاء</span><b id="kpiCustomers">0</b></div>
+        <div><span data-i18n="ui_282aaa47b0a0">حسب الفلتر</span><b id="kpiFiltered">0</b></div>
+        <div><span data-i18n="ui_17a927751b7b">زيارات اليوم</span><b id="kpiVisits">0</b></div>
+        <div><span data-i18n="ui_170914e8b0de">عروض السعر</span><b id="kpiQuotes">0</b></div>
+        <div><span data-i18n="ui_88ff1dc5f1fc">طلبات</span><b id="kpiOrders">0</b></div>
       </section>
 
       <section class="filters">
-        <input id="search" placeholder="ابحث باسم العميل أو الجوال أو المدينة..." oninput="render()">
+        <input id="search" placeholder="ابحث باسم العميل أو الجوال أو المدينة..." oninput="render()" data-i18n-placeholder="ui_b935a5b311f8">
         <select id="repFilter" onchange="render()"></select>
         <select id="cityFilter" onchange="render()"></select>
         <select id="categoryFilter" onchange="render()"></select>
       </section>
 
       <section class="list-head">
-        <b>قائمة العملاء</b>
-        <span id="resultCount">0 عميل</span>
+        <b data-i18n="ui_729218f4183d">قائمة العملاء</b>
+        <span id="resultCount" data-i18n="ui_5f5e08d7050c">0 عميل</span>
       </section>
 
       <section id="customers" class="customers"></section>

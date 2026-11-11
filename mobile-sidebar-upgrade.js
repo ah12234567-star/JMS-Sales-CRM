@@ -8,7 +8,7 @@
     if (!nav) return;
     const wrap = document.createElement('div');
     wrap.className = 'jms-mobile-nav-search';
-    wrap.innerHTML = '<span>⌕</span><input type="search" placeholder="ابحث في القائمة" aria-label="ابحث في القائمة">';
+    wrap.innerHTML = '<span>⌕</span><input type="search" placeholder="ابحث في القائمة" data-i18n-placeholder=ui_1e06894d4491 aria-label="ابحث في القائمة" data-i18n-aria-label=ui_1e06894d4491>';
     nav.parentNode.insertBefore(wrap, nav);
     wrap.querySelector('input').addEventListener('input', event => {
       const term = event.target.value.trim().toLowerCase();
@@ -30,6 +30,12 @@
       const icon = document.createElement('span');
       icon.className = 'jms-nav-icon';
       icon.textContent = icons[button.dataset.page] || '•';
+      if (!button.children.length && button.textContent.trim()) {
+        const caption=document.createElement('span');
+        caption.setAttribute('data-i18n-text',button.getAttribute('data-i18n-text') || button.textContent.trim());
+        caption.textContent=button.textContent;
+        button.replaceChildren(caption);
+      }
       button.prepend(icon);
     });
   }
@@ -48,7 +54,7 @@
     button.type = 'button';
     button.className = 'nav jms-quote-create-nav';
     button.dataset.page = 'quotes';
-    button.innerHTML = '<span class="jms-nav-icon">＋</span><span>إنشاء عرض السعر</span>';
+    button.innerHTML = '<span class="jms-nav-icon">＋</span><span><span data-i18n=ui_de9e6c54530d>إنشاء عرض السعر</span></span>';
     button.addEventListener('click', () => {
       document.body.classList.remove('jms-mobile-menu-open');
       quoteItem.click();

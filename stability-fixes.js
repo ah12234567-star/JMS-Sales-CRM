@@ -32,7 +32,7 @@
       if(!q || validQuote(q)) return;
       card.classList.add('jms-record-incomplete');
       if(!card.querySelector('.jms-incomplete-note')){
-        card.insertAdjacentHTML('afterbegin','<div class="jms-incomplete-note">⚠ عرض قديم ناقص — عدّله قبل الاعتماد أو الإرسال أو التحويل</div>');
+        card.insertAdjacentHTML('afterbegin',"<div class=\"jms-incomplete-note\" data-i18n=\"ui_19ae5905c093\">⚠ عرض قديم ناقص — عدّله قبل الاعتماد أو الإرسال أو التحويل</div>");
       }
       card.querySelectorAll('.approve,.send,.convert,.accept').forEach(b=>{b.disabled=true;b.title=invalidMessage});
     });
@@ -41,7 +41,7 @@
   function cleanupUi(){
     const users=document.getElementById('users');
     if(users){
-      const add=[...users.querySelectorAll('button')].filter(b=>/إضافة مستخدم/.test(b.textContent));
+      const add=[...users.querySelectorAll('button')].filter(b=>(b.getAttribute('onclick')==='openUserForm()'||b.id==='jmsAddUserBtn'));
       add.slice(1).forEach(b=>b.remove());
     }
     document.querySelectorAll('select').forEach(s=>{

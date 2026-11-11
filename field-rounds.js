@@ -9,12 +9,12 @@ function setupVoiceInput(){
  const button=$('voiceInput'),status=$('voiceStatus');if(!button)return;
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!Recognition){button.hidden=true;return;}
- const setActive=active=>{voiceActive=active;button.textContent=active?'⏹ إيقاف الإملاء':'🎙 ابدأ الإملاء';button.setAttribute('aria-pressed',String(active));};
+ const setActive=active=>{voiceActive=active;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,active?'⏹ إيقاف الإملاء':'🎙 ابدأ الإملاء');button.setAttribute('aria-pressed',String(active));};
  button.onclick=()=>{
   if(voiceActive){voiceRecognition?.stop();return;}
   try{
-   voiceRecognition=new Recognition();voiceRecognition.lang='ar-SA';voiceRecognition.continuous=true;voiceRecognition.interimResults=true;voiceBase=$('source').value.trim();
-   voiceRecognition.onstart=()=>{setActive(true);status.textContent='أستمع الآن… اضغط إيقاف عند الانتهاء.';};
+   voiceRecognition=new Recognition();voiceRecognition.lang=document.documentElement?.lang==='en'?'en-US':'ar-SA';voiceRecognition.continuous=true;voiceRecognition.interimResults=true;voiceBase=$('source').value.trim();
+   voiceRecognition.onstart=()=>{setActive(true);(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,'أستمع الآن… اضغط إيقاف عند الانتهاء.');};
    voiceRecognition.onresult=event=>{
     let finalText='',interimText='';
     for(let i=0;i<event.results.length;i++){const transcript=event.results[i][0]?.transcript||'';if(event.results[i].isFinal)finalText+=transcript+' ';else interimText+=transcript+' ';}
@@ -25,12 +25,12 @@ function setupVoiceInput(){
     else if(event.error==='no-speech')message('لم أسمع كلامًا. حاول مرة أخرى أو اكتب الملخص.',true);
     else if(event.error!=='aborted')message('تعذر إكمال الإملاء. يمكنك كتابة الملخص يدويًا.',true);
    };
-   voiceRecognition.onend=()=>{setActive(false);status.textContent='تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.';if($('source').value.trim())message('انتهى الإملاء. راجع النص ثم رتّب كلامك في جدول.');};
+   voiceRecognition.onend=()=>{setActive(false);(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تحدث بشكل طبيعي؛ راجع النص قبل إنشاء الجدول.");if($('source').value.trim())message('انتهى الإملاء. راجع النص ثم رتّب كلامك في جدول.');};
    voiceRecognition.start();setActive(true);
   }catch{setActive(false);message('تعذر بدء الإملاء. تحقق من إذن الميكروفون أو اكتب الملخص.',true);}
  };
 }
-function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);}
+function message(text,error=false){(window.JMSI18n?.setText || ((el,value)=>el.textContent=value))($('message'),text);$('message').classList.toggle('error',error);}
 async function request(path='',body){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),55000);
  try{
@@ -40,30 +40,30 @@ async function request(path='',body){
 }
 function cacheKey(){return 'jms-field-round-draft:'+user.id;}
 function persist(){if(!user)return;try{localStorage.setItem(cacheKey(),JSON.stringify({source:$('source').value,area:$('area').value,date:$('date').value,record:record?.status==='draft'?record:null}));}catch{}}
-async function operation(button,fn){if(busy)return;busy=true;const text=button.textContent;button.disabled=true;button.textContent='جاري التنفيذ…';message('جاري التنفيذ؛ يرجى الانتظار.');try{await fn();}catch(e){message(e.message,true);}finally{button.disabled=false;button.textContent=text;busy=false;}}
+async function operation(button,fn){if(busy)return;busy=true;const text=button.textContent;button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,'جاري التنفيذ…');message('جاري التنفيذ؛ يرجى الانتظار.');try{await fn();}catch(e){message(e.message,true);}finally{button.disabled=false;button.textContent=text;busy=false;}}
 function rowHtml(row,i,readOnly){
- return `<article class="entry" data-index="${i}"><div class="entry-head"><h3>منشأة ${i+1}</h3>${readOnly?'':`<button data-remove="${i}" aria-label="حذف المنشأة ${i+1}">حذف</button>`}</div><div class="two"><label>اسم المنشأة<input data-field="name" maxlength="160" value="${esc(row.name)}" ${readOnly?'disabled':''}></label><label>الحي<input data-field="area" maxlength="120" value="${esc(row.area)}" ${readOnly?'disabled':''}></label><label>ماذا حدث؟<select data-field="outcome" ${readOnly?'disabled':''}>${Object.entries(labels).map(([v,l])=>`<option value="${v}" ${row.outcome===v?'selected':''}>${l}</option>`).join('')}</select></label><label>متابعة قادمة (اختياري)<input data-field="follow_up_date" type="date" value="${esc(row.follow_up_date)}" ${readOnly?'disabled':''}></label></div><label>النتيجة والملاحظة<textarea data-field="notes" rows="2" maxlength="1000" ${readOnly?'disabled':''}>${esc(row.notes)}</textarea></label></article>`;
+ return `<article class="entry" data-index="${i}"><div class="entry-head"><h3>منشأة ${i+1}</h3>${readOnly?'':`<button data-remove="${i}" aria-label="حذف المنشأة ${i+1}">حذف</button>`}</div><div class="two"><label><span data-i18n="ui_5a84521f0a34">اسم المنشأة</span><input data-field="name" maxlength="160" value="${esc(row.name)}" ${readOnly?'disabled':''}></label><label><span data-i18n="ui_0a6767f7377b">الحي</span><input data-field="area" maxlength="120" value="${esc(row.area)}" ${readOnly?'disabled':''}></label><label><span data-i18n="ui_c233e92540d1">ماذا حدث؟</span><select data-field="outcome" ${readOnly?'disabled':''}>${Object.entries(labels).map(([v,l])=>`<option value="${v}" ${row.outcome===v?'selected':''} data-i18n-text>${l}</option>`).join('')}</select></label><label><span data-i18n="ui_7da694e76087">متابعة قادمة (اختياري)</span><input data-field="follow_up_date" type="date" value="${esc(row.follow_up_date)}" ${readOnly?'disabled':''}></label></div><label><span data-i18n="ui_65c2708ce2bf">النتيجة والملاحظة</span><textarea data-field="notes" rows="2" maxlength="1000" ${readOnly?'disabled':''}>${esc(row.notes)}</textarea></label></article>`;
 }
 function showRecord(next,restore=true){
  record=next;const readOnly=record.status==='submitted';
  if(restore&&!readOnly){try{const old=JSON.parse(localStorage.getItem(cacheKey())||'{}').record;if(old?.id===record.id&&old.locallyEdited&&Array.isArray(old.entries))record={...record,entries:old.entries,locallyEdited:true};}catch{}}
- $('compose').hidden=true;$('review').hidden=false;$('reviewActions').hidden=readOnly;$('reviewTitle').textContent=readOnly?'تم اعتماد الجولة':'راجع المسودة قبل الاعتماد';
+ $('compose').hidden=true;$('review').hidden=false;$('reviewActions').hidden=readOnly;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))($('reviewTitle'),readOnly?'تم اعتماد الجولة':'راجع المسودة قبل الاعتماد');
  $('roundMeta').textContent=`${record.rep_name} · ${record.date} · ${record.area}`;$('original').textContent=record.source_text;
  $('clarification').textContent=record.analysis_status==='pending'?'التحليل قيد التنفيذ أو لم يكتمل. أعد فتح المسودة لاحقًا، أو أضف الأماكن يدويًا.':record.clarification||'راجع أسماء المنشآت والنتائج، وعدّل أي تفسير غير دقيق.';
  $('entries').innerHTML=record.entries.map((r,i)=>rowHtml(r,i,readOnly)).join('');$('confirmed').checked=false;
  history.replaceState(null,'','?id='+encodeURIComponent(record.id));persist();
 }
-function table(r){return `<div class="table-wrap"><table><thead><tr><th>المنشأة</th><th>الحي</th><th>حالة المرور</th><th>النتيجة</th><th>المتابعة</th></tr></thead><tbody>${r.entries.map(e=>`<tr><td>${esc(e.name)}</td><td>${esc(e.area)}</td><td>${esc(labels[e.outcome])}</td><td>${esc(e.notes||'—')}</td><td>${esc(e.follow_up_date||'—')}</td></tr>`).join('')}</tbody></table></div>`;}
+function table(r){return `<div class="table-wrap"><table><thead><tr><th data-i18n="ui_c7d4bb31a8ea">المنشأة</th><th data-i18n="ui_0a6767f7377b">الحي</th><th data-i18n="ui_8a20e10195ec">حالة المرور</th><th data-i18n="ui_3c64ba0afab6">النتيجة</th><th data-i18n="ui_1796ea83af03">المتابعة</th></tr></thead><tbody>${r.entries.map(e=>`<tr><td>${esc(e.name)}</td><td>${esc(e.area)}</td><td>${esc(labels[e.outcome])}</td><td>${esc(e.notes||'—')}</td><td>${esc(e.follow_up_date||'—')}</td></tr>`).join('')}</tbody></table></div>`;}
 function renderReports(){
  const q=$('search').value.trim().toLowerCase();const list=records.filter(r=>[r.rep_name,r.area,...r.entries.flatMap(e=>[e.name,e.area,e.notes])].join(' ').toLowerCase().includes(q));
  const submitted=list.filter(r=>r.status==='submitted'),entries=submitted.flatMap(r=>r.entries);
  $('totals').textContent=`المعروض: ${submitted.length} جولة معتمدة · ${entries.filter(e=>e.outcome==='entered').length} دخول مُبلّغ عنه · ${entries.length} مكان مسجل`;
- $('reports').innerHTML=list.map(r=>`<article class="report"><div class="heading"><b>${esc(r.rep_name)} · ${esc(r.date)} · ${esc(r.area)}</b><span class="tag ${r.status==='submitted'?'submitted':''}">${r.status==='submitted'?'معتمد من المندوب':'مسودة خاصة'}</span></div>${r.status==='submitted'?table(r):`<p>${esc(r.source_text.slice(0,180))}</p><button data-open="${esc(r.id)}">مراجعة المسودة</button>`}<p class="hint">تسجيل المندوب؛ لا تُحتسب هذه المنشآت ضمن زيارات العملاء المسجلين.</p></article>`).join('')||'<p>لا توجد تقارير مطابقة.</p>';
+ $('reports').innerHTML=list.map(r=>`<article class="report"><div class="heading"><b>${esc(r.rep_name)} · ${esc(r.date)} · ${esc(r.area)}</b><span class="tag ${r.status==='submitted'?'submitted':''}">${r.status==='submitted'?'معتمد من المندوب':'مسودة خاصة'}</span></div>${r.status==='submitted'?table(r):`<p>${esc(r.source_text.slice(0,180))}</p><button data-open="${esc(r.id)}">مراجعة المسودة</button>`}<p class="hint" data-i18n="ui_690b01f11be4">تسجيل المندوب؛ لا تُحتسب هذه المنشآت ضمن زيارات العملاء المسجلين.</p></article>`).join('')||"<p data-i18n=\"ui_c2778888c808\">لا توجد تقارير مطابقة.</p>";
 }
 async function loadReports(append=false){
  const date=$('filterDate').value;if(!append)offset=0;
  const result=await request('?offset='+offset+(date?'&date='+date:''));user=result.user;$('userName').textContent=user.name;
- $('reportsTitle').textContent=user.role==='rep'?'تقاريري':'جولات المناديب';
+ (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))($('reportsTitle'),user.role==='rep'?'تقاريري':'جولات المناديب');
  records=append?[...records,...result.records]:result.records;offset=records.length;$('more').hidden=!result.hasMore;renderReports();
 }
 setupVoiceInput();

@@ -12,7 +12,7 @@ export default async function handler(req,res){
     if(data.status&&data.status!=='active') return json(res,403,{ok:false,error:'user_disabled'});
     return json(res,200,{ok:true,user:{
       id:row.id,name:data.name||'مستخدم',email:row.email,phone:row.phone||'',
-      role:data.role||auth.role,status:data.status||'active',permissions:data.permissions||{}
+      role:data.role||auth.role,status:data.status||'active',permissions:data.permissions||{},language:row.language==='en'?'en':'ar'
     }});
   }catch(error){
     console.error('auth-session failed:',error);

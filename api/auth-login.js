@@ -19,7 +19,7 @@ export default async function handler(req, res){
     if(!hash||!salt||pbkdf2(password,salt)!==hash) return json(res,401,{ok:false,error:'invalid_login'});
     if(requestedRole&&data.role&&requestedRole!==data.role) return json(res,403,{ok:false,error:'wrong_role'});
 
-    const user={id:row.id,name:data.name||'مستخدم',email:row.email,phone:row.phone||'',role:data.role||'rep',status:data.status||'active',permissions:data.permissions||{}};
+    const user={id:row.id,name:data.name||'مستخدم',email:row.email,phone:row.phone||'',role:data.role||'rep',status:data.status||'active',permissions:data.permissions||{},language:row.language==='en'?'en':'ar'};
     return json(res,200,{ok:true,user,token:sign({id:user.id,email:user.email,role:user.role})});
   }catch(e){
     console.error('auth-login failed:',e);

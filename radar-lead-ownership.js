@@ -48,7 +48,7 @@
     const baseKeywords=value('radarKeywords','افتتاح جديد opening soon new');
     const keywords=district?`${baseKeywords} ${district} قريب nearby near me`:baseKeywords;
     const limit=Number(value('radarLimit','12'));
-    setStatus('<div class="jms-thinking">جارٍ البحث وحجز النتائج الجديدة لهذا المندوب...</div>');
+    setStatus("<div class=\"jms-thinking\" data-i18n=\"ui_eb95339e9cbc\">جارٍ البحث وحجز النتائج الجديدة لهذا المندوب...</div>");
     try{
       const currentUser=user();
       const data=await request('/api/new-customer-radar',{

@@ -43,22 +43,22 @@
     const kg = number(order.total_kg);
     const savedPrice = number(order.price_kg) || (kg ? number(order.amount_value) / kg : 0);
     body.innerHTML = `
-      <div class="jms-order-edit-head"><div><span>إكمال الطلب قبل التحويل</span><h2>تعديل بيانات طلب المبيعات</h2><p>أكمل الخانات المطلوبة ثم احفظ. بعدها تستطيع اعتماد الطلب وتسجيل التحويل وإرساله للإنتاج.</p></div></div>
+      <div class="jms-order-edit-head"><div><span data-i18n="ui_58389996e0d5">إكمال الطلب قبل التحويل</span><h2 data-i18n="ui_fe5407f34a1a">تعديل بيانات طلب المبيعات</h2><p data-i18n="ui_d1a870c85469">أكمل الخانات المطلوبة ثم احفظ. بعدها تستطيع اعتماد الطلب وتسجيل التحويل وإرساله للإنتاج.</p></div></div>
       <div class="jms-order-edit-grid">
-        <label class="wide">العميل<select id="jmsEditOrderCustomer"><option value="">اختر العميل</option>${customerOptions(order.customer_id)}</select></label>
-        <label>المنتج<select id="jmsEditOrderProduct">${productOptions(order.product)}</select></label>
-        <label>الخامة<input id="jmsEditOrderMaterial" value="${esc(order.material || '')}" placeholder="HDPE / LDPE / LLDPE"></label>
-        <label>العرض<input id="jmsEditOrderWidth" type="number" min="0" step="0.01" value="${esc(order.width || '')}"></label>
-        <label>الطول<input id="jmsEditOrderLength" type="number" min="0" step="0.01" value="${esc(order.length || '')}"></label>
-        <label>السماكة بالميكرون<input id="jmsEditOrderThickness" type="number" min="0" step="0.01" value="${esc(order.thickness || '')}"></label>
-        <label>الكمية بالكيلو<input id="jmsEditOrderKg" type="number" min="0" step="0.01" value="${esc(order.total_kg || '')}" oninput="jmsRecalculateEditedOrder()"></label>
-        <label>سعر الكيلو<input id="jmsEditOrderPrice" type="number" min="0" step="0.01" value="${savedPrice ? savedPrice.toFixed(2) : ''}" oninput="jmsRecalculateEditedOrder()"></label>
-        <label>الإجمالي<input id="jmsEditOrderAmount" type="number" readonly value="${esc(order.amount_value || '')}"></label>
-        <label>اللون<input id="jmsEditOrderColor" value="${esc(order.color || '')}" placeholder="شفاف / أبيض / حسب الطلب"></label>
-        <label class="wide">ملاحظات الطلب<textarea id="jmsEditOrderNotes" rows="3">${esc(order.notes || '')}</textarea></label>
+        <label class="wide"><span data-i18n="ui_a042411e90be">العميل</span><select id="jmsEditOrderCustomer"><option value="" data-i18n="ui_efac3d2cdb26">اختر العميل</option>${customerOptions(order.customer_id)}</select></label>
+        <label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="jmsEditOrderProduct">${productOptions(order.product)}</select></label>
+        <label><span data-i18n="ui_ed10f61584eb">الخامة</span><input id="jmsEditOrderMaterial" value="${esc(order.material || '')}" placeholder="HDPE / LDPE / LLDPE"></label>
+        <label><span data-i18n="ui_40504fc32bfc">العرض</span><input id="jmsEditOrderWidth" type="number" min="0" step="0.01" value="${esc(order.width || '')}"></label>
+        <label><span data-i18n="ui_1ea9eb72945b">الطول</span><input id="jmsEditOrderLength" type="number" min="0" step="0.01" value="${esc(order.length || '')}"></label>
+        <label><span data-i18n="ui_fab16df243bc">السماكة بالميكرون</span><input id="jmsEditOrderThickness" type="number" min="0" step="0.01" value="${esc(order.thickness || '')}"></label>
+        <label><span data-i18n="ui_f37e8d51e0a4">الكمية بالكيلو</span><input id="jmsEditOrderKg" type="number" min="0" step="0.01" value="${esc(order.total_kg || '')}" oninput="jmsRecalculateEditedOrder()"></label>
+        <label><span data-i18n="ui_0696d91556d4">سعر الكيلو</span><input id="jmsEditOrderPrice" type="number" min="0" step="0.01" value="${savedPrice ? savedPrice.toFixed(2) : ''}" oninput="jmsRecalculateEditedOrder()"></label>
+        <label><span data-i18n="ui_baed6e999960">الإجمالي</span><input id="jmsEditOrderAmount" type="number" readonly value="${esc(order.amount_value || '')}"></label>
+        <label><span data-i18n="ui_041b469dc8a9">اللون</span><input id="jmsEditOrderColor" value="${esc(order.color || '')}" placeholder="شفاف / أبيض / حسب الطلب"></label>
+        <label class="wide"><span data-i18n="ui_404791304aac">ملاحظات الطلب</span><textarea id="jmsEditOrderNotes" rows="3">${esc(order.notes || '')}</textarea></label>
       </div>
       <div id="jmsOrderEditError" class="jms-order-edit-error" hidden></div>
-      <div class="jms-order-edit-actions"><button type="button" onclick="closeModal()">إلغاء</button><button type="button" class="primary" onclick="jmsSaveEditedSalesOrder('${esc(order.id)}')">حفظ البيانات</button></div>`;
+      <div class="jms-order-edit-actions"><button type="button" onclick="closeModal()" data-i18n="ui_9a30dc2a96b8">إلغاء</button><button type="button" class="primary" onclick="jmsSaveEditedSalesOrder('${esc(order.id)}')">حفظ البيانات</button></div>`;
     modal.classList.remove('hidden');
     recalculate();
   };
@@ -118,7 +118,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'jms-edit-sales-order';
-      button.textContent = 'تعديل وإكمال البيانات';
+      (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,'تعديل وإكمال البيانات');
       button.onclick = () => window.jmsEditSalesOrder(match[1]);
       actions.prepend(button);
     });

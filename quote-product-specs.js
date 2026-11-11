@@ -24,7 +24,7 @@
     selected=legacy[selected]||selected;
     const list = [...productOptions];
     if (selected && !list.some(([value]) => value === selected)) list.push([selected, selected]);
-    return list.map(([value,label]) => `<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(label)}</option>`).join('');
+    return list.map(([value,label]) => `<option ${productOptions.some(([v])=>v===value)?'data-i18n-text':''} value="${esc(value)}" ${value===selected?'selected':''}>${esc(label)}</option>`).join('');
   }
 
   function enhanceForm(q) {
@@ -35,7 +35,7 @@
       const current=q?.payment_terms||payment.value||'حسب الاتفاق';
       const terms=['حسب الاتفاق','الدفع مقدمًا 100%','الدفع خلال 30 يومًا من تاريخ استلام الطلب','الدفع خلال 60 يومًا من تاريخ استلام الطلب','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب'];
       if(current&&!terms.includes(current)) terms.push(current);
-      const select=document.createElement('select'); select.id='mqPayment'; select.innerHTML=terms.map(term=>`<option value="${esc(term)}" ${term===current?'selected':''}>${esc(term)}</option>`).join('');
+      const select=document.createElement('select'); select.id='mqPayment'; select.innerHTML=terms.map((term,index)=>`<option ${index<5?'data-i18n-text':''} value="${esc(term)}" ${term===current?'selected':''}>${esc(term)}</option>`).join('');
       payment.replaceWith(select);
       const paymentLabel=select.closest('label');
       const deliveryLabel=document.getElementById('mqDelivery')?.closest('label');
@@ -56,24 +56,24 @@
     const anchor = document.getElementById('mqThicknessUnit')?.closest('.form-grid') || product.closest('.form-grid');
     const panel = document.createElement('div');
     panel.id = 'jmsQuoteSpecs'; panel.className = 'jms-quote-spec-panel';
-    panel.innerHTML = `<div class="jms-spec-head"><div><b>مواصفات المنتج</b><span>الخانات الفارغة لن تظهر في عرض السعر</span></div><i>✦</i></div>
+    panel.innerHTML = `<div class="jms-spec-head"><div><b data-i18n="ui_5b52b97d6edd">مواصفات المنتج</b><span data-i18n="ui_7ba92ad00b96">الخانات الفارغة لن تظهر في عرض السعر</span></div><i>✦</i></div>
       <div class="jms-spec-grid">
-        <label>الطوية السفلية سم<input id="mqFoldBottom" type="number" min="0" step="0.01" value="${esc(q?.fold_bottom||'')}"></label>
-        <label>الطوية العلوية سم<input id="mqFoldTop" type="number" min="0" step="0.01" value="${esc(q?.fold_top||'')}"></label>
-        <label>الطوية الجانبية سم<input id="mqFoldSide" type="number" min="0" step="0.01" value="${esc(q?.fold_side||'')}"></label>
-        <label id="mqHandleTypeWrap">نوع اليد<select id="mqHandleType"><option value="">اختر</option>${['تيشرت','بنانا','شريط'].map(type=>`<option ${type===(legacyHandle[q?.product]||q?.handle_type)?'selected':''}>${type}</option>`).join('')}</select></label>
-        <label id="mqHandleColorWrap">لون الشريط<input id="mqHandleColor" placeholder="مثال: أحمر" value="${esc(q?.handle_color||'')}"></label>
-        <label id="mqPrintColorsWrap">عدد ألوان الطباعة<select id="mqPrintColors"><option value="">اختر</option>${[1,2,3,4,5,6,7,8].map(n=>`<option ${String(q?.print_colors||'')===String(n)?'selected':''}>${n}</option>`).join('')}</select></label>
+        <label><span data-i18n="ui_f86fa5963028">الطوية السفلية سم</span><input id="mqFoldBottom" type="number" min="0" step="0.01" value="${esc(q?.fold_bottom||'')}"></label>
+        <label><span data-i18n="ui_3cc3873babeb">الطوية العلوية سم</span><input id="mqFoldTop" type="number" min="0" step="0.01" value="${esc(q?.fold_top||'')}"></label>
+        <label><span data-i18n="ui_4421dd68c662">الطوية الجانبية سم</span><input id="mqFoldSide" type="number" min="0" step="0.01" value="${esc(q?.fold_side||'')}"></label>
+        <label id="mqHandleTypeWrap"><span data-i18n="ui_5de31787c237">نوع اليد</span><select id="mqHandleType"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${['تيشرت','بنانا','شريط'].map(type=>`<option ${type===(legacyHandle[q?.product]||q?.handle_type)?'selected':''}>${type}</option>`).join('')}</select></label>
+        <label id="mqHandleColorWrap"><span data-i18n="ui_74c64b4edaad">لون الشريط</span><input id="mqHandleColor" placeholder="مثال: أحمر" value="${esc(q?.handle_color||'')}"></label>
+        <label id="mqPrintColorsWrap"><span data-i18n=ui_3cad656ea567>عدد ألوان الطباعة</span><select id="mqPrintColors"><option value="" data-i18n="ui_d6b8d3e4d508">اختر</option>${[1,2,3,4,5,6,7,8].map(n=>`<option ${String(q?.print_colors||'')===String(n)?'selected':''}>${n}</option>`).join('')}</select></label>
       </div>`;
     anchor?.insertAdjacentElement('afterend', panel);
     const handleType=document.getElementById('mqHandleType'),handleTypeWrap=document.getElementById('mqHandleTypeWrap'),handleColor=document.getElementById('mqHandleColor'),handleColorWrap=document.getElementById('mqHandleColorWrap');
     const toggleHandle=()=>{const isBag=product.value==='أكياس بلاستيك';handleTypeWrap.hidden=!isBag;if(!isBag)handleType.value='';const isStrip=isBag&&handleType.value==='شريط';handleColorWrap.hidden=!isStrip;if(!isStrip)handleColor.value='';};
     product.addEventListener('change',toggleHandle);handleType.addEventListener('change',toggleHandle);toggleHandle();
     draftItems = Array.isArray(q?.items) ? q.items.slice(1) : [];
-    panel.insertAdjacentHTML('beforeend', `<div class="jms-multi-item-actions"><button type="button" onclick="jmsAddQuoteItem()">＋ حفظ الصنف وإضافة صنف آخر</button><span>يمكن إضافة حتى 10 أصناف في عرض واحد</span></div><div id="jmsQuoteDraftItems" class="jms-draft-items"></div>`);
+    panel.insertAdjacentHTML('beforeend', `<div class="jms-multi-item-actions"><button type="button" onclick="jmsAddQuoteItem()" data-i18n="ui_25fcf0c9ee5a">＋ حفظ الصنف وإضافة صنف آخر</button><span data-i18n="ui_9a01a9e48b9e">يمكن إضافة حتى 10 أصناف في عرض واحد</span></div><div id="jmsQuoteDraftItems" class="jms-draft-items"></div>`);
     const print = document.getElementById('mqPrint');
     if (print) {
-      print.innerHTML = '<option>بدون طباعة</option><option>طباعة وجه واحد</option><option>طباعة وجهين</option>';
+      print.innerHTML = "<option data-i18n=ui_b67388cf072a>بدون طباعة</option><option value=\"طباعة وجه واحد\" data-i18n=\"ui_6f3f3e03f956\">طباعة وجه واحد</option><option value=\"طباعة وجهين\" data-i18n=\"ui_d2444fbb64a4\">طباعة وجهين</option>";
       const old = q?.print || print.value; const wanted = old === 'وجه واحد' ? 'طباعة وجه واحد' : old === 'وجهين' ? 'طباعة وجهين' : old;
       const match=[...print.options].find(o=>o.value===wanted); if(match) match.selected=true; else print.options[0].selected=true;
       const toggle = () => { const wrap=document.getElementById('mqPrintColorsWrap'); if(wrap) wrap.hidden=print.value==='بدون طباعة'; if(wrap?.hidden) document.getElementById('mqPrintColors').value=''; };
@@ -91,7 +91,7 @@
     item.total_amount=(Number(item.total_kg||0)*Number(item.price_kg||0)).toFixed(2); return item;
   }
   function validItem(item){return item.product&&(item.product!=='أكياس بلاستيك'||item.handle_type)&&Number(item.width)>0&&Number(item.length)>0&&Number(item.thickness)>0&&Number(item.total_kg)>0&&Number(item.price_kg)>0;}
-  function renderDraftItems(){const box=document.getElementById('jmsQuoteDraftItems');if(!box)return;box.innerHTML=draftItems.map((item,index)=>`<div><b>الصنف ${index+1}: ${esc(item.product)}</b><span>${esc(item.width)} × ${esc(item.length)} ${esc(item.size_unit||'سم')} · ${esc(item.thickness)} ${esc(item.thickness_unit||'ميكرون')} · ${esc(item.total_kg)} كجم</span><button type="button" onclick="jmsRemoveQuoteItem(${index})">حذف</button></div>`).join('');}
+  function renderDraftItems(){const box=document.getElementById('jmsQuoteDraftItems');if(!box)return;box.innerHTML=draftItems.map((item,index)=>`<div><b>الصنف ${index+1}: ${esc(item.product)}</b><span>${esc(item.width)} × ${esc(item.length)} ${esc(item.size_unit||'سم')} · ${esc(item.thickness)} ${esc(item.thickness_unit||'ميكرون')} · ${esc(item.total_kg)} كجم</span><button type="button" onclick="jmsRemoveQuoteItem(${index})"><span data-i18n=ui_59ca629220a6>حذف</span></button></div>`).join('');}
   window.jmsRemoveQuoteItem=function(index){draftItems.splice(index,1);renderDraftItems();};
   window.jmsAddQuoteItem=function(){const item=currentItem();if(!validItem(item))return alert('أكمل المنتج ونوع اليد للأكياس والطول والعرض والسماكة والكمية والسعر قبل إضافة الصنف.');if(draftItems.length>=9)return alert('الحد الأعلى 10 أصناف في العرض الواحد.');draftItems.push(item);renderDraftItems();['mqColor','mqWidth','mqLength','mqThickness','mqKg','mqPriceKg','mqTotal','mqPiece','mqPieces','mqFoldBottom','mqFoldTop','mqFoldSide','mqHandleType','mqHandleColor','mqPrintColors'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const print=document.getElementById('mqPrint');if(print)print.selectedIndex=0;document.getElementById('mqPrintColorsWrap')?.setAttribute('hidden','');document.getElementById('mqProduct')?.dispatchEvent(new Event('change'));document.getElementById('mqProduct')?.focus();};
   function applyItems(q,current){if(!q)return;const items=[...draftItems,current].filter(validItem).slice(0,10);if(!items.length)return;q.items=items;Object.assign(q,items[0]);q.total_kg=items.reduce((sum,item)=>sum+Number(item.total_kg||0),0);q.total_amount=items.reduce((sum,item)=>sum+Number(item.total_amount||0),0).toFixed(2);q.items_count=items.length;saveDb();draftItems=[];}
@@ -110,11 +110,11 @@
   }
   function openClicheEditor(q){
     const items=q.items?.length?q.items:[q],body=document.getElementById('modalBody');
-    body.innerHTML='<h2>تعديل سعر الكلايش</h2><p>سعر الكليشة قبل الضريبة؛ تُضاف ضريبة 15% إلى الإجمالي.</p><div id="jmsClicheRows"></div><label>الملاحظات<textarea id="jmsClicheNotes" rows="5"></textarea></label><button type="button" id="jmsClicheSave" class="primary">حفظ التعديلات</button>';
+    body.innerHTML="<h2 data-i18n=\"ui_c5e4929a7342\">تعديل سعر الكلايش</h2><p data-i18n=\"ui_588659fbdab1\">سعر الكليشة قبل الضريبة؛ تُضاف ضريبة 15% إلى الإجمالي.</p><div id=\"jmsClicheRows\"></div><label><span data-i18n=ui_cee9f2b0adc8>الملاحظات</span><textarea id=\"jmsClicheNotes\" rows=\"5\"></textarea></label><button type=\"button\" id=\"jmsClicheSave\" class=\"primary\" data-i18n=\"ui_6c03d6737c2f\">حفظ التعديلات</button>";
     const root=document.getElementById('jmsClicheRows');
     items.forEach((item,index)=>{
       const row=document.createElement('div');row.className='form-grid';
-      row.innerHTML='<label>الصنف<input value="كلايش" readonly></label><label>وصف الصنف<input data-description></label><label>عدد القطع<input data-quantity type="number" min="1" step="1"></label><label>سعر الكليشة<input data-price type="number" min="0.01" step="0.01"></label>';
+      row.innerHTML="<label><span data-i18n=\"ui_5b12a452b19e\">الصنف</span><input value=\"كلايش\" readonly></label><label><span data-i18n=\"ui_f4f5946a6293\">وصف الصنف</span><input data-description></label><label><span data-i18n=\"ui_7839ac5a77ea\">عدد القطع</span><input data-quantity type=\"number\" min=\"1\" step=\"1\"></label><label><span data-i18n=\"ui_5fb2249c0a41\">سعر الكليشة</span><input data-price type=\"number\" min=\"0.01\" step=\"0.01\"></label>";
       row.querySelector('[data-description]').value=item.description||item.size||'';
       row.querySelector('[data-quantity]').value=item.quantity??item.total_kg??1;
       row.querySelector('[data-price]').value=item.unit_price??item.price_kg??0;
@@ -127,7 +127,7 @@
       const vat=Math.round((subtotal*.15+Number.EPSILON)*100)/100;
       const changed={...q,items:next,items_count:next.length,total_kg:next.reduce((sum,i)=>sum+i.quantity,0),total_amount:subtotal,vat_amount:vat,grand_total:Math.round((subtotal+vat)*100)/100,notes:document.getElementById('jmsClicheNotes').value,status:'pending',updated_at:new Date().toISOString(),edited_at:new Date().toISOString()};
       const button=document.getElementById('jmsClicheSave');
-      button.disabled=true;button.textContent='جاري الحفظ…';
+      button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,"جاري الحفظ…");
       try{
         const token=sessionStorage.getItem('jms_auth_token');
         if(!token)throw new Error('سجّل الدخول مرة أخرى');
@@ -140,7 +140,7 @@
         alert('تم حفظ التعديلات وإرجاع العرض للاعتماد');
       }catch(e){
         alert((e.message||'تعذر الحفظ')+' — التعديلات ما زالت في النافذة، حاول الحفظ مرة أخرى.');
-      }finally{button.disabled=false;button.textContent='حفظ التعديلات';}
+      }finally{button.disabled=false;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button,"حفظ التعديلات");}
     };
     document.getElementById('modal').classList.remove('hidden');
   }
@@ -222,7 +222,7 @@
       const terms=doc.querySelector('.quote-a4-terms ul'); if(terms) terms.innerHTML='<li>Prices apply to the specifications stated in this quotation.</li><li>This quotation is valid until the date shown above.</li><li>Delivery is subject to the production schedule after order confirmation.</li><li>Changes to size, material or printing may affect the price.</li>'+(q.notes?`<li>${esc(q.notes)}</li>`:'');
     }
     const bank=document.createElement('section'); bank.className='jms-bank-details';
-    bank.innerHTML=`<div class="jms-bank-heading"><b>${lang==='ar'?'بيانات التحويل البنكي':'Bank Transfer Details'}</b><span>${lang==='ar'?'مصرف الراجحي':'Al Rajhi Bank'}</span></div><div class="jms-bank-fields"><div><span>${lang==='ar'?'اسم المستفيد':'Beneficiary'}</span><b>${lang==='ar'?'شركة جده النموذجي للصناعه':'شركة جده النموذجي للصناعه'}</b></div><div><span>${lang==='ar'?'رقم الحساب':'Account No.'}</span><b dir="ltr">445000010006080230905</b></div><div class="jms-bank-iban"><span>IBAN</span><b dir="ltr">SA2080000445608010230905</b></div></div>`;
+    bank.innerHTML=`<div class="jms-bank-heading"><b>${lang==='ar'?'بيانات التحويل البنكي':'Bank Transfer Details'}</b><span>${lang==='ar'?'مصرف الراجحي':'Al Rajhi Bank'}</span></div><div class="jms-bank-fields"><div><span>${lang==='ar'?'اسم المستفيد':'Beneficiary'}</span><b data-i18n-text>${lang==='ar'?'شركة جده النموذجي للصناعه':'شركة جده النموذجي للصناعه'}</b></div><div><span>${lang==='ar'?'رقم الحساب':'Account No.'}</span><b dir="ltr">445000010006080230905</b></div><div class="jms-bank-iban"><span>IBAN</span><b dir="ltr">SA2080000445608010230905</b></div></div>`;
     const summary=doc.querySelector('.quote-a4-summary');
     if(summary) summary.insertAdjacentElement('afterend',bank); else doc.querySelector('.jms-smart-specs')?.insertAdjacentElement('afterend',bank);
     const toolbar=document.querySelector('#modalBody .quote-toolbar');
@@ -237,7 +237,7 @@
   window.sendQuote=function(qid){
     const q=(database().quotes||[]).find(x=>x.id===qid); if(!q)return;
     const modal=document.getElementById('modal'),body=document.getElementById('modalBody');
-    body.innerHTML=`<div class="jms-send-language"><i>PDF</i><h2>اختر لغة عرض السعر</h2><p>سيتم تجهيز الملف ومشاركته عبر واتساب باللغة التي تختارها.</p><div><button onclick="jmsSendQuoteLanguage('${qid}','ar')"><b>عربي</b><span>عرض سعر باللغة العربية</span></button><button onclick="jmsSendQuoteLanguage('${qid}','en')"><b>English</b><span>Quotation in English</span></button></div></div>`; modal.classList.remove('hidden');
+    body.innerHTML=`<div class="jms-send-language"><i>PDF</i><h2 data-i18n="ui_efd3f122a32b">اختر لغة عرض السعر</h2><p data-i18n="ui_c37472065597">سيتم تجهيز الملف ومشاركته عبر واتساب باللغة التي تختارها.</p><div><button onclick="jmsSendQuoteLanguage('${qid}','ar')"><b data-i18n="ui_9f9a680f547c">عربي</b><span data-i18n="ui_29621c353e66">عرض سعر باللغة العربية</span></button><button onclick="jmsSendQuoteLanguage('${qid}','en')"><b>English</b><span>Quotation in English</span></button></div></div>`; modal.classList.remove('hidden');
   };
   window.jmsSendQuoteLanguage=async function(qid,lang){const q=(database().quotes||[]).find(x=>x.id===qid);if(!q)return;q.output_language=lang;saveDb();oldView(qid);enhanceQuoteDocument(q,lang);setTimeout(()=>pdfShare(qid),80);};
 

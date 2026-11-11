@@ -34,11 +34,11 @@ function phoneOk(c){return String(c.phone||'').replace(/\D/g,'').length>=8}
 function setupFilters(){
   const rep=document.getElementById('repFilter'), city=document.getElementById('cityFilter'), cat=document.getElementById('categoryFilter');
   const oldRep=rep.value||'all', oldCity=city.value||'all', oldCat=cat.value||'all';
-  rep.innerHTML='<option value="all">كل المناديب</option>'+(db.reps||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  rep.innerHTML="<option value=\"all\" data-i18n=\"ui_2ad3f8552c55\">كل المناديب</option>"+(db.reps||[]).map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   const cities=[...new Set((db.customers||[]).map(c=>c.city).filter(Boolean))];
   const cats=[...new Set((db.customers||[]).map(c=>c.category).filter(Boolean))];
-  city.innerHTML='<option value="all">كل المدن</option>'+cities.map(x=>`<option value="${x}">${x}</option>`).join('');
-  cat.innerHTML='<option value="all">كل التصنيفات</option>'+cats.map(x=>`<option value="${x}">${x}</option>`).join('');
+  city.innerHTML="<option value=\"all\" data-i18n=\"ui_48fb14c85920\">كل المدن</option>"+cities.map(x=>`<option value="${x}">${x}</option>`).join('');
+  cat.innerHTML="<option value=\"all\" data-i18n=\"ui_6ef4f851c8f9\">كل التصنيفات</option>"+cats.map(x=>`<option value="${x}">${x}</option>`).join('');
   rep.value=[...rep.options].some(o=>o.value===oldRep)?oldRep:'all';
   city.value=[...city.options].some(o=>o.value===oldCity)?oldCity:'all';
   cat.value=[...cat.options].some(o=>o.value===oldCat)?oldCat:'all';
@@ -69,23 +69,23 @@ function card(c){
       <span class="badge">${c.category||'عميل'}</span>
     </div>
     <div class="info">
-      <div><span>الجوال</span><b>${c.phone||'-'}</b></div>
-      <div><span>آخر زيارة</span><b>${lastVisit(c.id)}</b></div>
-      <div><span>العروض</span><b>${quoteCount(c.id)}</b></div>
-      <div><span>الطلبات</span><b>${orderCount(c.id)}</b></div>
-      <div><span>الرصيد</span><b>${money(c.debt_balance||0)} ريال</b></div>
-      <div><span>العنوان</span><b>${c.location||c.district||'-'}</b></div>
+      <div><span data-i18n="ui_0b6aa9453dfb">الجوال</span><b>${c.phone||'-'}</b></div>
+      <div><span data-i18n="ui_f9fd43b0460f">آخر زيارة</span><b>${lastVisit(c.id)}</b></div>
+      <div><span data-i18n="ui_c33dc1a31d21">العروض</span><b>${quoteCount(c.id)}</b></div>
+      <div><span data-i18n="ui_f0a8a028cce5">الطلبات</span><b>${orderCount(c.id)}</b></div>
+      <div><span data-i18n="ui_f311da916aa5">الرصيد</span><b>${money(c.debt_balance||0)} ريال</b></div>
+      <div><span data-i18n="ui_2d110e56d5f5">العنوان</span><b>${c.location||c.district||'-'}</b></div>
     </div>
     <div class="actions">
       <button class="visit" onclick="quickVisit('${c.id}')">زيارة</button>
-      <button class="quote" onclick="alert('سيتم ربط عرض السعر في المرحلة التالية')">عرض سعر</button>
-      <button class="collect" onclick="alert('سيتم ربط التحصيل في المرحلة التالية')">تحصيل</button>
+      <button class="quote" onclick="alert('سيتم ربط عرض السعر في المرحلة التالية')" data-i18n="ui_679403c38f0b">عرض سعر</button>
+      <button class="collect" onclick="alert('سيتم ربط التحصيل في المرحلة التالية')" data-i18n="ui_68f752e279d8">تحصيل</button>
       <button class="more" onclick="toggleMore('${c.id}')">⋮</button>
     </div>
     <div id="more_${c.id}" class="more-panel">
       <button onclick="editCustomer('${c.id}')">تعديل العميل</button>
       <button onclick="openMap('${c.id}')">موقع العميل</button>
-      ${phoneOk(c)?`<button onclick="sendSurvey('${c.id}')">رسالة تقييم واتساب</button>`:`<button disabled>لا يوجد رقم جوال</button>`}
+      ${phoneOk(c)?`<button onclick="sendSurvey('${c.id}')">رسالة تقييم واتساب</button>`:`<button disabled data-i18n="ui_4cc63e1989ce">لا يوجد رقم جوال</button>`}
       <button onclick="quickVisit('${c.id}')">تسجيل زيارة</button>
     </div>
   </div>`
@@ -94,23 +94,23 @@ function render(){
   setupFilters();
   const list=filtered();
   updateKpis(list);
-  customers.innerHTML=list.map(card).join('')||'<div class="empty">لا يوجد عملاء حسب الفلتر المحدد</div>';
+  customers.innerHTML=list.map(card).join('')||"<div class=\"empty\" data-i18n=\"ui_7a040e8e263a\">لا يوجد عملاء حسب الفلتر المحدد</div>";
 }
 function toggleMore(cid){document.getElementById('more_'+cid)?.classList.toggle('open')}
 function closeModal(){modal.classList.add('hidden');modalBody.innerHTML=''}
 function openCustomerModal(){editCustomer(null)}
 function editCustomer(cid){
   const c=cid?(db.customers||[]).find(x=>x.id===cid):{};
-  modalBody.innerHTML=`<h2>${cid?'تعديل العميل':'إضافة عميل'}</h2>
+  modalBody.innerHTML=`<h2 data-i18n-text>${cid?'تعديل العميل':'إضافة عميل'}</h2>
   <div class="form-grid">
-    <label>اسم العميل<input id="mName" value="${c.name||''}"></label>
-    <label>الجوال<input id="mPhone" value="${c.phone||''}"></label>
-    <label>المدينة<input id="mCity" value="${c.city||'جدة'}"></label>
-    <label>الحي<input id="mDistrict" value="${c.district||''}"></label>
-    <label>العنوان<input id="mLocation" value="${c.location||''}"></label>
-    <label>التصنيف<input id="mCategory" value="${c.category||'عميل'}"></label>
-    <label>المندوب<select id="mRep">${(db.reps||[]).map(r=>`<option value="${r.id}" ${c.rep_id===r.id?'selected':''}>${r.name}</option>`).join('')}</select></label>
-    <label>الرصيد<input id="mDebt" type="number" value="${c.debt_balance||0}"></label>
+    <label><span data-i18n="ui_70771eb8320f">اسم العميل</span><input id="mName" value="${c.name||''}"></label>
+    <label><span data-i18n="ui_0b6aa9453dfb">الجوال</span><input id="mPhone" value="${c.phone||''}"></label>
+    <label><span data-i18n="ui_23ee0d351c7b">المدينة</span><input id="mCity" value="${c.city||'جدة'}"></label>
+    <label><span data-i18n="ui_0a6767f7377b">الحي</span><input id="mDistrict" value="${c.district||''}"></label>
+    <label><span data-i18n="ui_2d110e56d5f5">العنوان</span><input id="mLocation" value="${c.location||''}"></label>
+    <label><span data-i18n="ui_3a7c87ed0100">التصنيف</span><input id="mCategory" value="${c.category||'عميل'}"></label>
+    <label><span data-i18n="ui_4059aaa08477">المندوب</span><select id="mRep">${(db.reps||[]).map(r=>`<option value="${r.id}" ${c.rep_id===r.id?'selected':''}>${r.name}</option>`).join('')}</select></label>
+    <label><span data-i18n="ui_f311da916aa5">الرصيد</span><input id="mDebt" type="number" value="${c.debt_balance||0}"></label>
   </div>
   <br><button class="primary" onclick="saveCustomer('${cid||''}')">حفظ</button>`;
   modal.classList.remove('hidden');

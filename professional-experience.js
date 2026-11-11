@@ -11,7 +11,7 @@
   function toast(message){
     let host=document.getElementById('jmsProToasts');
     if(!host){host=document.createElement('div');host.id='jmsProToasts';document.body.appendChild(host);}
-    const item=document.createElement('div');item.className='jms-pro-toast';item.innerHTML=`<i>✓</i><div><b>تم بنجاح</b><span>${esc(message.replace(/^تم\s*/,'')||message)}</span></div>`;host.appendChild(item);
+    const item=document.createElement('div');item.className='jms-pro-toast';item.innerHTML=`<i>✓</i><div><b data-i18n="ui_0f0f70d1f196">تم بنجاح</b><span>${esc(message.replace(/^تم\s*/,'')||message)}</span></div>`;host.appendChild(item);
     requestAnimationFrame(()=>item.classList.add('show'));setTimeout(()=>{item.classList.remove('show');setTimeout(()=>item.remove(),250)},3200);
   }
   const nativeAlert=window.alert.bind(window);
@@ -21,7 +21,7 @@
     let layer=document.getElementById('jmsCommand');
     if(!layer){
       layer=document.createElement('div');layer.id='jmsCommand';layer.className='jms-command hidden';
-      layer.innerHTML=`<div class="jms-command-card"><div class="jms-command-head"><div><b>البحث الشامل</b><span>عميل، عرض سعر، رقم عرض أو جوال</span></div><button type="button" aria-label="إغلاق">×</button></div><div class="jms-command-input"><span>⌕</span><input inputmode="search" autocomplete="off" placeholder="ابدأ الكتابة..."></div><div class="jms-command-results"></div><div class="jms-command-foot"><span>JMS Smart Search</span><small>ESC للإغلاق</small></div></div>`;
+      layer.innerHTML=`<div class="jms-command-card"><div class="jms-command-head"><div><b data-i18n="ui_0e277e5ac013">البحث الشامل</b><span data-i18n="ui_297364e4e4d4">عميل، عرض سعر، رقم عرض أو جوال</span></div><button type="button" aria-label="إغلاق" data-i18n-aria-label="ui_ca90c297b099">×</button></div><div class="jms-command-input"><span>⌕</span><input inputmode="search" autocomplete="off" placeholder="ابدأ الكتابة..." data-i18n-placeholder="ui_61dabc10dab4"></div><div class="jms-command-results"></div><div class="jms-command-foot"><span>JMS Smart Search</span><small data-i18n="ui_8e5449e6a3ab">ESC للإغلاق</small></div></div>`;
       document.body.appendChild(layer);layer.querySelector('.jms-command-head button').onclick=closeSearch;layer.addEventListener('click',e=>{if(e.target===layer)closeSearch();});layer.querySelector('input').addEventListener('input',renderSearch);
     }
     layer.classList.remove('hidden');setTimeout(()=>layer.querySelector('input').focus(),30);renderSearch({target:layer.querySelector('input')});
@@ -32,22 +32,22 @@
     (data.customers||[]).forEach(c=>{const text=[c.name,c.phone,c.city,c.district].join(' ').toLowerCase();if(!query||text.includes(query))rows.push({type:'عميل',title:c.name||'عميل',meta:[c.phone,c.city].filter(Boolean).join(' · '),action:`openCustomer360('${c.id}')`});});
     (data.quotes||[]).forEach(q=>{const customer=(data.customers||[]).find(c=>c.id===q.customer_id);const text=[q.quote_no,customer?.name,q.product].join(' ').toLowerCase();if(query&&text.includes(query))rows.push({type:'عرض سعر',title:q.quote_no||'عرض سعر',meta:[customer?.name,q.product].filter(Boolean).join(' · '),action:`viewQuote('${q.id}')`});});
     const box=document.querySelector('#jmsCommand .jms-command-results');if(!box)return;
-    rows=rows.slice(0,10);box.innerHTML=rows.map(r=>`<button type="button" onclick="${r.action};document.getElementById('jmsCommand').classList.add('hidden')"><i>${r.type==='عميل'?'ع':'س'}</i><div><b>${esc(r.title)}</b><span>${esc(r.meta||r.type)}</span></div><em>${r.type}</em></button>`).join('')||`<div class="jms-command-empty">${query?'لا توجد نتائج مطابقة':'اكتب اسم العميل أو رقم العرض للبحث فورًا'}</div>`;
+    rows=rows.slice(0,10);box.innerHTML=rows.map(r=>`<button type="button" onclick="${r.action};document.getElementById('jmsCommand').classList.add('hidden')"><i>${r.type==='عميل'?'ع':'س'}</i><div><b>${esc(r.title)}</b><span>${esc(r.meta||r.type)}</span></div><em>${r.type}</em></button>`).join('')||`<div class="jms-command-empty" data-i18n-text>${query?'لا توجد نتائج مطابقة':'اكتب اسم العميل أو رقم العرض للبحث فورًا'}</div>`;
   }
 
   function toggleActions(){document.getElementById('jmsQuickMenu')?.classList.toggle('open');}
   function installShell(){
     if(document.getElementById('jmsProShell'))return;
-    const shell=document.createElement('div');shell.id='jmsProShell';shell.innerHTML=`<button id="jmsGlobalSearch" type="button" aria-label="البحث الشامل">⌕</button><div id="jmsQuickMenu" class="jms-quick-menu"><div><button type="button" onclick="openCustomerForm?.()"><i>＋</i><span>عميل جديد</span></button><button type="button" onclick="openQuoteForm?.()"><i>▤</i><span>عرض سعر</span></button><button type="button" onclick="openVisitForm?.()"><i>◷</i><span>تسجيل زيارة</span></button><button type="button" onclick="openOrderForm?.()"><i>▣</i><span>طلب تصنيع</span></button></div><button id="jmsQuickToggle" type="button" aria-label="الإجراءات السريعة">＋</button></div><div id="jmsConnection" class="jms-connection"><i></i><span></span></div>`;
+    const shell=document.createElement('div');shell.id='jmsProShell';shell.innerHTML=`<button id="jmsGlobalSearch" type="button" aria-label="البحث الشامل" data-i18n-aria-label="ui_0e277e5ac013">⌕</button><div id="jmsQuickMenu" class="jms-quick-menu"><div><button type="button" onclick="openCustomerForm?.()"><i>＋</i><span data-i18n="ui_9f73e063ae8d">عميل جديد</span></button><button type="button" onclick="openQuoteForm?.()"><i>▤</i><span data-i18n="ui_679403c38f0b">عرض سعر</span></button><button type="button" onclick="openVisitForm?.()"><i>◷</i><span data-i18n="ui_dd5f9783f90a">تسجيل زيارة</span></button><button type="button" onclick="openOrderForm?.()"><i>▣</i><span data-i18n="ui_8be7e7406418">طلب تصنيع</span></button></div><button id="jmsQuickToggle" type="button" aria-label="الإجراءات السريعة" data-i18n-aria-label="ui_cfda8ef13de7">＋</button></div><div id="jmsConnection" class="jms-connection"><i></i><span></span></div>`;
     document.body.appendChild(shell);document.getElementById('jmsGlobalSearch').onclick=openSearch;document.getElementById('jmsQuickToggle').onclick=toggleActions;updateConnection();
   }
-  function updateConnection(){const el=document.getElementById('jmsConnection');if(!el)return;const online=navigator.onLine;el.classList.toggle('offline',!online);el.querySelector('span').textContent=online?'متصل وآمن':'وضع بدون اتصال';el.classList.add('visible');clearTimeout(updateConnection.timer);updateConnection.timer=setTimeout(()=>el.classList.remove('visible'),online?2200:10000);}
+  function updateConnection(){const el=document.getElementById('jmsConnection');if(!el)return;const online=navigator.onLine;el.classList.toggle('offline',!online);(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(el.querySelector('span'),online?'متصل وآمن':'وضع بدون اتصال');el.classList.add('visible');clearTimeout(updateConnection.timer);updateConnection.timer=setTimeout(()=>el.classList.remove('visible'),online?2200:10000);}
 
   function improveModal(){
     const modal=document.getElementById('modal'),body=document.getElementById('modalBody'),card=modal?.querySelector('.modal-card');if(!modal||!body||!card||modal.classList.contains('hidden'))return;
     document.getElementById('jmsQuickMenu')?.classList.remove('open');
     if(body.querySelector('.quote-print-shell,.jms-send-language')||body.querySelector('.jms-form-jump'))return;
-    setTimeout(()=>{if(card.scrollHeight<=card.clientHeight+120)return;const primary=[...body.querySelectorAll('button.primary')].filter(b=>b.offsetParent!==null).pop();if(!primary)return;const jump=document.createElement('button');jump.type='button';jump.className='jms-form-jump';jump.textContent='↓ متابعة للحفظ';jump.onclick=()=>primary.scrollIntoView({behavior:'smooth',block:'center'});body.appendChild(jump);},80);
+    setTimeout(()=>{if(card.scrollHeight<=card.clientHeight+120)return;const primary=[...body.querySelectorAll('button.primary')].filter(b=>b.offsetParent!==null).pop();if(!primary)return;const jump=document.createElement('button');jump.type='button';jump.className='jms-form-jump';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(jump,"↓ متابعة للحفظ");jump.onclick=()=>primary.scrollIntoView({behavior:'smooth',block:'center'});body.appendChild(jump);},80);
   }
 
   const style=document.createElement('style');style.textContent=`

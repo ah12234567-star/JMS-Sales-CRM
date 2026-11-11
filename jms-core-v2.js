@@ -92,7 +92,7 @@
 
   function repOptions(selected='',includeFile=false){
     const opts=[...repRegistry().values()].filter(r=>r.status!=='inactive').sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
-    return (includeFile?'<option value="file">حسب الملف / rep_id</option>':'')+opts.map(r=>`<option value="${esc(r.id)}" ${String(r.id)===String(selected)?'selected':''}>${esc(r.name)}</option>`).join('');
+    return (includeFile?"<option value=\"file\" data-i18n=\"ui_3cc8157ae2bc\">حسب الملف / rep_id</option>":'')+opts.map(r=>`<option value="${esc(r.id)}" ${String(r.id)===String(selected)?'selected':''}>${esc(r.name)}</option>`).join('');
   }
 
   function closeModalSafe(){try{if(typeof closeModal==='function')closeModal();else document.getElementById('modal')?.classList.add('hidden')}catch(_){}}
@@ -102,13 +102,13 @@
     const u=getUser();if(u?.role!=='admin')return alert('مركز الاستيراد متاح لمدير النظام فقط');
     const body=document.getElementById('modalBody'),m=document.getElementById('modal');if(!body||!m)return alert('تعذر فتح مركز الاستيراد');
     const a=audit();
-    body.innerHTML=`<div class="jms-core-center"><div class="jms-core-title"><div><h2>مركز الاستيراد الموحد</h2><p>نقطة واحدة لكل استيراد العملاء والديون والتحديثات، مع حماية ملكية المندوب.</p></div><span>Core 2.0</span></div>
-      <div class="jms-core-kpis"><div><b>${a.counts.reps}</b><small>مناديب</small></div><div><b>${a.counts.customers}</b><small>عملاء</small></div><div><b>${a.issues.length}</b><small>ملاحظات سلامة</small></div></div>
+    body.innerHTML=`<div class="jms-core-center"><div class="jms-core-title"><div><h2 data-i18n="ui_bcfb3117a01b">مركز الاستيراد الموحد</h2><p data-i18n="ui_7cf288b55b6d">نقطة واحدة لكل استيراد العملاء والديون والتحديثات، مع حماية ملكية المندوب.</p></div><span>Core 2.0</span></div>
+      <div class="jms-core-kpis"><div><b>${a.counts.reps}</b><small data-i18n="ui_06264bff35d7">مناديب</small></div><div><b>${a.counts.customers}</b><small data-i18n="ui_36afc9ba115a">عملاء</small></div><div><b>${a.issues.length}</b><small data-i18n="ui_5f81635fa894">ملاحظات سلامة</small></div></div>
       <div class="jms-core-tools">
-        <button onclick="jmsCoreOpenImport('openCustomerImport')"><b>استيراد عملاء</b><small>إضافة أو تحديث مع منع التكرار وتعارض المندوب</small></button>
-        <button onclick="jmsCoreOpenImport('openCustomerPhoneUpdateImportV2')"><b>تحديث بيانات/جوالات</b><small>تحديث العملاء الموجودين بدون إنشاء نسخ مكررة</small></button>
-        <button onclick="jmsCoreOpenImport('openSmartDebtImport')"><b>استيراد الديون</b><small>الرصيد وأعمار الديون مع ربط صحيح بالمندوب</small></button>
-        <button onclick="openJmsDataIntegrity()"><b>فحص سلامة البيانات</b><small>تكرار العملاء، سجلات بلا مندوب، وتعارضات الملكية</small></button>
+        <button onclick="jmsCoreOpenImport('openCustomerImport')"><b data-i18n="ui_73c7ed8ae4db">استيراد عملاء</b><small data-i18n="ui_b40c99da7dd0">إضافة أو تحديث مع منع التكرار وتعارض المندوب</small></button>
+        <button onclick="jmsCoreOpenImport('openCustomerPhoneUpdateImportV2')"><b data-i18n="ui_8b6666852e30">تحديث بيانات/جوالات</b><small data-i18n="ui_e164b8314b4b">تحديث العملاء الموجودين بدون إنشاء نسخ مكررة</small></button>
+        <button onclick="jmsCoreOpenImport('openSmartDebtImport')"><b data-i18n="ui_36e2288d0fc8">استيراد الديون</b><small data-i18n="ui_c8d598fd8360">الرصيد وأعمار الديون مع ربط صحيح بالمندوب</small></button>
+        <button onclick="openJmsDataIntegrity()"><b data-i18n="ui_3afc596eb819">فحص سلامة البيانات</b><small data-i18n="ui_f39048c8fcea">تكرار العملاء، سجلات بلا مندوب، وتعارضات الملكية</small></button>
       </div></div>`;
     m.classList.remove('hidden');
   };
@@ -129,9 +129,9 @@
   window.openJmsDataIntegrity=function(){
     const body=document.getElementById('modalBody'),m=document.getElementById('modal');if(!body||!m)return;
     const a=audit(), groups=Object.entries(a.grouped||{}).sort((x,y)=>y[1]-x[1]);
-    body.innerHTML=`<div class="jms-core-center"><div class="jms-core-title"><div><h2>فحص سلامة البيانات</h2><p>الفحص لا ينقل ملكية عميل بين المناديب تلقائياً؛ يعرض التعارض للمراجعة.</p></div><span>${esc(a.version)}</span></div>
-      <div class="jms-core-kpis"><div><b>${a.counts.customers}</b><small>عملاء</small></div><div><b>${a.auto_fixed}</b><small>تصحيحات آمنة تلقائية</small></div><div><b>${a.issues.length}</b><small>تحتاج مراجعة</small></div></div>
-      ${groups.length?`<div class="jms-core-groups">${groups.map(([k,v])=>`<span>${esc(issueText({type:k}).label)} <b>${v}</b></span>`).join('')}</div>`:'<div class="jms-core-ok">✓ لا توجد ملاحظات سلامة حالياً</div>'}
+    body.innerHTML=`<div class="jms-core-center"><div class="jms-core-title"><div><h2 data-i18n="ui_3afc596eb819">فحص سلامة البيانات</h2><p data-i18n="ui_7232d45ecdd4">الفحص لا ينقل ملكية عميل بين المناديب تلقائياً؛ يعرض التعارض للمراجعة.</p></div><span>${esc(a.version)}</span></div>
+      <div class="jms-core-kpis"><div><b>${a.counts.customers}</b><small data-i18n="ui_36afc9ba115a">عملاء</small></div><div><b>${a.auto_fixed}</b><small data-i18n="ui_1108de8889c6">تصحيحات آمنة تلقائية</small></div><div><b>${a.issues.length}</b><small data-i18n="ui_b536e7cdcca8">تحتاج مراجعة</small></div></div>
+      ${groups.length?`<div class="jms-core-groups">${groups.map(([k,v])=>`<span>${esc(issueText({type:k}).label)} <b>${v}</b></span>`).join('')}</div>`:"<div class=\"jms-core-ok\" data-i18n=\"ui_0de5b51da63e\">✓ لا توجد ملاحظات سلامة حالياً</div>"}
       <div class="jms-core-issues">${a.issues.slice(0,150).map(x=>{const t=issueText(x);return `<div><b>${esc(t.label)}</b><small>${esc(t.detail)}</small></div>`}).join('')}</div>
       ${a.issues.length>150?`<p class="muted">تم عرض أول 150 ملاحظة من ${a.issues.length}.</p>`:''}
     </div>`;
@@ -149,7 +149,7 @@
     const u=getUser();if(u?.role!=='admin')return;
     const page=document.getElementById('customers'),head=page?.querySelector('.page-head');if(!head)return;
     let actions=head.querySelector('.head-actions');if(!actions){actions=document.createElement('div');actions.className='head-actions';head.appendChild(actions)}
-    let b=document.getElementById('jmsUnifiedImportBtn');if(!b){b=document.createElement('button');b.id='jmsUnifiedImportBtn';b.type='button';b.className='primary secondary';b.textContent='مركز الاستيراد';b.onclick=window.openJmsImportCenter;actions.appendChild(b)}
+    let b=document.getElementById('jmsUnifiedImportBtn');if(!b){b=document.createElement('button');b.id='jmsUnifiedImportBtn';b.type='button';b.className='primary secondary';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,'مركز الاستيراد');b.onclick=window.openJmsImportCenter;actions.appendChild(b)}
     hideLegacyImportButtons();
   }
 
