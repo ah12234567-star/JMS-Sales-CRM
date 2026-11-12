@@ -1,3 +1,4 @@
+import {salesView,withPieceEstimates,mergeSalesEdit} from '../lib/quote-privacy.js';
 import { json, readBody, authFromRequest, supabase } from './auth-utils.js';
 
 const TABLES={customers:'jms_customers',quotes:'jms_quotes',visits:'jms_visits',orders:'jms_orders',collections:'jms_collections'};
@@ -102,6 +103,9 @@ export default async function handler(req,res){
         out[key]=(rawTables[key]||[]).map(raw=>({...raw,rep_id:repFromKeys(raw,resolve)})).filter(x=>ownedBy(auth,x));
       }
 
+      for(const key of ['orders','quotes']){
+        out[key]=out[key].map(auth.role==='admin'?withPieceEstimates:salesView);
+      }
       const debtByRep={};
       for(const c of out.customers){
         const id=c.rep_id||'unmapped';
@@ -116,10 +120,24 @@ export default async function handler(req,res){
         const source=Array.isArray(data[key])?data[key]:[];
         const normalized=source.map(x=>{
           const mapped={...x,rep_id:repFromKeys(x,resolve)||clean(x?.rep_id)};
+
           return key==='customers'?zeroSmallCustomerDebt(mapped):mapped;
         });
         const allowed=normalized.filter(x=>x&&x.id&&ownedBy(auth,x)).slice(0,1000);
         if(!allowed.length){result[key]=0;continue;}
+        if(auth.role!=='admin' && (key==='quotes'||key==='orders')){
+          for(let start=0;start<allowed.length;start+=50){
+            const batch=allowed.slice(start,start+50);
+            const ids=batch.map(row=>'"'+String(row.id).replace(/["\\]/g,'')+'"').join(',');
+            const existing=await supabase(table+'?select=id,data&id=in.('+encodeURIComponent(ids)+')');
+            const byId=new Map(existing.map(row=>[String(row.id),row.data]));
+            for(let i=0;i<batch.length;i++){
+              const prior=byId.get(String(batch[i].id));
+              if(auth.role==='rep' && prior && !ownedBy(auth,prior))return json(res,403,{error:'forbidden'});
+              allowed[start+i]=mergeSalesEdit(batch[i],prior);
+            }
+          }
+        }
         const now=new Date().toISOString();
         const rows=allowed.map(x=>({id:String(x.id),data:{...x,updated_at:x.updated_at||now},updated_at:x.updated_at||now}));
         await supabase(table+'?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});

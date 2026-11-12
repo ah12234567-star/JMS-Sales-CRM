@@ -47,13 +47,17 @@ async function get(store,key){
 function localSnapshot(){
  try{return localStorage.getItem(STORE_KEY)||''}catch(_){return ''}
 }
+function salesSnapshot(raw){
+ if(!raw||typeof window.scrubQuoteCache!=='function')return raw;
+ const copy=JSON.parse(raw);window.scrubQuoteCache(copy);return JSON.stringify(copy);
+}
 function hash(value){
  let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(16);
 }
 async function backup(reason){
- const raw=localSnapshot();if(!raw)return;
+ const raw=salesSnapshot(localSnapshot());if(!raw)return;
  const signature=hash(raw);
- if(signature===lastSeen&&reason!=='beforeunload')return;
+ if(signature===lastSeen&&!['beforeunload','privacy-refresh'].includes(reason))return;
  lastSeen=signature;
  try{
   await put(SNAPSHOTS,{id:'latest',raw,signature,updated_at:new Date().toISOString(),reason});
@@ -104,10 +108,11 @@ function installStyle(){
 }
 
 async function restoreIfNeeded(){
- const local=localSnapshot();if(local){lastSeen=hash(local);return}
+ const local=localSnapshot();
+ if(local){lastSeen=hash(salesSnapshot(local));if(window.currentUser?.role!=='admin')await backup('privacy-refresh');return}
  try{
   const snap=await get(SNAPSHOTS,'latest');
-  if(snap?.raw){localStorage.setItem(STORE_KEY,snap.raw);lastSeen=snap.signature||hash(snap.raw);location.reload()}
+  if(snap?.raw){localStorage.setItem(STORE_KEY,salesSnapshot(snap.raw));lastSeen=snap.signature||hash(snap.raw);location.reload()}
  }catch(error){console.warn('JMS offline restore failed',error)}
 }
 
@@ -144,7 +149,7 @@ async function syncNow(){
 
 function watchLocalChanges(){
  setInterval(()=>{
-  const raw=localSnapshot();if(!raw)return;
+  const raw=salesSnapshot(localSnapshot());if(!raw)return;
   const signature=hash(raw);
   if(signature!==lastSeen)backup('local_change');
   hookPush();
