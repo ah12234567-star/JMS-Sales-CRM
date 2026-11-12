@@ -27,8 +27,6 @@ function publicQuote(data) {
     total_kg: data.total_kg,
     price_kg: data.price_kg,
     total_amount: data.total_amount,
-    piece_weight: data.piece_weight,
-    pieces: data.pieces,
     payment_terms: data.payment_terms,
     delivery_terms: data.delivery_terms,
     notes: data.notes,

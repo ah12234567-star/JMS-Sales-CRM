@@ -2,7 +2,36 @@
   'use strict';
   const VERSION='2026-08-14-smart-suite-1';
   const DAY=86400000;
-  const DEFAULT_COSTS={HDPE:4.60,LDPE:4.90,LLDPE:4.75,PP:4.80,MIX:4.75,calcium:1.20,production:0.65,printFace:0.22,waste:4,margin:18};
+  let privateRates=null, ratesOwner=null, pendingRates=null;
+  const admin=()=>user()?.role==='admin';
+  function token(){return sessionStorage.getItem('jms_auth_token')||localStorage.getItem('jms_auth_token');}
+  async function pricingRequest(body){
+    const response=await fetch('/api/quote-costs',{method:body?'POST':'GET',cache:'no-store',
+      headers:{Authorization:'Bearer '+token(),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    if(!response.ok)throw new Error('Pricing unavailable');
+    return response.json();
+  }
+  async function loadRates(){
+    const owner=token();
+    if(!admin()||!owner)return false;
+    if(ratesOwner===owner&&privateRates)return true;
+    if(pendingRates?.owner===owner)return pendingRates.promise;
+    const promise=(async()=>{
+      let result=await pricingRequest();
+      if(!admin()||token()!==owner)return false;
+      const db=data(),legacy=db.settings?.find?.(x=>x.id==='pricing')?.materialCosts||db.businessSettings?.materialCosts;
+      if(!result.configured&&legacy){
+        await pricingRequest({rates:{...result.rates,...legacy},initialize:true});
+        result=await pricingRequest();
+      }
+      if(!admin()||token()!==owner)return false;
+      privateRates=result.rates;ratesOwner=owner;
+      if(legacy){db.settings=db.settings?.filter(x=>x.id!=='pricing')||[];if(db.businessSettings)delete db.businessSettings.materialCosts;persist();}
+      return true;
+    })().catch(()=>false).finally(()=>{if(pendingRates?.owner===owner)pendingRates=null;});
+    pendingRates={owner,promise};return promise;
+  }
+
 
   function data(){try{return db}catch(_){return window.db||{}}}
   function user(){try{return currentUser}catch(_){return window.currentUser||null}}
@@ -59,8 +88,9 @@
     section.innerHTML="<div class=\"jms-smart-head\"><div><small data-i18n=\"ui_d24ae2947501\">تحليل دورات الشراء</small><h2 data-i18n=\"ui_900bb92c7aac\">التنبيه الذكي لإعادة الطلب</h2></div><b>"+predictions().length+'</b></div><div class="jms-reorder-list">'+reorderHtml(6)+'</div>';
   }
 
-  function settings(){const store=data();store.settings=Array.isArray(store.settings)?store.settings:[];let record=store.settings.find(item=>item.id==='pricing');if(!record){record={id:'pricing',materialCosts:{...DEFAULT_COSTS}};store.settings.push(record)}record.materialCosts={...DEFAULT_COSTS,...(record.materialCosts||store.businessSettings?.materialCosts||{})};return record.materialCosts}
+  function settings(){return admin()&&ratesOwner===token()?privateRates:null;}
   function priceCalculation(){
+    if(!settings())return null;
     const material=document.getElementById('mqMaterial')?.value||'HDPE',costs=settings();const raw=Number(costs[material]||costs.MIX);
     const calcium=Math.max(0,Math.min(40,Number(document.getElementById('jmsCalciumPct')?.value||0)));const waste=Math.max(0,Number(document.getElementById('jmsWastePct')?.value||costs.waste));const margin=Math.max(0,Number(document.getElementById('jmsMarginPct')?.value||costs.margin));
     const print=document.getElementById('mqPrint')?.value||'';const faces=/وجهين/.test(print)?2:/وجه واحد/.test(print)?1:0;
@@ -68,17 +98,27 @@
     return {material,raw,materialCost,direct,suggested:Number.isFinite(suggested)?suggested:direct,calcium,waste,margin,faces};
   }
   window.jmsCalculateSmartPrice=function(apply){
-    const result=priceCalculation();const box=document.getElementById('jmsPriceResult');if(box)box.innerHTML="<div><small data-i18n=\"ui_6a46f186a6b9\">تكلفة الكيلو المتوقعة</small><b>"+money(result.direct)+" <span data-i18n=ui_feafe34f5add>ر.س</span></b></div><div><small data-i18n=\"ui_094f94aed5a7\">السعر المقترح</small><b>"+money(result.suggested)+' <span data-i18n=ui_feafe34f5add>ر.س</span></b></div><p><span data-i18n=ui_0cb05106ac04>خامة</span> '+esc(result.material)+' · <span data-i18n=ui_429dbfbdb1be>هدر</span> '+result.waste+'% · <span data-i18n=ui_4c76b05243d1>هامش</span> '+result.margin+'% · <span data-i18n=ui_2e00e00acffe>طباعة</span> '+result.faces+' <span data-i18n=ui_2699bf83d07e>وجه</span></p>';
+    const result=priceCalculation();if(!result)return;const box=document.getElementById('jmsPriceResult');if(box)box.innerHTML="<div><small data-i18n=\"ui_6a46f186a6b9\">تكلفة الكيلو المتوقعة</small><b>"+money(result.direct)+" <span data-i18n=ui_feafe34f5add>ر.س</span></b></div><div><small data-i18n=\"ui_094f94aed5a7\">السعر المقترح</small><b>"+money(result.suggested)+' <span data-i18n=ui_feafe34f5add>ر.س</span></b></div><p><span data-i18n=ui_0cb05106ac04>خامة</span> '+esc(result.material)+' · <span data-i18n=ui_429dbfbdb1be>هدر</span> '+result.waste+'% · <span data-i18n=ui_4c76b05243d1>هامش</span> '+result.margin+'% · <span data-i18n=ui_2e00e00acffe>طباعة</span> '+result.faces+' <span data-i18n=ui_2699bf83d07e>وجه</span></p>';
     if(apply){setValue('mqPriceKg',result.suggested.toFixed(2));document.getElementById('mqPriceKg')?.focus()}
   };
-  window.jmsOpenMaterialCosts=function(){
-    if(!['admin','sales'].includes(user()?.role))return alert('تعديل أسعار الخام متاح للإدارة فقط');const values=settings();
+  window.jmsOpenMaterialCosts=async function(){
+    if(!admin()||!await loadRates())return alert('تعديل أسعار الخام متاح للإدارة فقط');const values=settings();
     const body=document.getElementById('modalBody'),modal=document.getElementById('modal');if(!body||!modal)return;
     body.innerHTML="<div class=\"jms-cost-editor\"><h2 data-i18n=\"ui_f9607226d6d4\">أسعار وتكاليف التسعير</h2><p data-i18n=\"ui_97b4416932e0\">حدّثها عند تغير أسعار المواد؛ المساعد يستخدمها لاقتراح السعر.</p><div class=\"form-grid three\">"+['HDPE','LDPE','LLDPE','PP','MIX'].map(key=>'<label>'+key+' — ريال/كجم<input id="cost_'+key+'" type="number" step="0.01" value="'+values[key]+'"></label>').join('')+"<label><span data-i18n=\"ui_4352a0bfb3ec\">كربونات الكالسيوم</span><input id=\"cost_calcium\" type=\"number\" step=\"0.01\" value=\""+values.calcium+"\"></label><label><span data-i18n=\"ui_bf1dfd4173d0\">تكلفة التشغيل/كجم</span><input id=\"cost_production\" type=\"number\" step=\"0.01\" value=\""+values.production+"\"></label><label><span data-i18n=\"ui_ba9f3152c305\">تكلفة وجه الطباعة/كجم</span><input id=\"cost_printFace\" type=\"number\" step=\"0.01\" value=\""+values.printFace+"\"></label><label><span data-i18n=\"ui_9170d3931246\">الهدر الافتراضي %</span><input id=\"cost_waste\" type=\"number\" step=\"0.1\" value=\""+values.waste+"\"></label><label><span data-i18n=\"ui_c9b43fb7007f\">هامش الربح الافتراضي %</span><input id=\"cost_margin\" type=\"number\" step=\"0.1\" value=\""+values.margin+"\"></label></div><button class=\"primary\" type=\"button\" onclick=\"jmsSaveMaterialCosts()\" data-i18n=\"ui_d9157013254c\">حفظ الأسعار</button></div>";modal.classList.remove('hidden');
   };
-  window.jmsSaveMaterialCosts=function(){const values=settings();Object.keys(DEFAULT_COSTS).forEach(key=>{const input=document.getElementById('cost_'+key);if(input)values[key]=Number(input.value||DEFAULT_COSTS[key])});persist();window.closeModal?.();alert('تم حفظ أسعار الخام والتكاليف')};
-  function injectPricingAssistant(){
-    const root=document.getElementById('modalBody');if(!root||!document.getElementById('mqPriceKg')||document.getElementById('jmsSmartPricing'))return;
+  window.jmsSaveMaterialCosts=async function(){
+    if(!settings())return;
+    const rates={...settings()};
+    for(const key of Object.keys(rates)){const input=document.getElementById('cost_'+key);if(input)rates[key]=Number(input.value);}
+    const owner=token();
+    try{await pricingRequest({rates});if(admin()&&token()===owner){privateRates=rates;window.closeModal?.();alert('تم حفظ أسعار الخام والتكاليف')}}
+    catch{alert('تعذر حفظ التكلفة');}
+  };
+  async function injectPricingAssistant(){
+    if(!admin()){privateRates=null;ratesOwner=null;document.querySelectorAll('#jmsSmartPricing,.jms-cost-editor').forEach(el=>el.remove());return;}
+    const field=document.getElementById('mqPriceKg');
+    if(!field||document.getElementById('jmsSmartPricing')||!await loadRates())return;
+    if(!settings()||field!==document.getElementById('mqPriceKg')||document.getElementById('jmsSmartPricing'))return;
     const panel=document.createElement('section');panel.id='jmsSmartPricing';panel.className='jms-pricing-assistant';panel.innerHTML="<div class=\"jms-smart-head\"><div><small data-i18n=\"ui_eede9d4a244e\">حساب التكلفة والربحية</small><h3 data-i18n=\"ui_c2c594c6c80a\">مساعد التسعير الذكي</h3></div><button type=\"button\" onclick=\"jmsOpenMaterialCosts()\" data-i18n=\"ui_f06c20275fae\">⚙ أسعار الخام</button></div><div class=\"jms-price-inputs\"><label><span data-i18n=\"ui_46b832a9c417\">نسبة الكالسيوم %</span><input id=\"jmsCalciumPct\" type=\"number\" min=\"0\" max=\"40\" value=\"0\"></label><label><span data-i18n=\"ui_93e696ee9d3e\">نسبة الهدر %</span><input id=\"jmsWastePct\" type=\"number\" min=\"0\" value=\""+settings().waste+"\"></label><label><span data-i18n=\"ui_efb943b2782b\">هامش الربح %</span><input id=\"jmsMarginPct\" type=\"number\" min=\"0\" max=\"80\" value=\""+settings().margin+"\"></label></div><div id=\"jmsPriceResult\" class=\"jms-price-result\"></div><button class=\"jms-apply-price\" type=\"button\" onclick=\"jmsCalculateSmartPrice(true)\" data-i18n=\"ui_42b4b28a2ad4\">احتساب وتطبيق السعر المقترح</button>";
     document.getElementById('mqPriceKg').closest('label')?.parentElement?.insertAdjacentElement('afterend',panel);panel.querySelectorAll('input').forEach(input=>input.addEventListener('input',()=>window.jmsCalculateSmartPrice(false)));document.getElementById('mqMaterial')?.addEventListener('change',()=>window.jmsCalculateSmartPrice(false));document.getElementById('mqPrint')?.addEventListener('change',()=>window.jmsCalculateSmartPrice(false));window.jmsCalculateSmartPrice(false);
   }
@@ -112,7 +152,8 @@
 
   function style(){if(document.getElementById('jmsSmartSuiteStyle'))return;const sheet=document.createElement('style');sheet.id='jmsSmartSuiteStyle';sheet.textContent='body,.quote-a4,.quote-doc,.jms-public-quote{font-family:Cairo,Tahoma,Arial,sans-serif}.jms-smart-section{margin:12px 0!important}.jms-smart-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.jms-smart-head small{color:#64748b}.jms-smart-head h2,.jms-smart-head h3{margin:2px 0;color:#0f172a}.jms-smart-head>b{display:grid;place-items:center;min-width:42px;height:42px;border-radius:13px;background:#eff6ff;color:#2563eb}.jms-smart-head button{border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px;color:#334155}.jms-reorder-list{display:grid;gap:8px;margin-top:10px}.jms-reorder-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #bfdbfe;border-radius:15px;background:#eff6ff}.jms-reorder-card.overdue{border-color:#fed7aa;background:#fff7ed}.jms-reorder-card span{font-size:10px;color:#2563eb;font-weight:900}.jms-reorder-card h3{margin:3px 0;color:#0f172a;font-size:15px}.jms-reorder-card p{margin:0;color:#64748b;font-size:10px}.jms-reorder-card button,.jms-apply-price,.jms-open-maps{border:0;border-radius:11px;padding:10px 12px;background:#0f172a;color:#fff;font-weight:900;text-decoration:none;text-align:center}.jms-empty-smart{padding:14px;border:1px dashed #cbd5e1;border-radius:13px;color:#64748b;text-align:center}.jms-pricing-assistant{grid-column:1/-1;margin:12px 0;padding:14px;border:1px solid #c4b5fd;border-radius:16px;background:linear-gradient(135deg,#f5f3ff,#fff)}.jms-price-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:11px 0}.jms-price-inputs label{font-size:10px;font-weight:800;color:#475569}.jms-price-inputs input{width:100%;margin-top:4px;padding:9px;border:1px solid #cbd5e1;border-radius:9px;background:#fff}.jms-price-result{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.jms-price-result>div{padding:10px;border-radius:11px;background:#fff}.jms-price-result small,.jms-price-result b{display:block}.jms-price-result b{margin-top:3px;color:#6d28d9;font-size:18px}.jms-price-result p{grid-column:1/-1;margin:0;color:#64748b;font-size:9px}.jms-apply-price{width:100%;background:#6d28d9}.jms-route-list{display:grid;gap:7px;margin:12px 0}.jms-route-list article{display:grid;grid-template-columns:38px 1fr;align-items:center;gap:9px;padding:9px;border:1px solid #e2e8f0;border-radius:12px}.jms-route-list i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#eff6ff;color:#2563eb;font-style:normal;font-weight:900}.jms-route-list b,.jms-route-list span{display:block}.jms-route-list span{font-size:10px;color:#64748b}.jms-open-maps{display:block;background:#047857}.quote-a4,.quote-doc{font-family:Cairo,Tahoma,Arial,sans-serif!important;direction:rtl!important}@media(max-width:620px){.jms-reorder-card{align-items:stretch;flex-direction:column}.jms-reorder-card button{width:100%}.jms-price-inputs{grid-template-columns:1fr 1fr}.jms-price-result{grid-template-columns:1fr}.jms-price-result p{grid-column:1}.jms-smart-section{padding:12px!important}}';document.head.appendChild(sheet)}
   function observeModal(){const root=document.getElementById('modalBody');if(!root)return;let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>{injectPricingAssistant();forcePdfTypography()},60)}).observe(root,{childList:true,subtree:true})}
-  function install(){style();settings();enhanceRoutesPage();renderReorderWidgets();observeModal();forcePdfTypography();const oldRender=window.renderAll;window.renderAll=function(){const result=typeof oldRender==='function'?oldRender.apply(this,arguments):undefined;setTimeout(()=>{renderReorderWidgets();enhanceRoutesPage()},40);return result}}
+  function install(){style();enhanceRoutesPage();renderReorderWidgets();observeModal();forcePdfTypography();const oldRender=window.renderAll;window.renderAll=function(){const result=typeof oldRender==='function'?oldRender.apply(this,arguments):undefined;setTimeout(()=>{renderReorderWidgets();enhanceRoutesPage()},40);return result}}
+  window.addEventListener('jms:session-refreshed',injectPricingAssistant);
   window.JMS_SMART_API={predictions,priceCalculation,optimizedRoute};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
   window.JMS_SMART_BUSINESS_SUITE=VERSION;

@@ -175,9 +175,33 @@ function resetAppViewport(){
 }
 window.jmsResetAppViewport=resetAppViewport;
 
+function quoteAdmin(){ return typeof currentUser!=='undefined' && currentUser?.role==='admin'; }
+function salesQuoteTotal(){
+  const total=document.getElementById('mqTotal');
+  if(total){const amount=Number(document.getElementById('mqKg')?.value)*Number(document.getElementById('mqPriceKg')?.value);total.value=amount?amount.toFixed(2):'';}
+}
+function scrubQuoteCache(store){
+  const privateKeys=new Set(['piece_weight','pieces','density','materialCosts','material_cost','production_cost','unit_cost','cost_per_kg','cost_price','margin','profit_margin','waste','cost_breakdown']);
+  function clear(record){
+    if(!record||typeof record!=='object')return;
+    for(const key of Object.keys(record)){if(privateKeys.has(key))delete record[key];else clear(record[key]);}
+  }
+  for(const group of ['quotes','orders','production_orders'])clear(store[group]);
+  if(Array.isArray(store.settings))store.settings=store.settings.filter(row=>row.id!=='pricing');
+  if(store.businessSettings)delete store.businessSettings.materialCosts;
+}
+function prepareQuotePrivacy(){
+  const admin=quoteAdmin();
+  document.documentElement.classList.toggle('jms-private-quote-access',admin);
+  if(admin)return;
+  scrubQuoteCache(db);
+  document.querySelectorAll('#jmsSmartPricing,.jms-cost-editor').forEach(el=>el.remove());
+  for(const id of ['pieceWeight','piecesCount','density']){const el=document.getElementById(id);if(el)el.value='';}
+  try{localStorage.setItem(STORE,JSON.stringify(db));}catch{}
+}
 function showApp(){
   if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
-  loginView.classList.add('hidden');
+  prepareQuotePrivacy(); loginView.classList.add('hidden');
   appView.classList.remove('hidden');
   currentUserName.textContent=((currentUser&&currentUser.name)||"");
   (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(currentUserRole,roleText((currentUser&&currentUser.role)));
@@ -291,6 +315,7 @@ function renderSelects(){
 ['width','length','thickness','sizeUnit','thicknessUnit','material','totalKg','priceKg'].forEach(x=>$(x).addEventListener('input',calc));
 ['sizeUnit','thicknessUnit','material'].forEach(x=>$(x).addEventListener('change',calc));
 function calc(){
+  if(!quoteAdmin()){const amount=Number(totalKg.value)*Number(priceKg.value);orderAmount.value=amount?amount.toFixed(2)+' ريال':'';return;}
   let w=Number(width.value||0),l=Number(length.value||0),t=Number(thickness.value||0);
   if(sizeUnit.value==='cm'){w/=100;l/=100}else if(sizeUnit.value==='mm'){w/=1000;l/=1000}
   if(thicknessUnit.value==='mm')t*=1000;
@@ -568,8 +593,8 @@ function openQuoteForm(){
     <div class="form-grid two">
       <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label>
       <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
-      <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>
-      <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>
+      ${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>`:''}
+      ${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>`:''}
     </div>
     <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
     <br><button class="primary" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
@@ -581,6 +606,7 @@ function openQuoteForm(){
   calcQuoteForm();
 }
 function calcQuoteForm(){
+    if(!quoteAdmin()){salesQuoteTotal();return;}
   if(!window.mqTotal) return;
   let w=Number(mqWidth.value||0),l=Number(mqLength.value||0),t=Number(mqThickness.value||0);
   if(mqSizeUnit.value==='cm'){w/=100;l/=100}else if(mqSizeUnit.value==='mm'){w/=1000;l/=1000}
@@ -603,7 +629,7 @@ function saveQuote(){
     customer_id:mqCustomer.value,rep_id:mqRep.value,date:mqDate.value||today(),valid_until:mqValid.value,
     product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
     width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
-    total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
+    total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:window.mqPiece?.value||'',pieces:window.mqPieces?.value||'',
     payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,
     created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()
   });
@@ -797,7 +823,7 @@ function convertQuoteToOrder(qid){
         <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
         <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label>
       </div>
-      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div>
+      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>`:''}${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>`:''}</div>
       <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
       <br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
     modal.classList.remove('hidden');
@@ -812,6 +838,7 @@ function convertQuoteToOrder(qid){
   };
 
   window.calcQuoteForm=function(){
+    if(!quoteAdmin()){salesQuoteTotal();return;}
     if(!window.mqTotal) return;
     let w=Number(mqWidth.value||0),l=Number(mqLength.value||0),t=Number(mqThickness.value||0);
     if(mqSizeUnit.value==='cm'){w/=100;l/=100}else if(mqSizeUnit.value==='mm'){w/=1000;l/=1000}
@@ -841,7 +868,7 @@ function convertQuoteToOrder(qid){
       if(!customerId) return alert('اختر العميل');
     }
     const no='Q-'+String((db.quotes||[]).length+1).padStart(5,'0');
-    db.quotes.unshift({id:newLocalId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()});
+    db.quotes.unshift({id:newLocalId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:window.mqPiece?.value||'',pieces:window.mqPieces?.value||'',payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()});
     saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
   };
 
@@ -1289,7 +1316,7 @@ function convertQuoteToOrder(qid){
         <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
         <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label>
       </div>
-      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div>
+      <div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>`:''}${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>`:''}</div>
       <label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label>
       <br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
 
@@ -1344,7 +1371,7 @@ function convertQuoteToOrder(qid){
       id:localId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||tdy(),valid_until:mqValid.value,
       product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
       width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
-      total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
+      total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:window.mqPiece?.value||'',pieces:window.mqPieces?.value||'',
       payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()
     });
     saveDb();
@@ -1532,7 +1559,7 @@ function convertQuoteToOrder(qid){
 
   window.showApp = function(){
     if(!currentUser || !currentUser.role){ loginView.classList.remove('hidden'); appView.classList.add('hidden'); return; }
-    loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
+    prepareQuotePrivacy(); loginView.classList.add('hidden'); appView.classList.remove('hidden'); logoFix();
     currentUserName.textContent=((currentUser&&currentUser.name)||""); (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(currentUserRole,roleText((currentUser&&currentUser.role)));
     const repAllowed=['customers','visits','orders','quotes','routes','profile','newCustomerRadar','repAiAssistant'];
     document.querySelectorAll('.nav').forEach(btn=>{
@@ -1582,6 +1609,7 @@ function convertQuoteToOrder(qid){
     existingCustomerBox.classList.toggle('hidden',mode!=='existing'); newCustomerBox.classList.toggle('hidden',mode!=='new');
   };
   window.calcQuoteForm=function(){
+    if(!quoteAdmin()){salesQuoteTotal();return;}
     if(!window.mqTotal)return; let w=num(mqWidth.value),l=num(mqLength.value),t=num(mqThickness.value);
     if(mqSizeUnit.value==='cm'){w/=100;l/=100}else if(mqSizeUnit.value==='mm'){w/=1000;l/=1000} if(mqThicknessUnit.value==='mm')t*=1000;
     const den=(typeof DENSITY!=='undefined'?(DENSITY[mqMaterial.value]||.93):.93); const gram=w*l*t*den;
@@ -1593,13 +1621,13 @@ function convertQuoteToOrder(qid){
     <div id="existingCustomerBox" class="form-grid two"><label><span data-i18n="ui_99092d18b155">بحث باسم العميل</span><div class="customer-search-picker"><input id="mqCustomerSearch" placeholder="اكتب اسم العميل أو جزء منه..." autocomplete="off" oninput="renderQuoteCustomerSearch()" onfocus="renderQuoteCustomerSearch()" data-i18n-placeholder="ui_9fea834a4d3c"><div id="mqCustomerSearchResults" class="customer-search-results"></div><div id="selectedQuoteCustomer" class="selected-customer-pill"></div></div><input id="mqCustomer" type="hidden" value=""></label><label><span data-i18n=ui_4059aaa08477>المندوب</span><select id="mqRep">${reps.map(r=>`<option value="${r.id}" ${r.id===defaultRep?'selected':''}>${r.name}</option>`).join('')}</select></label></div>
     <div id="newCustomerBox" class="form-grid two hidden"><label><span data-i18n=ui_401e461b99ac>اسم العميل الجديد</span><input id="mqNewCustomerName" placeholder="اسم العميل" data-i18n-placeholder="ui_70771eb8320f"></label><label><span data-i18n="ui_af379ba7872c">جوال العميل</span><input id="mqNewCustomerPhone" placeholder="05xxxxxxxx"></label><label><span data-i18n=ui_23ee0d351c7b>المدينة</span><input id="mqNewCustomerCity" value="جدة"></label><label><span data-i18n="ui_53a077c11246">الحي / الموقع</span><input id="mqNewCustomerLocation" placeholder="الحي أو رابط الموقع" data-i18n-placeholder="ui_5f073b6a9246"></label></div>
     <div class="form-grid two"><label><span data-i18n=ui_237d8bf6b792>تاريخ العرض</span><input id="mqDate" type="date" value="${safeToday()}"></label><label><span data-i18n=ui_ad6745c93e4f>صلاحية العرض</span><input id="mqValid" type="date"></label></div><div class="form-grid four"><label><span data-i18n="ui_a79e304d96a1">المنتج</span><select id="mqProduct"><option data-i18n=ui_8c880b51fe42>أكياس رول</option><option data-i18n=ui_a6595bbb62a5>أكياس شيت</option><option data-i18n=ui_f6c15b22e2f6>أكياس تي شيرت</option><option data-i18n=ui_2155f0c5217e>شرنك</option><option data-i18n=ui_fda301ffb0b2>فيلم</option><option data-i18n=ui_4fa664436dbf>أكياس نفايات</option></select></label><label><span data-i18n=ui_ed10f61584eb>الخامة</span><select id="mqMaterial"><option value="HDPE">HDPE</option><option value="LDPE">LDPE</option><option value="LLDPE">LLDPE</option><option value="PP">PP</option><option value="MIX" data-i18n=ui_964447be7d7e>خلطة</option></select></label><label><span data-i18n=ui_041b469dc8a9>اللون</span><input id="mqColor" placeholder="شفاف / أبيض / حسب الطلب" data-i18n-placeholder="ui_37e139defc9a"></label><label><span data-i18n=ui_770a398a4d19>الطباعة</span><select id="mqPrint"><option data-i18n=ui_b67388cf072a>بدون طباعة</option><option data-i18n=ui_f0718f92209f>وجه واحد</option><option data-i18n=ui_0601455a0af9>وجهين</option></select></label></div>
-    <div class="form-grid four"><label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label><label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label><label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label></div><div class="form-grid four"><label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label><label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label><label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label></div><div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label><label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label><label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label></div><label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label><br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
+    <div class="form-grid four"><label><span data-i18n=ui_40504fc32bfc>العرض</span><input id="mqWidth" type="number" step="0.01" placeholder="65"></label><label><span data-i18n=ui_1ea9eb72945b>الطول</span><input id="mqLength" type="number" step="0.01" placeholder="95"></label><label><span data-i18n=ui_d69525df07ef>وحدة المقاس</span><select id="mqSizeUnit"><option value="cm" data-i18n=ui_fd953bfdcb35>سم</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_5cccef2ccc68>السماكة</span><input id="mqThickness" type="number" step="0.01" placeholder="75"></label></div><div class="form-grid four"><label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label><label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="1000"></label><label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label><label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly></label></div><div class="form-grid two"><label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="حسب الاتفاق"></label><label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly></label>`:''}${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly></label>`:''}</div><label><span data-i18n="ui_d446d2dc6b81">ملاحظات</span><input id="mqNotes" placeholder="ملاحظات للمدير أو العميل" data-i18n-placeholder="ui_47b41301e943"></label><br><button class="primary" type="button" onclick="saveQuote()"><span data-i18n=ui_d110ac2e2fb2>حفظ وإرساله للمدير للاعتماد</span></button>`;
     modal.classList.remove('hidden'); ['mqWidth','mqLength','mqThickness','mqSizeUnit','mqThicknessUnit','mqMaterial','mqKg','mqPriceKg'].forEach(x=>{const el=document.getElementById(x);if(el){el.addEventListener('input',calcQuoteForm);el.addEventListener('change',calcQuoteForm)}}); if(cs[0]){mqCustomer.value=cs[0].id;selectedQuoteCustomer.textContent='العميل الافتراضي: '+cs[0].name;selectedQuoteCustomer.classList.add('active')} calcQuoteForm();
   };
   window.saveQuote=function(){
     ensureQuotes(); const mode=document.querySelector('input[name="quoteCustomerMode"]:checked')?.value||'existing'; let customerId=''; let repId=(window.mqRep&&mqRep.value)?mqRep.value:(currentUser&&currentUser.id);
     if(mode==='new'){const name=(mqNewCustomerName.value||'').trim(); if(!name)return alert('اكتب اسم العميل الجديد'); const c={id:safeId(),name,phone:mqNewCustomerPhone.value||'',city:mqNewCustomerCity.value||'جدة',district:'',location:mqNewCustomerLocation.value||'',category:'عميل',status:'active',rep_id:repId,debt_balance:0,credit_limit:0,notes:'تمت إضافته من عرض سعر'}; db.customers.unshift(c); customerId=c.id}else{customerId=mqCustomer.value;if(!customerId)return alert('اكتب اسم العميل واختره من نتائج البحث')}
-    db.quotes.unshift({id:safeId(),quote_no:quoteNo(),status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()}); saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
+    db.quotes.unshift({id:safeId(),quote_no:quoteNo(),status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||safeToday(),valid_until:mqValid.value,product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:window.mqPiece?.value||'',pieces:window.mqPieces?.value||'',payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:((currentUser&&currentUser.name)||""),created_at:new Date().toISOString()}); saveDB(); closeModal(); renderAll(); alert('تم حفظ العرض وإرساله للمدير للاعتماد');
   };
   window.renderQuotes=function(){
     if(!window.quotesList)return; ensureQuotes(); if(typeof renderQuoteFilters==='function')renderQuoteFilters(); const st=window.quoteStatusFilter?.value||'all',rep=window.quoteRepFilter?.value||'all',txt=(window.quoteSearch?.value||'').trim(); let list=allowedQuotes().filter(q=>{if(st!=='all'&&q.status!==st)return false;if(rep!=='all'&&q.rep_id!==rep)return false;const cname=customerName(q.customer_id);return !txt||String(q.quote_no).includes(txt)||cname.includes(txt)});
@@ -1914,6 +1942,7 @@ function convertQuoteToOrder(qid){
   }
 
   window.jmsCalcQuote = function(){
+    if(!quoteAdmin()){salesQuoteTotal();return;}
     if(!window.mqPiece && !document.getElementById('mqPiece')) return;
     const width = document.getElementById('mqWidth')?.value;
     const length = document.getElementById('mqLength')?.value;
@@ -1935,6 +1964,13 @@ function convertQuoteToOrder(qid){
   };
 
   window.jmsCalcOrder = function(){
+    if(!quoteAdmin()){
+      const kg=document.getElementById('oKg')||document.getElementById('totalKg');
+      const price=document.getElementById('oPriceKg')||document.getElementById('priceKg');
+      const total=document.getElementById('oTotal')||document.getElementById('orderAmount');
+      if(total)total.value=(Number(kg?.value||0)*Number(price?.value||0)).toFixed(2);
+      return;
+    }
     const width = document.getElementById('oWidth')?.value || document.getElementById('width')?.value;
     const length = document.getElementById('oLength')?.value || document.getElementById('length')?.value;
     const sizeUnit = document.getElementById('oSizeUnit')?.value || document.getElementById('sizeUnit')?.value || 'cm';
@@ -2001,12 +2037,12 @@ function convertQuoteToOrder(qid){
         <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
         <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="2000"></label>
         <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01"></label>
-        <label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>
+        ${quoteAdmin()?`<label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>`:''}
       </div>
 
       <div class="form-grid three">
-        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly></label>
-        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly></label>
+        ${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly></label>`:''}
+        ${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly></label>`:''}
         <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" class="jms-calc-output" readonly></label>
       </div>
 
@@ -2051,7 +2087,7 @@ function convertQuoteToOrder(qid){
       id:localId(),quote_no:no,status:'pending',customer_id:customerId,rep_id:repId,date:mqDate.value||today(),valid_until:mqValid.value,
       product:mqProduct.value,material:mqMaterial.value,color:mqColor.value,print:mqPrint.value,
       width:mqWidth.value,length:mqLength.value,size_unit:mqSizeUnit.value,thickness:mqThickness.value,thickness_unit:mqThicknessUnit.value,
-      total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:mqPiece.value,pieces:mqPieces.value,
+      total_kg:mqKg.value,price_kg:mqPriceKg.value,total_amount:mqTotal.value,piece_weight:window.mqPiece?.value||'',pieces:window.mqPieces?.value||'',
       payment_terms:mqPayment.value,delivery_terms:mqDelivery.value,notes:mqNotes.value,created_by:currentUser?.name||'',created_at:new Date().toISOString()
     });
     if(typeof save==='function') save();
@@ -2288,12 +2324,12 @@ function convertQuoteToOrder(qid){
         <label><span data-i18n=ui_e670882c4b20>وحدة السماكة</span><select id="mqThicknessUnit"><option value="micron" data-i18n=ui_28132715d654>ميكرون</option><option value="mm" data-i18n=ui_c8323c4ab565>مم</option></select></label>
         <label><span data-i18n=ui_67aa7e7b5075>كمية الطلب بالكيلو</span><input id="mqKg" type="number" step="0.01" placeholder="2000" value="${q?.total_kg || ''}"></label>
         <label><span data-i18n=ui_0696d91556d4>سعر الكيلو</span><input id="mqPriceKg" type="number" step="0.01" value="${q?.price_kg || ''}"></label>
-        <label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>
+        ${quoteAdmin()?`<label><span data-i18n=ui_26f89f002368>كثافة الخامة</span><input id="mqDensity" class="jms-calc-output" readonly></label>`:''}
       </div>
 
       <div class="form-grid three">
-        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly value="${q?.piece_weight || ''}"></label>
-        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly value="${q?.pieces || ''}"></label>
+        ${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" class="jms-calc-output" readonly value="${q?.piece_weight || ''}"></label>`:''}
+        ${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" class="jms-calc-output" readonly value="${q?.pieces || ''}"></label>`:''}
         <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" class="jms-calc-output" readonly value="${q?.total_amount || ''}"></label>
       </div>
 
@@ -2347,8 +2383,8 @@ function convertQuoteToOrder(qid){
     ok = numValue('mqKg') && ok;
     ok = numValue('mqPriceKg') && ok;
     window.jmsCalcQuote && window.jmsCalcQuote();
-    ok = requiredValue('mqPiece') && ok;
-    ok = requiredValue('mqPieces') && ok;
+    if(quoteAdmin())ok = requiredValue('mqPiece') && ok;
+    if(quoteAdmin())ok = requiredValue('mqPieces') && ok;
     ok = numValue('mqTotal') && ok;
     if(!ok){
       alert('لا يمكن حفظ عرض السعر. عبئ الخانات الأساسية أولًا: العميل، المنتج، المقاس، السماكة، الكمية، سعر الكيلو.');
@@ -2451,7 +2487,7 @@ function convertQuoteToOrder(qid){
   window.sendQuote = function(qid){
     const q=db.quotes.find(x=>x.id===qid);
     if(!q) return;
-    const required = ['customer_id','product','width','length','thickness','material','total_kg','price_kg','piece_weight','pieces','total_amount'];
+    const required = ['customer_id','product','width','length','thickness','material','total_kg','price_kg',...(quoteAdmin()?['piece_weight','pieces']:[]),'total_amount'];
     const missing = required.some(k=>!q[k] || Number(q[k])===0);
     if(missing){
       return alert('لا يمكن إرسال عرض السعر لأنه ناقص. عدّل العرض وعبئ الخانات الأساسية أولًا.');
@@ -2526,8 +2562,8 @@ function convertQuoteToOrder(qid){
     ok = reqNum('mqThickness') && ok;
     ok = reqNum('mqKg') && ok;
     ok = reqNum('mqPriceKg') && ok;
-    ok = req('mqPiece') && ok;
-    ok = req('mqPieces') && ok;
+    if(quoteAdmin())ok = req('mqPiece') && ok;
+    if(quoteAdmin())ok = req('mqPieces') && ok;
     ok = reqNum('mqTotal') && ok;
     if(!ok) alert('لا يمكن حفظ أو إرسال عرض السعر قبل تعبئة العميل، المقاس، السماكة، الكمية، سعر الكيلو والحسابات.');
     return ok;
@@ -2563,8 +2599,8 @@ function convertQuoteToOrder(qid){
         <label><span data-i18n=ui_baed6e999960>الإجمالي</span><input id="mqTotal" readonly value="${q?.total_amount||''}"></label>
       </div>
       <div class="form-grid two">
-        <label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly value="${q?.piece_weight||''}"></label>
-        <label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly value="${q?.pieces||''}"></label>
+        ${quoteAdmin()?`<label><span data-i18n=ui_5ee09e61f1d5>وزن الحبة</span><input id="mqPiece" readonly value="${q?.piece_weight||''}"></label>`:''}
+        ${quoteAdmin()?`<label><span data-i18n=ui_05e79ef21bf5>عدد الحبات</span><input id="mqPieces" readonly value="${q?.pieces||''}"></label>`:''}
         <label><span data-i18n=ui_a97195003727>شروط الدفع</span><input id="mqPayment" value="${q?.payment_terms||'حسب الاتفاق'}"></label>
         <label><span data-i18n="ui_f9425f7cfe31">مدة التسليم</span><input id="mqDelivery" value="${q?.delivery_terms||window.JMSI18n?.label('حسب جدول الإنتاج') || 'حسب جدول الإنتاج'}"></label>
       </div>
@@ -2616,7 +2652,7 @@ function convertQuoteToOrder(qid){
   };
 
   const oldSend = window.sendQuote;
-  window.sendQuote = function(qid){ const q=db.quotes.find(x=>x.id===qid); if(!q) return; const missing = ['customer_id','product','width','length','thickness','material','total_kg','price_kg','piece_weight','pieces','total_amount'].some(k=>!q[k] || Number(q[k])===0); if(missing) return alert('لا يمكن إرسال عرض ناقص. اضغط تعديل وعبئ الخانات الأساسية.'); if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن الإرسال قبل اعتماد المدير'); if(typeof oldSend==='function') oldSend(qid); };
+  window.sendQuote = function(qid){ const q=db.quotes.find(x=>x.id===qid); if(!q) return; const missing = ['customer_id','product','width','length','thickness','material','total_kg','price_kg',...(quoteAdmin()?['piece_weight','pieces']:[]),'total_amount'].some(k=>!q[k] || Number(q[k])===0); if(missing) return alert('لا يمكن إرسال عرض ناقص. اضغط تعديل وعبئ الخانات الأساسية.'); if(q.status!=='approved' && q.status!=='sent') return alert('لا يمكن الإرسال قبل اعتماد المدير'); if(typeof oldSend==='function') oldSend(qid); };
   setTimeout(()=>{ if(window.quotesList) renderQuotes(); }, 300);
 })();
 
