@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const VERSION = '20261111-1';
+  const VERSION = '20261113-1';
   let standaloneAccount = null;
   const catalogs = {};
   const keysByText = new Map();

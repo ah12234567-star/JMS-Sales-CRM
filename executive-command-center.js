@@ -88,9 +88,9 @@
     const openVisits = visits.filter(v => (v.smart || v.checkin_at) && !v.checkout_at);
     const productionOpen = role === 'rep' ? [] : (db.productionOrders || []).filter(p => p.stage !== 'delivered');
 
-    pendingQuotes.slice(0, 2).forEach(q => tasks.push({tone:'orange', icon:'▤', title:`عرض ${q.quote_no || ''} ينتظر الاعتماد`, detail: customerName(q.customer_id), page:'quotes'}));
+    pendingQuotes.slice(0, 2).forEach(q => tasks.push({tone:'orange', icon:'▤', title:`<span data-i18n-text>عرض سعر</span> ${esc(q.quote_no || '')} — <span data-i18n-text>بانتظار الاعتماد</span>`, detail: customerName(q.customer_id), page:'quotes'}));
     incompleteOrders.slice(0, 2).forEach(o => tasks.push({tone:'red', icon:'!', title:'طلب تصنيع بياناته ناقصة', detail: customerName(o.customer_id), page:'orders'}));
-    overdue.slice(0, 2).forEach(item => tasks.push({tone:'blue', icon:'⌖', title:`عميل بدون زيارة منذ ${item.days} يوم`, detail:item.customer.name, page:'customers'}));
+    overdue.slice(0, 2).forEach(item => tasks.push({tone:'blue', icon:'⌖', title:`<span data-i18n-text>عميل بدون زيارة منذ</span> ${item.days} <span data-i18n-text>يوم</span>`, detail:item.customer.name, page:'customers'}));
     openVisits.slice(0, 2).forEach(v => tasks.push({tone:'green', icon:'●', title:'زيارة مفتوحة ولم تُغلق', detail:customerName(v.customer_id), page:'smartVisits'}));
 
     return {
@@ -100,12 +100,12 @@
   }
 
   function signature(data) {
-    return JSON.stringify([currentUser?.id, data.counts, data.tasks.map(task => task.title + task.detail)]);
+    return JSON.stringify([document.documentElement.lang,currentUser?.id, data.counts, data.tasks.map(task => task.title + task.detail)]);
   }
 
   function actionButton(page, icon, label) {
     if (!pageAllowed(page)) return '';
-    return `<button type="button" onclick="jmsCommandGo('${page}')"><i>${icon}</i><span>${label}</span></button>`;
+    return `<button type="button" onclick="jmsCommandGo('${page}')"><i>${icon}</i><span data-i18n-text>${label}</span></button>`;
   }
 
   function render() {
@@ -123,14 +123,14 @@
       dashboard.querySelector('.page-head')?.insertAdjacentElement('afterend', root);
     }
     root.dataset.signature = nextSignature;
-    const date = new Intl.DateTimeFormat('ar-SA', {weekday:'long', day:'numeric', month:'long'}).format(new Date());
+    const date = new Intl.DateTimeFormat(document.documentElement.lang==='en'?'en-GB':'ar-SA', {weekday:'long', day:'numeric', month:'long'}).format(new Date());
     const attention = counts.pendingQuotes + counts.incompleteOrders + counts.overdue + counts.openVisits;
     root.innerHTML = `
       <div class="jms-command-hero">
         <div>
           <span class="jms-command-date">${esc(date)}</span>
-          <h3>${hourGreeting()}، ${esc(currentUser.name || 'مدير النظام')}</h3>
-          <p>${attention ? `لديك <b>${attention}</b> مهمة تحتاج متابعة اليوم.` : 'كل الأعمال المهمة تحت السيطرة اليوم.'}</p>
+          <h3><span data-i18n-text>${hourGreeting()}</span>, ${esc(currentUser.name || 'مدير النظام')}</h3>
+          <p>${attention ? `<span data-i18n-text>لديك</span> <b>${attention}</b> <span data-i18n-text>مهمة تحتاج متابعة اليوم.</span>` : '<span data-i18n-text>كل الأعمال المهمة تحت السيطرة اليوم.</span>'}</p>
         </div>
         <div class="jms-command-score ${attention ? 'busy' : 'clear'}"><b>${attention}</b><span data-i18n="ui_1c3a81f7a25c">تحتاج إجراء</span></div>
       </div>
@@ -145,7 +145,7 @@
           <div class="jms-command-title"><div><b data-i18n="ui_7cd52e6e168a">أولويات العمل</b><small data-i18n="ui_57545fab9cc6">مرتبة حسب الأهمية</small></div><span>${tasks.length}</span></div>
           <div class="jms-task-list">${tasks.length ? tasks.map(task => `
             <button type="button" class="jms-task" onclick="jmsCommandGo('${task.page}')">
-              <i class="${task.tone}">${task.icon}</i><div><b>${esc(task.title)}</b><small>${esc(task.detail || 'فتح التفاصيل')}</small></div><em>‹</em>
+              <i class="${task.tone}">${task.icon}</i><div><b>${task.title.startsWith('<span data-i18n-text>')?task.title:`<span data-i18n-text>${esc(task.title)}</span>`}</b><small>${esc(task.detail || 'فتح التفاصيل')}</small></div><em>‹</em>
             </button>`).join('') : "<div class=\"jms-command-empty\"><i>✓</i><b data-i18n=\"ui_1848899cefb8\">لا توجد مهام عاجلة</b><span data-i18n=\"ui_1f73065f9415\">الوضع ممتاز، استمر في متابعة العمل.</span></div>"}</div>
         </div>
         <div class="jms-command-quick">
@@ -197,6 +197,7 @@
     window.addEventListener('focus',render);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
     document.addEventListener('jms:data-synced',render);
+    document.addEventListener('jms:language-changed',render);
     window.addEventListener('pageshow',()=>{ensureManagerShell();if(isManager())setTimeout(()=>window.jmsResetAppViewport?.(),120)});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);

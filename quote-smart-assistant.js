@@ -1,6 +1,7 @@
 (function(){
 'use strict';
-const VERSION='2026-08-14-quote-smart-assistant-1';
+const VERSION='2026-11-13-admin-only';
+const admin=()=>{try{return currentUser?.role==='admin';}catch(_){return window.currentUser?.role==='admin';}};
 const $=id=>document.getElementById(id);
 const value=(id,v)=>{const el=$(id);if(!el||v===undefined||v===null||v==='')return;if(el.tagName==='SELECT'){const wanted=String(v).toLowerCase();const option=[...el.options].find(o=>String(o.value).toLowerCase()===wanted||String(o.textContent).toLowerCase()===wanted);if(option)el.value=option.value;}else el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));};
 const normalizeDigits=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٬,]/g,'').replace(/٫/g,'.');
@@ -59,6 +60,7 @@ function applyParsed(data){
 }
 
 async function analyze(){
+ if(!admin())return;
  const input=$('jmsQuoteAiText'),status=$('jmsQuoteAiStatus'),button=$('jmsQuoteAiAnalyze');
  const text=input?.value?.trim();if(!text)return alert('اكتب تفاصيل العرض أو استخدم زر الميكروفون');
  button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"جاري قراءة تفاصيل العرض...");
@@ -66,24 +68,27 @@ async function analyze(){
   let parsed=null;
   try{parsed=await aiParse(text)}catch(error){console.warn('JMS quote AI fallback',error)}
   parsed={...localParse(text),...(parsed||{})};
+  if(!admin()||input!==$('jmsQuoteAiText'))return;
   applyParsed(parsed);
   (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تمت تعبئة الحقول. راجعها ثم اضغط حفظ وإرساله للمدير للاعتماد.");
  }catch(error){console.error(error);(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تعذر تحليل النص. حاول بصياغة أوضح.");}
- finally{button.disabled=false}
+ finally{if(button)button.disabled=false}
 }
 
 function startVoice(){
+ if(!admin())return;
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!Recognition)return alert('التسجيل الصوتي غير مدعوم في هذا المتصفح. استخدم الكتابة حالياً.');
  const button=$('jmsQuoteAiMic'),status=$('jmsQuoteAiStatus');
  const recognition=new Recognition();recognition.lang=document.documentElement.lang==='en'?'en-US':'ar-SA';recognition.interimResults=false;recognition.maxAlternatives=1;
  button.disabled=true;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"🎙️ أتكلم الآن...");
- recognition.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';if(text){$('jmsQuoteAiText').value=text;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تم تحويل الصوت إلى نص. اضغط تعبئة العرض.");}};
+ recognition.onresult=e=>{if(!admin()||!$('jmsQuoteAiText'))return;const text=e.results?.[0]?.[0]?.transcript||'';if(text){$('jmsQuoteAiText').value=text;(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تم تحويل الصوت إلى نص. اضغط تعبئة العرض.");}};
  recognition.onerror=()=>{(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(status,"تعذر التعرف على الصوت. جرّب مرة أخرى أو اكتب النص.");};
  recognition.onend=()=>{button.disabled=false;};recognition.start();
 }
 
 function mount(){
+ if(!admin()){$('jmsQuoteSmartAssistant')?.remove();return;}
  const product=$('mqProduct');if(!product||$('jmsQuoteSmartAssistant'))return;
  const formAnchor=product.closest('.form-grid');if(!formAnchor)return;
  const panel=document.createElement('div');panel.id='jmsQuoteSmartAssistant';panel.className='jms-quote-ai';
@@ -95,7 +100,7 @@ function mount(){
 function style(){if($('jmsQuoteAiStyle'))return;const el=document.createElement('style');el.id='jmsQuoteAiStyle';el.textContent='.jms-quote-ai{margin:12px 0 16px;padding:14px;border:1px solid #c7d2fe;border-radius:16px;background:linear-gradient(135deg,#eef2ff,#fff)}.jms-quote-ai-head{display:flex;justify-content:space-between;margin-bottom:9px}.jms-quote-ai-head div{display:grid;gap:3px}.jms-quote-ai-head b{font-size:15px;color:#312e81}.jms-quote-ai-head span,.jms-quote-ai small{font-size:11px;color:#64748b}.jms-quote-ai textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #cbd5e1;border-radius:12px;padding:11px;font:inherit;box-sizing:border-box}.jms-quote-ai-actions{display:flex;gap:8px;margin:9px 0}.jms-quote-ai-actions button{min-height:42px;border-radius:10px;padding:8px 14px;cursor:pointer}.jms-quote-ai-actions button:first-child{border:1px solid #cbd5e1;background:#fff}@media(max-width:620px){.jms-quote-ai-actions button{flex:1}.jms-quote-ai textarea{font-size:16px}}';document.head.appendChild(el)}
 
 function wrap(name){const old=window[name];if(typeof old!=='function'||old.__jmsQuoteAiWrapped)return;const wrapped=function(){const result=old.apply(this,arguments);setTimeout(mount,0);return result};wrapped.__jmsQuoteAiWrapped=true;window[name]=wrapped;}
-function boot(){style();['openQuoteForm','forceQuoteForm','editQuote'].forEach(wrap);setTimeout(mount,0)}
+function boot(){style();['openQuoteForm','forceQuoteForm','editQuote'].forEach(wrap);setTimeout(mount,0);window.addEventListener('jms:session-refreshed',mount)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 window.JMS_QUOTE_SMART_ASSISTANT=VERSION;
 })();

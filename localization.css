@@ -24,3 +24,6 @@ html[data-locale-pending] #appView,html[data-account-page][data-locale-pending] 
  visibility:hidden;animation:jms-locale-fallback 0s 3s forwards
 }
 @keyframes jms-locale-fallback{to{visibility:visible}}
+
+html[dir=ltr] :is(.jms-command-kpis button,.jms-task,.jms-quick-grid button){text-align:start}
+html[dir=ltr] .jms-task em{transform:scaleX(-1)}
