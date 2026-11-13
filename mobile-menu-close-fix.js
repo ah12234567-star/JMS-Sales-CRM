@@ -60,7 +60,7 @@
    the current searchable customer picker without relying on an old index.html. */
 (function(){
   'use strict';
-  const VERSION='20260818-searchable-customer-v2';
+  const VERSION='20261113-ready-goods-totals-v3';
   const scripts=[
     ['jmsReadyGoodsCoreScript','/ready-goods-notice.js?v='+VERSION],
     ['jmsReadyGoodsKeyboardScript','/ready-goods-keyboard-fix.js?v='+VERSION],
