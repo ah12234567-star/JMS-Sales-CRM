@@ -23,6 +23,7 @@ test('official logo decodes and ready-goods document renders without overflow',a
  try{
   const page=await browser.newPage();await page.setContent(html,{waitUntil:'load'});
   await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(i=>i.decode()));});
+  await vm.runInContext('fitPrintDocument',context)(page);
   const state=await page.evaluate(()=>({moneyRight:[...document.querySelectorAll('.summary .number')].map(e=>e.getBoundingClientRect().right),images:[...document.images].map(i=>i.naturalWidth),overflow:[...document.querySelectorAll('header,td,.summary,.due')].some(e=>e.scrollWidth>e.clientWidth+2)}));
   assert.ok(Math.max(...state.moneyRight)-Math.min(...state.moneyRight)<1,'financial values share a right edge');assert.ok(state.images.every(n=>n>0));assert.equal(state.overflow,false);
   if(process.env.JMS_PDF_OUTPUT)await page.pdf({path:process.env.JMS_PDF_OUTPUT,format:'A4',printBackground:true,preferCSSPageSize:true,margin:{top:0,bottom:0,left:0,right:0}});
@@ -47,5 +48,21 @@ test('long multi-item notices paginate without clipping text or financial column
  try{const page=await browser.newPage();await page.setContent(longHtml,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
  const overflow=await page.evaluate(()=>[...document.querySelectorAll('td,th')].some(e=>e.scrollWidth>e.clientWidth+2));assert.equal(overflow,false);
  assert.equal(await page.$$eval('tbody tr',rows=>rows.length),14);
+ }finally{await browser.close();}
+});
+test('footer follows RTL contact order and row padding decreases with item count',async()=>{
+ const browser=await puppeteer.launch({args:chromium.args,executablePath:await chromium.executablePath(),headless:true});
+ try{
+  const page=await browser.newPage(),padding=[];
+  for(const count of [1,4,10,18]){
+   context.densityNotice={...n,items:Array.from({length:count},()=>({...n.items[0]}))};
+   const markup=vm.runInContext('documentHtml(densityNotice,{},[],logo,font)',context);
+   await page.setContent(markup,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
+   const state=await page.evaluate(()=>({padding:parseFloat(getComputedStyle(document.querySelector('td')).paddingTop),keys:[...document.querySelectorAll('footer>[data-contact]')].map(e=>e.dataset.contact),positions:[...document.querySelectorAll('footer>[data-contact]')].map(e=>e.getBoundingClientRect().right),overflow:[...document.querySelectorAll('td,footer>span')].some(e=>e.scrollWidth>e.clientWidth+2)}));
+   assert.deepEqual(state.keys,['phone','email','location','city','district']);assert.equal(state.overflow,false);
+   assert.ok(state.positions.every((v,i)=>i===0||v<state.positions[i-1]),'footer reads phone then email then location right to left');padding.push(state.padding);
+   if(count===10&&process.env.JMS_PDF_COMPACT_OUTPUT){await vm.runInContext('fitPrintDocument',context)(page);await page.pdf({path:process.env.JMS_PDF_COMPACT_OUTPUT,format:'A4',printBackground:true,preferCSSPageSize:true,margin:{top:0,bottom:0,left:0,right:0}});}
+  }
+  assert.ok(padding.every((v,i)=>i===0||v<padding[i-1]));
  }finally{await browser.close();}
 });
