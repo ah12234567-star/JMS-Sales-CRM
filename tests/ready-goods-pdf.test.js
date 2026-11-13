@@ -59,8 +59,10 @@ test('footer follows RTL contact order and row padding decreases with item count
    const markup=vm.runInContext('documentHtml(densityNotice,{},[],logo,font)',context);
    await page.setContent(markup,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
    const state=await page.evaluate(()=>({padding:parseFloat(getComputedStyle(document.querySelector('td')).paddingTop),keys:[...document.querySelectorAll('footer>[data-contact]')].map(e=>e.dataset.contact),positions:[...document.querySelectorAll('footer>[data-contact]')].map(e=>e.getBoundingClientRect().right),overflow:[...document.querySelectorAll('td,footer>span')].some(e=>e.scrollWidth>e.clientWidth+2)}));
-   assert.deepEqual(state.keys,['phone','email','location','city','district']);assert.equal(state.overflow,false);
+   assert.deepEqual(state.keys,['phone','email','address']);assert.equal(state.overflow,false);
    assert.ok(state.positions.every((v,i)=>i===0||v<state.positions[i-1]),'footer reads phone then email then location right to left');padding.push(state.padding);
+   assert.deepEqual(await page.$$eval('footer strong',els=>els.map(e=>e.textContent)),['هاتف:','إيميل:','الموقع / العنوان:']);
+   assert.equal(await page.$eval('footer [data-contact=address] bdi',e=>e.textContent),'جدة، الصناعية الثانية');
    if(count===10&&process.env.JMS_PDF_COMPACT_OUTPUT){await vm.runInContext('fitPrintDocument',context)(page);await page.pdf({path:process.env.JMS_PDF_COMPACT_OUTPUT,format:'A4',printBackground:true,preferCSSPageSize:true,margin:{top:0,bottom:0,left:0,right:0}});}
   }
   assert.ok(padding.every((v,i)=>i===0||v<padding[i-1]));
