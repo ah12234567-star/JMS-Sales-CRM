@@ -19,6 +19,7 @@
   }
 
   function itemId(card){
+    if(card.dataset.rgnItem)return card.dataset.rgnItem;
     const el=card.querySelector('[onchange*="JMSReadyGoods.patch"],[oninput*="JMSReadyGoods.patch"]');
     const txt=el?.getAttribute('onchange')||el?.getAttribute('oninput')||'';
     const m=txt.match(/patch\('([^']+)'/);
@@ -39,6 +40,7 @@
       field.className='rgn-field rgn-packaging';
       field.innerHTML=`<span data-i18n="ui_0c0822b00817">التعبئة / عدد العبوات</span><input type="text" inputmode="text" autocomplete="off" placeholder="مثال: 24 كرتون / 15 شدة" data-i18n-placeholder="ui_19dd60f4f10e"><small data-i18n="ui_90b96e37f5b6">تظهر كما هي في عمود التعبئة داخل PDF</small>`;
       const input=field.querySelector('input');
+      input.dataset.rgnField='packaging_label';
       input.value=values.get(id)||'';
       input.addEventListener('input',()=>{
         const v=input.value.trimStart();

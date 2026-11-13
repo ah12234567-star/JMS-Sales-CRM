@@ -1,4 +1,4 @@
-const CACHE_NAME='jms-crm-app-v43-private-quotes';
+const CACHE_NAME='jms-crm-app-v44-ready-goods-totals';
 const SHELL=[
   '/localization.js','/localization.css','/locales/ar.json','/locales/en.json',
   '/field-rounds.html','/field-rounds.js','/field-rounds.css','/field-rounds-entry.js',

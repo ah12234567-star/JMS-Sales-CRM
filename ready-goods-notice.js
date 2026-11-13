@@ -1,6 +1,8 @@
 /* JMS Ready Goods Notice — searchable customer picker + automatic VAT. */
 (function(){
   'use strict';
+  // Several cached shells load this module. Keep the original draft and handlers.
+  if(window.JMSReadyGoods){window.JMSReadyGoods.ensure?.();return;}
   const PAGE_ID='readyGoodsNotice';
   const NAV_ID='readyGoodsNoticeNav';
   const STYLE_ID='readyGoodsNoticeStyle';
@@ -60,26 +62,39 @@
     <div class="rgn-grid"><div class="rgn-card"><h3 data-i18n="ui_a3a59d7bdeb6">إنشاء إشعار جديد</h3>
       <div class="rgn-field rgn-customer-picker"><span data-i18n="ui_a042411e90be">العميل</span><input id="rgnCustomerSearch" class="rgn-customer-search" autocomplete="off" placeholder="ابحث باسم العميل أو رقم الجوال أو كود الحساب" oninput="JMSReadyGoods.searchCustomers(this.value)" onfocus="JMSReadyGoods.searchCustomers(this.value)" data-i18n-placeholder="ui_208609ede2d5"><span class="rgn-search-icon">⌕</span><input id="rgnCustomer" type="hidden" value=""><div id="rgnCustomerResults" class="rgn-customer-results"></div><div id="rgnCustomerSelected" class="rgn-customer-selected"></div></div>
       <div class="rgn-items" id="rgnItems"></div><button type="button" class="rgn-secondary" onclick="JMSReadyGoods.addItem()" data-i18n="ui_743f1e98cd87">+ إضافة صنف</button>
-      <div class="rgn-summary"><div class="rgn-kpi"><span data-i18n="ui_76165bc3874a">الإجمالي قبل الضريبة</span><b id="rgnSubtotal" data-i18n="ui_bab552b39d91">0.00 ريال</b></div><div class="rgn-kpi vat"><span data-i18n="ui_834b90058142">ضريبة القيمة المضافة 15%</span><b id="rgnVat" data-i18n="ui_bab552b39d91">0.00 ريال</b></div><div class="rgn-kpi total"><span data-i18n="ui_6f5bd3a8e930">الإجمالي شامل الضريبة</span><b id="rgnTotal" data-i18n="ui_bab552b39d91">0.00 ريال</b></div><div class="rgn-kpi"><span data-i18n="ui_db48b5760387">المدفوع سابقًا</span><input id="rgnPaid" type="number" min="0" step="0.01" value="0" oninput="JMSReadyGoods.recalc()"></div><div class="rgn-kpi remaining"><span data-i18n="ui_a707de32d885">المبلغ المتبقي</span><b id="rgnRemaining" data-i18n="ui_bab552b39d91">0.00 ريال</b></div></div>
+      <div class="rgn-summary"><div class="rgn-kpi"><span data-i18n="ui_76165bc3874a">الإجمالي قبل الضريبة</span><b id="rgnSubtotal" data-no-i18n>0.00 ريال</b></div><div class="rgn-kpi vat"><span data-i18n="ui_834b90058142">ضريبة القيمة المضافة 15%</span><b id="rgnVat" data-no-i18n>0.00 ريال</b></div><div class="rgn-kpi total"><span data-i18n="ui_6f5bd3a8e930">الإجمالي شامل الضريبة</span><b id="rgnTotal" data-no-i18n>0.00 ريال</b></div><div class="rgn-kpi"><span data-i18n="ui_db48b5760387">المدفوع سابقًا</span><input id="rgnPaid" type="number" min="0" step="0.01" value="0" oninput="JMSReadyGoods.recalc()"></div><div class="rgn-kpi remaining"><span data-i18n="ui_a707de32d885">المبلغ المتبقي</span><b id="rgnRemaining" data-no-i18n>0.00 ريال</b></div></div>
       <div class="rgn-actions"><button class="rgn-primary" onclick="JMSReadyGoods.save()" data-i18n="ui_a9ffb9a55fc7">حفظ الإشعار</button><button class="rgn-secondary" onclick="JMSReadyGoods.reset()" data-i18n="ui_7d99c412ba64">تفريغ</button></div>
     </div><div class="rgn-card"><h3 data-i18n="ui_4734d9cdfce0">الإشعارات السابقة</h3><div id="rgnList" class="rgn-list"></div></div></div>`}
 
   function ensure(){css();const main=document.querySelector('.main'),nav=document.querySelector('.sidebar nav');if(main&&!document.getElementById(PAGE_ID)){const sec=document.createElement('section');sec.id=PAGE_ID;sec.className='page';sec.innerHTML=pageHtml();main.appendChild(sec)}if(nav&&!document.getElementById(NAV_ID)){const b=document.createElement('button');b.id=NAV_ID;b.type='button';(window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(b,"إشعار بضاعة جاهزة");b.style.display=isRep()?'block':'none';const q=nav.querySelector('[data-page="quotes"]');if(q)q.insertAdjacentElement('afterend',b);else nav.appendChild(b);b.addEventListener('click',openPage)}const b=document.getElementById(NAV_ID);if(b)b.style.display=isRep()?'block':'none';if(document.getElementById(PAGE_ID)&&!draftItems.length){draftItems=[newItem()];renderItems();renderList();recalc()}}
   function openPage(){document.querySelectorAll('.nav,.page').forEach(x=>x.classList.remove('active'));document.getElementById(NAV_ID)?.classList.add('active');document.getElementById(PAGE_ID)?.classList.add('active');renderList();renderItems();recalc();const input=document.getElementById('rgnCustomerSearch');if(input&&!selectedCustomerId)input.value='';document.getElementById('rgnCustomerResults')?.classList.remove('show');const main=document.querySelector('.main');if(main)main.scrollTop=0;window.scrollTo(0,0)}
 
-  function renderItems(){const root=document.getElementById('rgnItems');if(!root)return;root.innerHTML=draftItems.map(it=>`<div class="rgn-item"><div class="rgn-item-grid">
+  function renderItems(){const root=document.getElementById('rgnItems');if(!root)return;root.innerHTML=draftItems.map(it=>`<div class="rgn-item" data-rgn-item="${esc(it.id)}"><div class="rgn-item-grid">
     <div class="rgn-field"><span data-i18n="ui_5b12a452b19e">الصنف</span><select onchange="JMSReadyGoods.patch('${it.id}','type',this.value)"><option ${it.type==='أكياس بلاستيك'?'selected':''}>أكياس بلاستيك</option><option ${it.type==='رول بلاستيك'?'selected':''}>رول بلاستيك</option><option ${it.type==='كليشة'?'selected':''}>كليشة</option><option ${it.type==='أخرى'?'selected':''}>أخرى</option></select></div>
-    <div class="rgn-field"><span data-i18n="ui_95023fc76e1b">الوصف</span><input value="${esc(it.description)}" placeholder="مثال: كيس تي شيرت" oninput="JMSReadyGoods.patch('${it.id}','description',this.value,this)"></div>
-    <div class="rgn-field"><span data-i18n="ui_d32ec91fdd57">المقاس</span><input value="${esc(it.size)}" placeholder="مثال: 32 × 40 سم" oninput="JMSReadyGoods.patch('${it.id}','size',this.value,this)"></div>
-    <div class="rgn-field"><span data-i18n="ui_935e21853946">الكمية</span><input type="number" min="0" step="0.01" value="${it.qty}" oninput="JMSReadyGoods.patch('${it.id}','qty',this.value,this)"></div>
+    <div class="rgn-field"><span data-i18n="ui_95023fc76e1b">الوصف</span><input value="${esc(it.description)}" placeholder="مثال: كيس تي شيرت" data-rgn-field="description"></div>
+    <div class="rgn-field"><span data-i18n="ui_d32ec91fdd57">المقاس</span><input value="${esc(it.size)}" placeholder="مثال: 32 × 40 سم" data-rgn-field="size"></div>
+    <div class="rgn-field"><span data-i18n="ui_935e21853946">الكمية</span><input type="number" min="0" step="0.01" value="${it.qty}" data-rgn-field="qty"></div>
     <div class="rgn-field"><span data-i18n="ui_9a08d7d4bf73">الوحدة</span><select onchange="JMSReadyGoods.patch('${it.id}','unit',this.value)">${['كجم','حبة','رول','قطعة'].map(u=>`<option ${it.unit===u?'selected':''}>${u}</option>`).join('')}</select></div>
-    <div class="rgn-field"><span data-i18n="ui_6be680c1f5d5">سعر الوحدة قبل الضريبة</span><input type="number" min="0" step="0.01" value="${it.unit_price}" inputmode="decimal" oninput="JMSReadyGoods.patch('${it.id}','unit_price',this.value,this)"><small class="rgn-price-note" data-i18n="ui_1dddc3d710ca">النظام يضيف 15% تلقائيًا</small></div>
+    <div class="rgn-field"><span data-i18n="ui_6be680c1f5d5">سعر الوحدة قبل الضريبة</span><input type="number" min="0" step="0.01" value="${it.unit_price}" inputmode="decimal" data-rgn-field="unit_price"><small class="rgn-price-note" data-i18n="ui_1dddc3d710ca">النظام يضيف 15% تلقائيًا</small></div>
     <button class="rgn-remove" type="button" onclick="JMSReadyGoods.removeItem('${it.id}')">حذف</button></div><div class="rgn-line-total"><span data-i18n="ui_36068cc80114">إجمالي الصنف قبل الضريبة: </span><b data-rgn-line="${it.id}">${fmt(itemSubtotal(it))} ريال</b></div></div>`).join('')}
 
-  function recalc(){const f=financials();const ids={rgnSubtotal:f.subtotal,rgnVat:f.vat_amount,rgnTotal:f.total,rgnRemaining:f.remaining};Object.entries(ids).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.textContent=fmt(val)+' ريال'});draftItems.forEach(it=>{const el=document.querySelector(`[data-rgn-line="${CSS.escape(String(it.id))}"]`);if(el)el.textContent=fmt(itemSubtotal(it))+' ريال'});return f}
-  function patch(itemId,key,value){const it=draftItems.find(x=>String(x.id)===String(itemId));if(!it)return;it[key]=['qty','unit_price'].includes(key)?num(value):value;if(key==='type'&&value==='كليشة'&&it.unit==='كجم'){it.unit='قطعة';renderItems()}else if(key==='type'||key==='unit'){renderItems()}recalc()}
-  function addItem(type){draftItems.push(newItem(type||'أكياس بلاستيك'));renderItems();recalc()}
-  function removeItem(itemId){if(draftItems.length===1)return alert('يجب وجود صنف واحد على الأقل');draftItems=draftItems.filter(x=>String(x.id)!==String(itemId));renderItems();recalc()}
+  function readDraftInputs(){
+    const root=document.getElementById('rgnItems');
+    if(!root)return;
+    root.querySelectorAll('[data-rgn-item]').forEach(card=>{
+      const item=draftItems.find(x=>String(x.id)===card.dataset.rgnItem);
+      if(!item)return;
+      card.querySelectorAll('[data-rgn-field]').forEach(input=>{
+        const key=input.dataset.rgnField;
+        if(['description','size','qty','unit_price','packaging_label'].includes(key))
+          item[key]=['qty','unit_price'].includes(key)?num(input.value):input.value;
+      });
+    });
+  }
+  function recalc(){readDraftInputs();const f=financials();const ids={rgnSubtotal:f.subtotal,rgnVat:f.vat_amount,rgnTotal:f.total,rgnRemaining:f.remaining};Object.entries(ids).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.textContent=fmt(val)+' ريال'});draftItems.forEach(it=>{const el=document.querySelector(`[data-rgn-line="${CSS.escape(String(it.id))}"]`);if(el)el.textContent=fmt(itemSubtotal(it))+' ريال'});return f}
+  function patch(itemId,key,value){readDraftInputs();const it=draftItems.find(x=>String(x.id)===String(itemId));if(!it)return;it[key]=['qty','unit_price'].includes(key)?num(value):value;if(key==='type'&&value==='كليشة'&&it.unit==='كجم'){it.unit='قطعة';renderItems()}else if(key==='type'||key==='unit'){renderItems()}recalc()}
+  function addItem(type){readDraftInputs();draftItems.push(newItem(type||'أكياس بلاستيك'));renderItems();recalc()}
+  function removeItem(itemId){readDraftInputs();if(draftItems.length===1)return alert('يجب وجود صنف واحد على الأقل');draftItems=draftItems.filter(x=>String(x.id)!==String(itemId));renderItems();recalc()}
   function reset(){draftItems=[newItem()];selectedCustomerId='';const h=document.getElementById('rgnCustomer');if(h)h.value='';const s=document.getElementById('rgnCustomerSearch');if(s)s.value='';document.getElementById('rgnCustomerSelected')?.classList.remove('show');const p=document.getElementById('rgnPaid');if(p)p.value='0';renderItems();recalc()}
 
   function saveNotice(){const customerId=selectedCustomerId||document.getElementById('rgnCustomer')?.value,customer=customers().find(c=>String(c.id)===String(customerId)),f=recalc();if(!customer)return alert('ابحث عن العميل واختره أولًا');if(!draftItems.length||draftItems.some(x=>!x.type||num(x.qty)<=0))return alert('راجع الأصناف والكميات');if(f.paid>f.total)return alert('المبلغ المدفوع لا يمكن أن يكون أكبر من الإجمالي شامل الضريبة');const n={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),number:makeNo(),created_at:new Date().toISOString(),date:new Date().toLocaleDateString('ar-SA'),customer_id:customer.id,customer_name:customer.name,customer_phone:customer.phone||'',rep_id:window.currentUser?.id,rep_name:window.currentUser?.name||'',items:draftItems.map(x=>({...x,line_subtotal:itemSubtotal(x),line_total:itemSubtotal(x)})),subtotal:f.subtotal,vat_rate:f.vat_rate,vat_amount:f.vat_amount,total:f.total,paid:f.paid,remaining:f.remaining,status:'draft',pricing_mode:'net_plus_vat'};notices().push(n);save();renderList();reset();alert('تم حفظ إشعار '+n.number);return n}
@@ -92,6 +107,12 @@
   async function shareNotice(id){const n=getNotice(id);if(!n)return;const f=noticeFin(n),text=`عميلنا العزيز ${n.customer_name}\nنفيدكم بأن البضاعة الخاصة بكم جاهزة.\nالقيمة قبل الضريبة: ${fmt(f.subtotal)} ريال\nضريبة القيمة المضافة: ${fmt(f.vat_amount)} ريال\nالإجمالي شامل الضريبة: ${fmt(f.total)} ريال\nالمدفوع: ${fmt(n.paid)} ريال\nالمتبقي: ${fmt(n.remaining)} ريال\nرقم الإشعار: ${n.number}`;try{const blob=await pdfBlob(n),file=new File([blob],`${n.number}.pdf`,{type:'application/pdf'});if(navigator.canShare?.({files:[file]})&&navigator.share){await navigator.share({title:'إشعار بضاعة جاهزة',text,files:[file]});return}}catch(e){console.warn(e)}const phone=String(n.customer_phone||'').replace(/\D/g,'').replace(/^0/,'966');window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank')}
 
   window.JMSReadyGoods={ensure,open:openPage,addItem,removeItem,patch,recalc,reset,save:saveNotice,exportPdf,share:shareNotice,renderList,searchCustomers,selectCustomer,VAT_RATE};
+  document.addEventListener('input',e=>{
+    if(e.target?.closest?.('#rgnItems [data-rgn-field]'))recalc();
+  });
+  document.addEventListener('change',e=>{
+    if(e.target?.closest?.('#rgnItems [data-rgn-field]'))recalc();
+  });
   function boot(){ensure();setTimeout(ensure,800);setTimeout(ensure,2500)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
   document.addEventListener('click',e=>{if(!e.target.closest?.('.rgn-customer-picker'))document.getElementById('rgnCustomerResults')?.classList.remove('show');setTimeout(()=>{const b=document.getElementById(NAV_ID);if(b)b.style.display=isRep()?'block':'none'},60)},true);
