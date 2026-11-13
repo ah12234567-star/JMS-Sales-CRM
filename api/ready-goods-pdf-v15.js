@@ -10,7 +10,7 @@ const SETTINGS_ID='__company_settings__';
 const VAT=.15;
 const num=v=>Math.max(0,Number(v)||0);
 const r2=v=>Math.round((num(v)+Number.EPSILON)*100)/100;
-const fmt=v=>r2(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt=v=>r2(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const safeDataImage=v=>/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(String(v||''))?String(v):'';
 
@@ -62,10 +62,64 @@ function bankHtml(b){
   </div>`;
 }
 
+function hasData(value){
+  return value!==null&&value!==undefined&&!['','-','—','–'].includes(String(value).trim());
+}
+function latinDigits(value){return String(value??'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[\u200e\u200f]/g,'')}
+function money(value){return `<span class="currency"><bdi class="number" dir="ltr">${fmt(value)}</bdi><span>ريال</span></span>`}
 function documentHtml(n,settings,packs,logo,font){
-  const company=settings?.company||{};const bank=settings?.bank||{};const f=finance(n);
-  const rows=(n.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td><b>${esc(it.type||'-')}</b></td><td>${esc(it.description||'-')}</td><td>${esc(it.size||'-')}</td><td>${fmt(it.qty)}</td><td>${esc(it.unit||'')}</td><td class="pack">${esc(packs[i]||'—')}</td><td>${fmt(it.unit_price)}</td><td><b>${fmt(it.line_subtotal??it.line_total)}</b></td></tr>`).join('');
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>${font}@page{size:A4 portrait;margin:0}html,body{margin:0;width:210mm;height:297mm;background:#fff}*{box-sizing:border-box}body{font-family:JMSArabic,Arial,sans-serif;color:#182033;-webkit-print-color-adjust:exact;print-color-adjust:exact}.doc{position:relative;width:210mm;height:297mm;padding:9mm 10mm 7mm;overflow:hidden}.top{position:absolute;top:0;left:0;right:0;height:1.6mm;background:linear-gradient(90deg,#172033 0 76%,#8f1d3f 76%)}header{display:flex;justify-content:space-between;align-items:center;gap:5mm;padding-bottom:3.5mm;border-bottom:.25mm solid #e5e7eb}.brand{display:flex;align-items:center;gap:3mm}.brand img{width:28mm;height:25mm;object-fit:contain}.brand h1{margin:0;font-size:4.5mm;color:#172033}.brand p{margin:1mm 0 0;font:2mm Arial,sans-serif;color:#667085}.meta{text-align:left;min-width:55mm}.meta em{font:700 1.7mm Arial,sans-serif;letter-spacing:.25mm;color:#8f1d3f}.meta h2{margin:.8mm 0 1mm;font-size:5mm}.meta b{display:block;font:700 3mm Arial,sans-serif}.meta small{display:block;margin-top:.8mm;font-size:2mm;color:#667085}.customer{display:flex;gap:2.5mm;margin-top:3mm}.customer>div{flex:1;padding:2.5mm 3mm;border:.25mm solid #e5e7eb;border-radius:2.2mm;background:#f8fafc}.customer small{display:block;margin-bottom:.7mm;color:#667085;font-size:2.5mm}.customer b{font-size:3mm}table{width:100%;margin-top:3mm;border-collapse:collapse;table-layout:fixed;border:.25mm solid #e5e7eb}th{padding:1.8mm .5mm;background:#243247;color:#fff;font-size:2.5mm}td{padding:2.8mm .9mm;text-align:center;font-size:2.7mm;border-top:.25mm solid #e5e7eb;border-left:.25mm solid #e5e7eb;overflow-wrap:anywhere}.pack{font-weight:700;color:#8f1d3f}th:nth-child(1){width:4%}th:nth-child(2){width:11%}th:nth-child(3){width:15%}th:nth-child(4){width:10%}th:nth-child(5){width:8%}th:nth-child(6){width:7%}th:nth-child(7){width:12%}th:nth-child(8){width:15%}th:nth-child(9){width:18%}.money{display:grid;grid-template-columns:1.35fr .8fr;gap:3mm;margin-top:3mm}.summary{border:.25mm solid #e5e7eb;border-radius:2.4mm;overflow:hidden}.summary div{display:flex;justify-content:space-between;padding:1.7mm 2.5mm;border-bottom:.25mm solid #e5e7eb;font-size:2.8mm}.summary div:last-child{border-bottom:0}.summary span{color:#667085}.due{padding:3mm 4mm;border-radius:2.8mm;background:#172033;color:#fff}.due span{font-size:2mm}.due strong{display:block;margin-top:1.5mm;font-size:6mm;line-height:1}.due small{display:block;margin-top:1mm;font-size:2mm}.bank{margin-top:3mm;border:.25mm solid #dfe3ea;border-radius:2.8mm;overflow:hidden;background:#fff}.bankbar{display:grid;grid-template-columns:1.05fr 1.55fr 1.25fr 1.65fr;direction:rtl;min-height:18mm}.bankhero{background:#172033;color:#fff;padding:3mm 3.5mm;display:flex;flex-direction:column;justify-content:center}.bankhero strong{font-size:3mm;line-height:1.2}.bankhero span{margin-top:1mm;font-size:2mm;color:#cbd5e1}.bankcell{padding:3mm 3.2mm;display:flex;flex-direction:column;justify-content:center;border-left:.25mm solid #e5e7eb;background:#fbfcfe;min-width:0}.bankcell small{display:block;margin-bottom:1mm;color:#7b8494;font-size:1.8mm}.bankcell b{font-size:2.3mm;color:#182033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bankcell.iban b{font:700 2.35mm Arial,sans-serif;letter-spacing:.05mm}.bankcell:not(.beneficiary) b{font-family:Arial,sans-serif}.empty{padding:3mm;text-align:center;color:#667085;font-size:2mm}.note{margin-top:3mm;padding-top:2mm;border-top:.25mm solid #e5e7eb;color:#667085;font-size:2mm;line-height:1.55}.note b{color:#475467}footer{display:flex;direction:ltr;justify-content:center;align-items:center;gap:4mm;margin-top:3mm;padding-top:2mm;border-top:.25mm solid #e5e7eb;font:700 2mm Arial,sans-serif}footer i{width:.25mm;height:3mm;background:#8f1d3f}</style></head><body><main class="doc"><div class="top"></div><header><div class="brand">${logo?`<img src="${logo}" alt="">`:''}<div><h1>${esc(company.name||'شركة جدة النموذجية للصناعة')}</h1><p>Jeddah Model Industrial Co. Ltd</p></div></div><div class="meta"><em>READY GOODS NOTICE</em><h2>إشعار بضاعة جاهزة</h2><b>${esc(n.number||'')}</b><small>${esc(n.date||'')} · ${esc(n.rep_name||'')}</small></div></header><section class="customer"><div><small>العميل</small><b>${esc(n.customer_name||'-')}</b></div>${n.customer_phone?`<div><small>الجوال</small><b dir="ltr">${esc(n.customer_phone)}</b></div>`:''}</section><table><thead><tr><th>#</th><th>الصنف</th><th>الوصف</th><th>المقاس</th><th>الكمية</th><th>الوحدة</th><th>التعبئة</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${rows}</tbody></table><section class="money"><div class="summary"><div><span>الإجمالي قبل الضريبة</span><b>${fmt(f.sub)} ريال</b></div><div><span>ضريبة القيمة المضافة 15%</span><b>${fmt(f.vat)} ريال</b></div><div><span>الإجمالي شامل الضريبة</span><b>${fmt(f.total)} ريال</b></div><div><span>المدفوع سابقًا</span><b>${fmt(n.paid)} ريال</b></div></div><aside class="due"><span>المبلغ المتبقي</span><strong>${fmt(n.remaining)}</strong><small>ريال سعودي</small></aside></section>${bankHtml(bank)?`<section class="bank">${bankHtml(bank)}</section>`:''}<section class="note">يرجى تحويل المبلغ المتبقي وإرسال إشعار التحويل لتنسيق استلام البضاعة.<br><b>هذا المستند إشعار بضاعة جاهزة صادر إلكترونيًا وليس فاتورة ضريبية.</b></section><footer><span>jeddahmodelfactory@gmail.com</span><i></i><span>0559922174</span></footer></main></body></html>`;
+  const company=settings?.company||{},bank=settings?.bank||{},f=finance(n),items=n.items||[];
+  const candidates=[
+    {key:'index',label:'#',weight:4,value:(_,i)=>i+1},
+    {key:'type',label:'الصنف',weight:13,value:it=>it.type},
+    {key:'description',label:'الوصف',weight:24,value:it=>it.description},
+    {key:'size',label:'المقاس',weight:15,value:it=>it.size},
+    {key:'qty',label:'الكمية',weight:10,numeric:true,value:it=>hasData(it.qty)?fmt(it.qty):''},
+    {key:'unit',label:'الوحدة',weight:8,value:it=>it.unit},
+    {key:'packaging',label:'التعبئة',weight:12,value:(_,i)=>packs[i]},
+    {key:'price',label:'سعر الوحدة',weight:13,numeric:true,value:it=>hasData(it.unit_price)?fmt(it.unit_price):''},
+    {key:'total',label:'الإجمالي',weight:16,numeric:true,value:it=>hasData(it.line_subtotal??it.line_total)?fmt(it.line_subtotal??it.line_total):hasData(it.qty)&&hasData(it.unit_price)?fmt(num(it.qty)*num(it.unit_price)):''}
+  ];
+  const columns=candidates.filter(c=>items.some((it,i)=>hasData(c.value(it,i))));
+  const weight=columns.reduce((sum,c)=>sum+c.weight,0);
+  const rows=items.map((it,i)=>`<tr>${columns.map(c=>`<td data-column="${c.key}" class="${c.numeric?'numeric':''}">${hasData(c.value(it,i))?`<bdi dir="${c.numeric?'ltr':'auto'}">${esc(c.value(it,i))}</bdi>`:''}</td>`).join('')}</tr>`).join('');
+  const bankSection=bankHtml(bank);
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>${font}
+    @page{size:A4 portrait;margin:12mm}
+    *{box-sizing:border-box}html,body{margin:0;background:#fff}
+    body{font-family:JMSArabic,Arial,sans-serif;color:#182033;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .doc{min-height:273mm;display:flex;flex-direction:column;justify-content:space-between;gap:7mm;border-top:1.5mm solid #8f1d3f;padding-top:6mm}
+    header{display:flex;justify-content:space-between;align-items:center;gap:6mm;padding-bottom:5mm;border-bottom:.3mm solid #dfe3ea;break-inside:avoid}
+    .brand{display:flex;align-items:center;gap:4mm;min-width:0}.brand img{width:28mm;height:26mm;object-fit:contain;flex:none}
+    .brand h1{font-size:14pt;line-height:1.7;margin:0}.brand p{font:8pt Arial,sans-serif;margin:2mm 0 0;color:#475569}
+    .title{text-align:left;flex:none}.title em{font:700 7.5pt Arial,sans-serif;letter-spacing:.2mm;color:#8f1d3f}.title h2{font-size:17pt;line-height:1.6;margin:2mm 0 0}
+    .references{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:3mm;break-inside:avoid}
+    .references div{background:#f1f5f9;border-radius:2mm;border:.25mm solid #dfe3ea;padding:3mm 4mm}
+    .references small,.customer small{display:block;font-size:9pt;color:#475569;margin-bottom:1.5mm}
+    .references b{display:block;font:700 12pt Arial,sans-serif;direction:ltr;text-align:right;color:#182033}
+    .customer{border-right:1.2mm solid #8f1d3f;padding:3mm 4mm;background:#f8fafc;break-inside:avoid}.customer b{font-size:13pt;line-height:1.8}.phone{font:10pt Arial,sans-serif;margin-top:2mm;direction:ltr;text-align:right}
+    .items{break-inside:auto}.section-title{font-size:11pt;margin:0 0 3mm;color:#334155}
+    table{width:100%;table-layout:fixed;border-collapse:collapse;direction:rtl}thead{display:table-header-group}tr{break-inside:avoid}
+    th{padding:3mm 1.5mm;background:#243247;color:#fff;font-size:9pt;text-align:right;line-height:1.6}
+    td{padding:7mm 1.5mm;border:.25mm solid #dfe3ea;font-size:10pt;line-height:1.9;text-align:right;overflow-wrap:anywhere;vertical-align:middle}
+    tbody tr:nth-child(even){background:#f8fafc}.numeric{text-align:right;font-family:Arial,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;overflow-wrap:normal}
+    .number{font-family:Arial,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr;unicode-bidi:isolate}
+    .currency{display:inline-flex;direction:ltr;align-items:baseline;gap:2mm;white-space:nowrap}.currency .number{display:inline-block;min-width:24mm;text-align:right}.currency>span{direction:rtl;font-family:JMSArabic,Arial,sans-serif;font-size:9pt}
+    .money{display:grid;grid-template-columns:1.5fr 1fr;gap:5mm;break-inside:avoid}
+    .summary{border:.25mm solid #dfe3ea;border-radius:2mm;overflow:hidden}.summary>div{display:flex;justify-content:space-between;align-items:center;gap:3mm;padding:3.5mm 4mm;border-bottom:.25mm solid #e2e8f0;font-size:10pt}.summary>div:last-child{border-bottom:0}.summary .grand{background:#f1f5f9;font-weight:700}.summary .currency{min-width:31mm;justify-content:flex-start;font-size:12pt}
+    .due{background:#172033;color:#fff;border-radius:3mm;padding:7mm 5mm;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:4mm;text-align:right}.due>span{font-size:11pt}.due .number{font-size:27pt;font-weight:700;line-height:1.3}.due small{font-size:10pt}
+    .closing{break-inside:avoid}.bank{margin-bottom:5mm;border:.25mm solid #dfe3ea;border-radius:2mm;overflow:hidden}.bankbar{display:flex;flex-wrap:wrap}.bankhero,.bankcell{padding:3mm;flex:1;min-width:35mm}.bankhero{background:#f1f5f9}.bankhero strong,.bankcell b{font-size:9pt}.bankhero span,.bankcell small{display:block;font-size:8pt;color:#475569;margin:1mm 0}.iban b{font:9pt Arial,sans-serif}
+    .note{border-top:.25mm solid #dfe3ea;padding-top:4mm;font-size:9pt;line-height:1.9;color:#334155}.note p{margin:0 0 2mm}.note .legal{font-size:8pt;color:#475569}
+    footer{display:flex;direction:ltr;justify-content:space-between;align-items:center;gap:4mm;padding-top:4mm;border-top:.25mm solid #dfe3ea;font:9pt Arial,sans-serif;color:#334155;break-inside:avoid}
+  </style></head><body><main class="doc">
+    <header><div class="brand">${logo?`<img src="${logo}" alt="شعار الشركة">`:''}<div><h1>${esc(company.name||'شركة جدة النموذجية للصناعة')}</h1><p>Jeddah Model Industrial Co. Ltd</p></div></div><div class="title"><em>READY GOODS NOTICE</em><h2>إشعار بضاعة جاهزة</h2></div></header>
+    <section class="references"><div><small>رقم الإشعار</small><b>${esc(n.number||'')}</b></div><div><small>التاريخ</small><b>${esc(latinDigits(n.date))}</b></div><div><small>المُصدر</small><b dir="auto">${esc(n.rep_name||'')}</b></div></section>
+    <section class="customer"><small>العميل</small><b>${esc(n.customer_name||'')}</b>${n.customer_phone?`<div class="phone">${esc(n.customer_phone)}</div>`:''}</section>
+    <section class="items"><h3 class="section-title">تفاصيل البضاعة الجاهزة</h3><table><colgroup>${columns.map(c=>`<col style="width:${(c.weight/weight*100).toFixed(3)}%">`).join('')}</colgroup><thead><tr>${columns.map(c=>`<th data-column="${c.key}" class="${c.numeric?'numeric':''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></section>
+    <section class="money"><div class="summary"><div><span>الإجمالي قبل الضريبة</span>${money(f.sub)}</div><div><span>ضريبة القيمة المضافة 15%</span>${money(f.vat)}</div><div class="grand"><span>الإجمالي شامل الضريبة</span>${money(f.total)}</div><div><span>المدفوع سابقًا</span>${money(n.paid)}</div></div><aside class="due"><span>المبلغ المتبقي</span><bdi class="number" dir="ltr">${fmt(n.remaining)}</bdi><small>ريال سعودي</small></aside></section>
+    <section class="closing">${bankSection?`<section class="bank">${bankSection}</section>`:''}<div class="note"><p>يرجى تحويل المبلغ المتبقي وإرسال إشعار التحويل لتنسيق استلام البضاعة.</p><p class="legal">هذا المستند إشعار بضاعة جاهزة صادر إلكترونيًا وليس فاتورة ضريبية.</p></div></section>
+    <footer><span>jeddahmodelfactory@gmail.com</span><span>0559922174</span></footer>
+  </main></body></html>`;
 }
 
 export default async function handler(req,res){
