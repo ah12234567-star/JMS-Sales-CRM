@@ -58,7 +58,7 @@ window.quoteCard=function(quote){
  if(!html)return html;
  let extra='';
  if(quote.status==='customer_approved'||quote.manager_review_status==='pending'){
-  extra="<div class=\"jms-manager-review pending\"><div><b data-i18n=\"ui_d7818a039d8b\">✓ موقّع من العميل</b><span>"+escapeHtml(quote.customer_signer_name||customerName(quote.customer_id))+' · بانتظار مراجعة الإدارة</span></div>'+(manager()?'<button type="button" onclick="jmsManagerApproveSignedQuote(\''+escapeHtml(quote.id)+'\')">اعتماد وتحويل للإنتاج</button>':'')+'</div>';
+  extra="<div class=\"jms-manager-review pending\"><div><b data-i18n=\"ui_d7818a039d8b\">✓ موقّع من العميل</b><span>"+escapeHtml(quote.customer_signer_name||customerName(quote.customer_id))+' · بانتظار مراجعة الإدارة</span></div>'+(manager()?'<button type="button" onclick="jmsManagerApproveSignedQuote(\''+escapeHtml(quote.id)+'\')"><span data-i18n-text>اعتماد وتحويل للإنتاج</span></button>':'')+'</div>';
  }else if(quote.status==='manager_approved'||quote.manager_review_status==='approved'){
   extra="<div class=\"jms-manager-review approved\"><div><b data-i18n=\"ui_ed535df64aab\">✓ اعتمدته الإدارة</b><span>"+escapeHtml(quote.manager_approved_by||'مدير النظام')+' · تم تحويله للإنتاج</span></div></div>';
  }
@@ -91,7 +91,7 @@ window.JMS_TWO_STAGE_APPROVAL=VERSION;
 (function loadQuoteSmartAssistant(){
  if(document.querySelector('script[data-jms-quote-ai]'))return;
  const script=document.createElement('script');
- script.src='quote-smart-assistant.js?v=20260814-1';
+ script.src='quote-smart-assistant.js?v=20261113-admin-only';
  script.dataset.jmsQuoteAi='1';
  script.defer=true;
  document.head.appendChild(script);

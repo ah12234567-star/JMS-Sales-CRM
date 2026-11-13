@@ -49,3 +49,19 @@ test('current administrator reads the configured rates; a downgraded account can
   role='rep';await costs(req,res);assert.equal(res.statusCode,403);
  }finally{global.fetch=old;}
 });
+
+test('quotation assistant mounts only for administrators and disappears on session downgrade',()=>{
+ const {window}=parseHTML('<html><head></head><body><div class="form-grid"><select id="mqProduct"><option>film</option></select></div></body></html>');
+ const queue=[],events={};
+ const ctx={document:window.document,currentUser:{id:'r',role:'rep'},setTimeout:fn=>queue.push(fn),addEventListener:(name,fn)=>events[name]=fn,openQuoteForm(){},Event:window.Event};
+ ctx.window=ctx;vm.createContext(ctx);
+ vm.runInContext(fs.readFileSync(new URL('../quote-smart-assistant.js',import.meta.url),'utf8'),ctx);
+ while(queue.length)queue.shift()();
+ assert.equal(window.document.getElementById('jmsQuoteSmartAssistant'),null);
+ ctx.currentUser={id:'a',role:'admin'};ctx.openQuoteForm();while(queue.length)queue.shift()();
+ assert.ok(window.document.getElementById('jmsQuoteSmartAssistant'));
+ ctx.currentUser={id:'r',role:'rep'};events['jms:session-refreshed']();
+ assert.equal(window.document.getElementById('jmsQuoteSmartAssistant'),null);
+ ctx.openQuoteForm();while(queue.length)queue.shift()();
+ assert.equal(window.document.getElementById('jmsQuoteSmartAssistant'),null);
+});

@@ -211,8 +211,8 @@
         button.title = 'إنشاء عرض سعر من صفحة واحدة جاهز للإرسال';
       });
       document.querySelectorAll('button[onclick^="sendQuote("]').forEach(button => {
-        button.textContent = 'إرسال ملف PDF';
-        button.title = 'مشاركة عرض السعر كملف PDF';
+        (window.JMSI18n?.setText || ((el,text)=>el.textContent=text))(button, 'إرسال ملف PDF');
+        button.setAttribute('data-i18n-title','ui_share_quote_pdf'); button.title = window.JMSI18n?.label('مشاركة عرض السعر كملف PDF') || 'مشاركة عرض السعر كملف PDF';
       });
     }
     refreshQuoteUi();

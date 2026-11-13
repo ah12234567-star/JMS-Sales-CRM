@@ -23,7 +23,7 @@ function harness(){
  }});
  window.alert=message=>state.alerts.push(message);window.currentUser={id:'shafiq',language:'en',permissions:{create_quotes:true}};
  vm.runInContext(script,context);window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
- return {window,state};
+ return {window,state,context};
 }
 test('catalog parity, English startup, safe values and reversible switching',async()=>{
  assert.deepEqual(Object.keys(en).sort(),Object.keys(ar).sort());
@@ -55,4 +55,31 @@ test('all sign-in paths retain the server language preference',()=>{
  for(const match of app.matchAll(/currentUser=\{[^\n]+/g))assert.match(match[0],/language:u.language/);
  const emergency=fs.readFileSync(new URL('../emergency-login.js',import.meta.url),'utf8');
  assert.match(emergency,/language:data.user.language/);assert.match(emergency,/permissions:data.user.permissions/);
+});
+
+test('dynamic quotation handles and item summaries switch labels without changing values',async()=>{
+ const {window:w,context}=harness();await tick();
+ w.document.body.insertAdjacentHTML('beforeend','<div class="form-grid"><select id="mqProduct"><option value="أكياس بلاستيك">أكياس بلاستيك</option></select><input id="mqThicknessUnit"></div>');
+ w.openQuoteForm=()=>{};context.Event=w.Event;
+ vm.runInContext(fs.readFileSync(new URL('../quote-product-specs.js',import.meta.url),'utf8'),context);
+ w.openQuoteForm();await tick();
+ const handle=w.document.querySelector('#mqHandleType');
+ assert.deepEqual(Array.from(handle.options).slice(1).map(o=>o.value),['تيشرت','بنانا','شريط']);
+ assert.deepEqual(Array.from(handle.options).slice(1).map(o=>o.textContent),['T-shirt','Die-cut handle','Loop handle']);
+ handle.value='شريط';handle.dispatchEvent(new w.Event('change'));
+ assert.equal(w.document.querySelector('#mqHandleColorWrap').hidden,false);
+ assert.equal(w.document.querySelector('#mqHandleColor').placeholder,'Example: red');
+ await w.JMSI18n.setLanguage('ar');await tick();
+ assert.equal(handle.value,'شريط');assert.equal(handle.options[3].textContent,'شريط');
+ await w.JMSI18n.setLanguage('en');await tick();
+ assert.equal(handle.value,'شريط');assert.equal(w.document.documentElement.dir,'ltr');
+ for(const [id,value] of Object.entries({mqWidth:'50',mqLength:'60',mqThickness:'70',mqKg:'100',mqPriceKg:'8',mqSizeUnit:'cm'})){
+  const input=w.document.createElement('input');input.id=id;input.value=value;w.document.body.append(input);
+ }
+ w.document.querySelector('#mqThicknessUnit').value='micron';
+ w.jmsAddQuoteItem();await tick();
+ const summary=w.document.querySelector('#jmsQuoteDraftItems');
+ assert.match(summary.textContent,/Item 1: Plastic bags/);assert.match(summary.textContent,/100 kg/);
+ await w.JMSI18n.setLanguage('ar');await tick();assert.match(summary.textContent,/الصنف 1: أكياس بلاستيك/);
+
 });
