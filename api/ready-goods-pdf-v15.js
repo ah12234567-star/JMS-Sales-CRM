@@ -52,12 +52,16 @@ async function fontCss(){
 }
 async function defaultLogo(){return fileData([path.join(process.cwd(),'assets','company-logo-official.jpg')],'image/jpeg')}
 
-function bankHtml(b){
+const PDF_EN = {"بيانات التحويل البنكي": "Bank transfer details", "اسم المستفيد": "Beneficiary", "رقم الحساب": "Account number", "الصنف": "Item", "الوصف": "Description", "المقاس": "Size", "الكمية": "Quantity", "الوحدة": "Unit", "التعبئة": "Packaging", "سعر الوحدة": "Unit price", "الإجمالي": "Total", "إشعار بضاعة جاهزة": "Ready Goods Notice", "رقم الإشعار": "Notice number", "التاريخ": "Date", "المُصدر": "Sales representative", "العميل": "Customer", "تفاصيل البضاعة الجاهزة": "Ready goods details", "الإجمالي قبل الضريبة": "Subtotal before VAT", "ضريبة القيمة المضافة 15%": "VAT 15%", "الإجمالي شامل الضريبة": "Total including VAT", "المدفوع سابقًا": "Amount received", "المبلغ المتبقي": "Balance due", "ريال سعودي": "Saudi Riyals", "يرجى تحويل المبلغ المتبقي وإرسال إشعار التحويل لتنسيق استلام البضاعة.": "Please transfer the balance due and send the transfer confirmation to arrange collection of your goods.", "هذا المستند إشعار بضاعة جاهزة صادر إلكترونيًا وليس فاتورة ضريبية.": "This electronically issued document is a ready goods notice, not a tax invoice.", "تواصل الشركة": "Company contact", "هاتف:": "Phone:", "إيميل:": "Email:", "الموقع / العنوان:": "Address:", "جدة، الصناعية الثانية": "Jeddah, Second Industrial City", "أكياس بلاستيك": "Plastic bags", "كليشة": "Printing plates", "كجم": "kg", "قطعة": "pcs"};
+const pdfText=(value,english)=>english?(PDF_EN[value]||value):value;
+
+function bankHtml(b,english=false){
+  const t=value=>pdfText(value,english);
   if(!(b.bank_name||b.account_name||b.account_number||b.iban))return '';
   return `<div class="bankbar">
-    <div class="bankhero"><strong>بيانات التحويل البنكي</strong><span>${esc(b.bank_name||'')}</span></div>
-    <div class="bankcell beneficiary"><small>اسم المستفيد</small><b>${esc(b.account_name||'شركة جدة النموذجية للصناعة')}</b></div>
-    <div class="bankcell"><small>رقم الحساب</small><b dir="ltr">${esc(b.account_number||'—')}</b></div>
+    <div class="bankhero"><strong>${t('بيانات التحويل البنكي')}</strong><span>${esc(b.bank_name||'')}</span></div>
+    <div class="bankcell beneficiary"><small>${t('اسم المستفيد')}</small><b>${esc(b.account_name||'شركة جدة النموذجية للصناعة')}</b></div>
+    <div class="bankcell"><small>${t('رقم الحساب')}</small><b dir="ltr">${esc(b.account_number||'—')}</b></div>
     <div class="bankcell iban"><small>IBAN</small><b dir="ltr">${esc(b.iban||'—')}</b></div>
   </div>`;
 }
@@ -66,26 +70,27 @@ function hasData(value){
   return value!==null&&value!==undefined&&!['','-','—','–'].includes(String(value).trim());
 }
 function latinDigits(value){return String(value??'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[\u200e\u200f]/g,'')}
-function money(value){return `<span class="currency"><bdi class="number" dir="ltr">${fmt(value)}</bdi><span>ريال</span></span>`}
+function money(value,english=false){return `<span class="currency"><bdi class="number" dir="ltr">${fmt(value)}</bdi><span>${english?'SAR':'ريال'}</span></span>`}
 function documentHtml(n,settings,packs,logo,font){
+  const english=n.language==='en',t=value=>pdfText(value,english);
   const company=settings?.company||{},bank=settings?.bank||{},f=finance(n),items=n.items||[];
   const candidates=[
     {key:'index',label:'#',weight:4,value:(_,i)=>i+1},
-    {key:'type',label:'الصنف',weight:13,value:it=>it.type},
-    {key:'description',label:'الوصف',weight:24,value:it=>it.description},
-    {key:'size',label:'المقاس',weight:15,value:it=>it.size},
-    {key:'qty',label:'الكمية',weight:10,numeric:true,value:it=>hasData(it.qty)?fmt(it.qty):''},
-    {key:'unit',label:'الوحدة',weight:8,value:it=>it.unit},
-    {key:'packaging',label:'التعبئة',weight:12,value:(_,i)=>packs[i]},
-    {key:'price',label:'سعر الوحدة',weight:13,numeric:true,value:it=>hasData(it.unit_price)?fmt(it.unit_price):''},
-    {key:'total',label:'الإجمالي',weight:16,numeric:true,value:it=>hasData(it.line_subtotal??it.line_total)?fmt(it.line_subtotal??it.line_total):hasData(it.qty)&&hasData(it.unit_price)?fmt(num(it.qty)*num(it.unit_price)):''}
+    {key:'type',label:t('الصنف'),weight:13,value:it=>english?(it.type_en||t(it.type)):it.type},
+    {key:'description',label:t('الوصف'),weight:24,value:it=>it.description},
+    {key:'size',label:t('المقاس'),weight:15,value:it=>it.size},
+    {key:'qty',label:t('الكمية'),weight:10,numeric:true,value:it=>hasData(it.qty)?fmt(it.qty):''},
+    {key:'unit',label:t('الوحدة'),weight:8,value:it=>english?(it.unit_en||t(it.unit)):it.unit},
+    {key:'packaging',label:t('التعبئة'),weight:12,value:(_,i)=>packs[i]},
+    {key:'price',label:t('سعر الوحدة'),weight:13,numeric:true,value:it=>hasData(it.unit_price)?fmt(it.unit_price):''},
+    {key:'total',label:t('الإجمالي'),weight:16,numeric:true,value:it=>hasData(it.line_subtotal??it.line_total)?fmt(it.line_subtotal??it.line_total):hasData(it.qty)&&hasData(it.unit_price)?fmt(num(it.qty)*num(it.unit_price)):''}
   ];
   const density=items.length>14?'dense':items.length>8?'compact':items.length>3?'balanced':'comfortable';
   const columns=candidates.filter(c=>items.some((it,i)=>hasData(c.value(it,i))));
   const weight=columns.reduce((sum,c)=>sum+c.weight,0);
   const rows=items.map((it,i)=>`<tr>${columns.map(c=>`<td data-column="${c.key}" class="${c.numeric?'numeric':''}">${hasData(c.value(it,i))?`<bdi dir="${c.numeric?'ltr':'auto'}">${esc(c.value(it,i))}</bdi>`:''}</td>`).join('')}</tr>`).join('');
-  const bankSection=bankHtml(bank);
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>${font}
+  const bankSection=bankHtml(bank,english);
+  return `<!doctype html><html lang="${english?'en':'ar'}" dir="${english?'ltr':'rtl'}"><head><meta charset="utf-8"><style>${font}
     @page{size:A4 portrait;margin:12mm}
     *{box-sizing:border-box}html,body{margin:0;background:#fff}body{width:186mm}
     body{font-family:JMSArabic,Arial,sans-serif;color:#182033;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -129,14 +134,21 @@ function documentHtml(n,settings,packs,logo,font){
     .closing{break-inside:avoid}.bank{margin-bottom:5mm;border:.25mm solid #dfe3ea;border-radius:2mm;overflow:hidden}.bankbar{display:flex;flex-wrap:wrap}.bankhero,.bankcell{padding:3mm;flex:1;min-width:35mm}.bankhero{background:#f1f5f9}.bankhero strong,.bankcell b{font-size:9pt}.bankhero span,.bankcell small{display:block;font-size:8pt;color:#475569;margin:1mm 0}.iban b{font:9pt Arial,sans-serif}
     .note{border-top:.25mm solid #dfe3ea;padding-top:4mm;font-size:9pt;line-height:1.9;color:#334155}.note p{margin:0 0 2mm}.note .legal{font-size:8pt;color:#475569}
     footer{display:grid;grid-template-columns:1fr 1.7fr 1.8fr;direction:rtl;align-items:center;gap:2mm;padding-top:4mm;border-top:.25mm solid #dfe3ea;font:8pt JMSArabic,Arial,sans-serif;color:#334155;break-inside:avoid}footer>span{display:flex;align-items:baseline;gap:1.5mm;min-width:0;white-space:nowrap}footer>span+span{border-right:.25mm solid #dfe3ea;padding-right:2mm}footer strong{font-size:8pt;color:#182033;flex:none}footer bdi[dir="ltr"]{font:8pt Arial,sans-serif}footer bdi[dir="rtl"]{font:8pt JMSArabic,Arial,sans-serif}
-  </style></head><body><main class="doc" data-density="${density}">
-    <header><div class="brand">${logo?`<img src="${logo}" alt="شعار الشركة">`:''}<div><h1>${esc(company.name||'شركة جدة النموذجية للصناعة')}</h1><p>Jeddah Model Industrial Co. Ltd</p></div></div><div class="title"><em>READY GOODS NOTICE</em><h2>إشعار بضاعة جاهزة</h2></div></header>
-    <section class="references"><div><small>رقم الإشعار</small><b>${esc(n.number||'')}</b></div><div><small>التاريخ</small><b>${esc(latinDigits(n.date))}</b></div><div><small>المُصدر</small><b dir="auto">${esc(n.rep_name||'')}</b></div></section>
-    <section class="customer"><small>العميل</small><b>${esc(n.customer_name||'')}</b>${n.customer_phone?`<div class="phone">${esc(n.customer_phone)}</div>`:''}</section>
-    <section class="items"><h3 class="section-title">تفاصيل البضاعة الجاهزة</h3><table><colgroup>${columns.map(c=>`<col style="width:${(c.weight/weight*100).toFixed(3)}%">`).join('')}</colgroup><thead><tr>${columns.map(c=>`<th data-column="${c.key}" class="${c.numeric?'numeric':''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></section>
-    <section class="money"><div class="summary"><div><span>الإجمالي قبل الضريبة</span>${money(f.sub)}</div><div><span>ضريبة القيمة المضافة 15%</span>${money(f.vat)}</div><div class="grand"><span>الإجمالي شامل الضريبة</span>${money(f.total)}</div><div><span>المدفوع سابقًا</span>${money(n.paid)}</div></div><aside class="due"><span>المبلغ المتبقي</span><bdi class="number" dir="ltr">${fmt(n.remaining)}</bdi><small>ريال سعودي</small></aside></section>
-    <section class="closing">${bankSection?`<section class="bank">${bankSection}</section>`:''}<div class="note"><p>يرجى تحويل المبلغ المتبقي وإرسال إشعار التحويل لتنسيق استلام البضاعة.</p><p class="legal">هذا المستند إشعار بضاعة جاهزة صادر إلكترونيًا وليس فاتورة ضريبية.</p></div></section>
-    <footer aria-label="تواصل الشركة"><span data-contact="phone"><strong>هاتف:</strong><bdi dir="ltr">0559922174</bdi></span><span data-contact="email"><strong>إيميل:</strong><bdi dir="ltr">jeddahmodelfactory@gmail.com</bdi></span><span data-contact="address"><strong>الموقع / العنوان:</strong><bdi dir="rtl">جدة، الصناعية الثانية</bdi></span></footer>
+  html[lang="en"] table,html[lang="en"] footer{direction:ltr}
+    html[lang="en"] th,html[lang="en"] td,html[lang="en"] .references b,html[lang="en"] .due,html[lang="en"] .phone{text-align:left}
+    html[lang="en"] .title{text-align:right}
+    html[lang="en"] .customer{border-right:0;border-left:1.2mm solid #8f1d3f}
+    html[lang="en"] footer>span+span{border-right:0;border-left:.25mm solid #dfe3ea;padding-right:0;padding-left:2mm}
+    html[lang="en"] footer{grid-template-columns:1fr 1.7fr 2fr;font-size:7pt}
+    html[lang="en"] footer strong,html[lang="en"] footer bdi{font-size:7pt}
+    </style></head><body><main class="doc" data-density="${density}">
+    <header><div class="brand">${logo?`<img src="${logo}" alt="شعار الشركة">`:''}<div><h1>${esc(company.name||'شركة جدة النموذجية للصناعة')}</h1><p>Jeddah Model Industrial Co. Ltd</p></div></div><div class="title"><em>READY GOODS NOTICE</em><h2>${t('إشعار بضاعة جاهزة')}</h2></div></header>
+    <section class="references"><div><small>${t('رقم الإشعار')}</small><b>${esc(n.number||'')}</b></div><div><small>${t('التاريخ')}</small><b>${esc(latinDigits(n.date))}</b></div><div><small>${t('المُصدر')}</small><b dir="auto">${esc(english?(n.rep_name_en||n.rep_name||''):(n.rep_name||''))}</b></div></section>
+    <section class="customer"><small>${t('العميل')}</small><b>${esc(english?(n.customer_name_en||n.customer_name||''):(n.customer_name||''))}</b>${n.customer_phone?`<div class="phone">${esc(n.customer_phone)}</div>`:''}</section>
+    <section class="items"><h3 class="section-title">${t('تفاصيل البضاعة الجاهزة')}</h3><table><colgroup>${columns.map(c=>`<col style="width:${(c.weight/weight*100).toFixed(3)}%">`).join('')}</colgroup><thead><tr>${columns.map(c=>`<th data-column="${c.key}" class="${c.numeric?'numeric':''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></section>
+    <section class="money"><div class="summary"><div><span>${t('الإجمالي قبل الضريبة')}</span>${money(f.sub,english)}</div><div><span>${t('ضريبة القيمة المضافة 15%')}</span>${money(f.vat,english)}</div><div class="grand"><span>${t('الإجمالي شامل الضريبة')}</span>${money(f.total,english)}</div><div><span>${t('المدفوع سابقًا')}</span>${money(n.paid,english)}</div></div><aside class="due"><span>${t('المبلغ المتبقي')}</span><bdi class="number" dir="ltr">${fmt(n.remaining)}</bdi><small>${t('ريال سعودي')}</small></aside></section>
+    <section class="closing">${bankSection?`<section class="bank">${bankSection}</section>`:''}<div class="note"><p>${t('يرجى تحويل المبلغ المتبقي وإرسال إشعار التحويل لتنسيق استلام البضاعة.')}</p><p class="legal">${t('هذا المستند إشعار بضاعة جاهزة صادر إلكترونيًا وليس فاتورة ضريبية.')}</p></div></section>
+    <footer aria-label="${t('تواصل الشركة')}"><span data-contact="phone"><strong>${t('هاتف:')}</strong><bdi dir="ltr">0559922174</bdi></span><span data-contact="email"><strong>${t('إيميل:')}</strong><bdi dir="ltr">jeddahmodelfactory@gmail.com</bdi></span><span data-contact="address"><strong>${t('الموقع / العنوان:')}</strong><bdi dir="${english?'ltr':'rtl'}">${t('جدة، الصناعية الثانية')}</bdi></span></footer>
   </main></body></html>`;
 }
 

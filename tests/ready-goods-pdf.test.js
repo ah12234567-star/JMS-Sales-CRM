@@ -68,3 +68,18 @@ test('footer follows RTL contact order and row padding decreases with item count
   assert.ok(padding.every((v,i)=>i===0||v<padding[i-1]));
  }finally{await browser.close();}
 });
+
+test('English notice retains ordered items and amounts and renders LTR labels',async()=>{
+ context.englishNotice={...n,language:'en',rep_name_en:'Shafiq Abbas',paid:8000,total:18818.51,remaining:10818.51,items:[{type:'أكياس بلاستيك',description:'Printed LD plastic bags',qty:575,unit:'كجم',unit_price:8.25,line_subtotal:4743.75},{type:'أكياس بلاستيك',description:'Printed LD plastic bags',qty:475,unit:'كجم',unit_price:8.25,line_subtotal:3918.75},{type:'أكياس بلاستيك',description:'Printed LD plastic bags',qty:539.3,unit:'كجم',unit_price:8.25,line_subtotal:4449.225},{type:'كليشة',description:'Large printing plates',qty:6,unit:'قطعة',unit_price:207.2,line_subtotal:1243.2}]};
+ const markup=vm.runInContext('documentHtml(englishNotice,{},[],logo,font)',context);
+ assert.match(markup,/<html lang="en" dir="ltr">/);
+ assert.match(markup,/Balance due/);assert.match(markup,/Amount received/);assert.match(markup,/8,000.00/);assert.match(markup,/10,818.51/);assert.match(markup,/Shafiq Abbas/);
+ assert.doesNotMatch(markup,/>المبلغ المتبقي<|>الوصف<|>الكمية<|>ريال<|>كجم</);
+ assert.ok(markup.indexOf('Printed LD plastic bags')<markup.indexOf('Large printing plates'));
+ const browser=await puppeteer.launch({args:chromium.args,executablePath:await chromium.executablePath(),headless:true});
+ try{const page=await browser.newPage();await page.setContent(markup,{waitUntil:'load'});await page.evaluate(()=>document.fonts.ready);
+  const state=await page.evaluate(()=>({direction:getComputedStyle(document.querySelector('table')).direction,overflow:[...document.querySelectorAll('td,th,.summary,.due,footer>span')].filter(e=>e.scrollWidth>e.clientWidth+2).map(e=>e.textContent)}));
+  assert.equal(state.direction,'ltr');assert.deepEqual(state.overflow,[]);
+  if(process.env.JMS_PDF_ENGLISH_OUTPUT){await vm.runInContext('fitPrintDocument',context)(page);await page.pdf({path:process.env.JMS_PDF_ENGLISH_OUTPUT,format:'A4',printBackground:true,preferCSSPageSize:true,margin:{top:0,bottom:0,left:0,right:0}});}
+ }finally{await browser.close()}
+});
