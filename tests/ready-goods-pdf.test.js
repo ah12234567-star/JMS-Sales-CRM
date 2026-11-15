@@ -83,3 +83,9 @@ test('English notice retains ordered items and amounts and renders LTR labels',a
   if(process.env.JMS_PDF_ENGLISH_OUTPUT){await vm.runInContext('fitPrintDocument',context)(page);await page.pdf({path:process.env.JMS_PDF_ENGLISH_OUTPUT,format:'A4',printBackground:true,preferCSSPageSize:true,margin:{top:0,bottom:0,left:0,right:0}});}
  }finally{await browser.close()}
 });
+
+ test('source rounding adjustment is explicit and signed without changing the total',()=>{
+ context.roundedNotice={...n,language:'en',subtotal:16363.965,vat_amount:2454.58,rounding_adjustment:-.04,total:18818.51,paid:8000,remaining:10818.51};
+ const markup=vm.runInContext('documentHtml(roundedNotice,{},[],logo,font)',context);
+ assert.match(markup,/Rounding adjustment/);assert.match(markup,/>-0\.04</);assert.match(markup,/18,818\.51/);assert.match(markup,/10,818\.51/);
+ });
