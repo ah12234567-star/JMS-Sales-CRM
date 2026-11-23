@@ -9,26 +9,25 @@ function officialLogo(){
   if(!logo){try{logo=localStorage.getItem('jms_official_quote_logo_v1')||''}catch(_){}}
   return /^data:image\/(png|jpe?g|webp);base64,/i.test(logo)?logo:'';
 }
-async function requestPdf(id){
+async function requestPdf(id,revision,updatedAt){
   const t=token();if(!t)throw new Error('auth_required');
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),45000);
-  let r;try{r=await fetch('/api/ready-goods-pdf-v15',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({id,logoData:officialLogo()}),cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout)}
+  let r;try{r=await fetch('/api/ready-goods-pdf-v15',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({id,revision,updatedAt,logoData:officialLogo()}),cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout)}
   if(!r.ok){let msg='pdf_generation_failed';try{const x=await r.json();msg=x.message||x.error||msg}catch(_){try{msg=await r.text()}catch(__){}}throw new Error(msg)}
   const type=(r.headers.get('content-type')||'').toLowerCase();
   if(!type.includes('application/pdf'))throw new Error('invalid_pdf_response');
   return r.blob();
 }
-// Session-only cache, keyed by current record, branding and signed-in session.
-const files=new Map();
-function pdfBlob(id){
-  const key=JSON.stringify([token(),notice(id),officialLogo()]);
-  const old=files.get(key);
-  if(old&&Date.now()-old.time<30000)return old.promise;
-  const entry={time:Date.now(),promise:requestPdf(id)};
-  files.set(key,entry);
-  entry.promise.catch(()=>{if(files.get(key)===entry)files.delete(key)});
-  while(files.size>4)files.delete(files.keys().next().value);
-  return entry.promise;
+async function pdfBlob(id){
+  const n=notice(id);
+  const revision=Number(n?.revision||0), updatedAt=n?.updated_at;
+  for(let attempt=0;;attempt++){
+    try{return await requestPdf(id,revision,updatedAt)}
+    catch(e){
+      if(e.message!=='notice_sync_pending'||attempt>=5)throw e;
+      await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+  }
 }
 let activeDialog=null;
 function download(file){
@@ -71,7 +70,7 @@ async function prepare(id,wantsShare){
     if(!wantsShare){download(file);box.close()}
   }catch(e){
     if(!box.open)return;
-    status.textContent=e.name==='AbortError'?'استغرق التجهيز وقتًا طويلًا. حاول مرة أخرى.':'تعذر تجهيز الملف. حاول مرة أخرى.';
+    status.textContent=e.message==='notice_sync_pending'?'التعديل لم يصل إلى الخادم بعد. انتظر قليلًا ثم أعد المحاولة.':e.name==='AbortError'?'استغرق التجهيز وقتًا طويلًا. حاول مرة أخرى.':'تعذر تجهيز الملف. حاول مرة أخرى.';
     action.textContent='إعادة المحاولة';action.disabled=false;
     action.onclick=()=>{box.close();prepare(id,wantsShare)};
   }
