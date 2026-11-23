@@ -171,6 +171,17 @@
   function displayHandle(item){const legacy={'أكياس تي شيرت':'تيشرت','أكياس بنانا':'بنانا','أكياس شريط':'شريط'};const type=legacy[item.product]||item.handle_type||'';return [type,type==='شريط'?item.handle_color:''].filter(Boolean).join(' - ');}
   function translatePayment(value,lang){if(lang==='ar')return value;const map={'حسب الاتفاق':'As agreed','الدفع مقدمًا 100%':'100% advance payment','الدفع خلال 30 يومًا من تاريخ استلام الطلب':'Payment within 30 days from receipt of the order','الدفع خلال 60 يومًا من تاريخ استلام الطلب':'Payment within 60 days from receipt of the order','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب':'50% upon order confirmation and 50% before collection when the order is ready'};return map[value]||value;}
 
+  function measure(value,unit,standard){
+    const amount=String(value??'').trim();
+    const label=String(unit??'').trim();
+    return amount && label && !standard.test(label) ? amount+' '+label : amount;
+  }
+  const dimension=(value,unit)=>measure(value,unit,/^(cm|سم|سنتيمتر)$/i);
+  function fold(value){
+    const amount=String(value??'').trim();
+    return /^[٠۰0]*(?:[.٫][٠۰0]+)?$/.test(amount) ? '' : amount;
+  }
+
   function enhanceQuoteDocument(q,lang='ar') {
     const doc=document.querySelector('#modalBody .quote-a4'); if(!doc||!q) return;
     doc.dataset.lang=lang; doc.dir=lang==='ar'?'rtl':'ltr';
@@ -188,17 +199,18 @@
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
       ['material',lang==='ar'?'الخامة':'Material',item=>displayMaterial(item.material),true],
       ['color',lang==='ar'?'اللون':'Color',item=>item.color,false],
-      ['length',lang==='ar'?'الطول':'Length',item=>item.length?`${item.length} ${item.size_unit||'cm'}`:'',true],
-      ['width',lang==='ar'?'العرض':'Width',item=>item.width?`${item.width} ${item.size_unit||'cm'}`:'',true],
-      ['fold_side',lang==='ar'?'الطوية الجانبية':'Side gusset',item=>item.fold_side?`${item.fold_side} ${lang==='ar'?'سم':'cm'}`:'',false],
-      ['folds',lang==='ar'?'الطوية س/ع':'Bottom/Top fold',item=>[item.fold_bottom,item.fold_top].filter(Boolean).join(' / '),false],
-      ['thickness',lang==='ar'?'السماكة':'Thickness',item=>item.thickness?`${item.thickness} ${item.thickness_unit||'micron'}`:'',true],
+      ['length',lang==='ar'?'الطول':'Length',item=>dimension(item.length,item.size_unit),true],
+      ['width',lang==='ar'?'العرض':'Width',item=>dimension(item.width,item.size_unit),true],
+      ['fold_side',lang==='ar'?'الطوية الجانبية':'Side gusset',item=>fold(item.fold_side),false],
+      ['fold_bottom',lang==='ar'?'الطوية السفلية':'Bottom fold',item=>fold(item.fold_bottom),false],
+      ['fold_top',lang==='ar'?'الطوية العلوية':'Top fold',item=>fold(item.fold_top),false],
+      ['thickness',lang==='ar'?'السماكة':'Thickness',item=>measure(item.thickness,item.thickness_unit,/^(microns?|µm|μm|ميكرون)$/i),true],
       ['handle',lang==='ar'?'نوع اليد':'Handle type',item=>displayHandle(item),false],
       ['print',lang==='ar'?'الطباعة':'Printing',item=>{const p=translatePrint(item.print||'',lang);return [p,item.print_colors?`${item.print_colors} ${lang==='ar'?'ألوان':'colors'}`:''].filter(Boolean).join(' - ')},false],
       ['description',lang==='ar'?'الوصف':'Description',item=>item.description||'',false],
       ['total_kg',lang==='ar'?'الكمية':'Qty',item=>item.total_kg?`${item.total_kg} ${item.unit|| (lang==='ar'?'كجم':'kg')}`:'',true],
-      ['price_kg',lang==='ar'?'سعر الوحدة':'Unit price',item=>item.price_kg?`${item.price_kg} ${lang==='ar'?'ريال':'SAR'}`:'',true],
-      ['total_amount',lang==='ar'?'الإجمالي':'Total',item=>item.total_amount?`${Number(item.total_amount).toLocaleString('en-US')} ${lang==='ar'?'ريال':'SAR'}`:'',true]
+      ['price_kg',lang==='ar'?'سعر الوحدة':'Unit price',item=>String(item.price_kg??''),true],
+      ['total_amount',lang==='ar'?'الإجمالي':'Total',item=>item.total_amount?Number(item.total_amount).toLocaleString('en-US'):'',true]
     ];
     const columns=definitions.filter(([, ,getter,required])=>required||items.some(item=>String(getter(item)||'').trim()));
     const section=document.createElement('section'); section.className='jms-smart-specs';
