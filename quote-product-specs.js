@@ -171,13 +171,18 @@
   function displayHandle(item){const legacy={'أكياس تي شيرت':'تيشرت','أكياس بنانا':'بنانا','أكياس شريط':'شريط'};const type=legacy[item.product]||item.handle_type||'';return [type,type==='شريط'?item.handle_color:''].filter(Boolean).join(' - ');}
   function translatePayment(value,lang){if(lang==='ar')return value;const map={'حسب الاتفاق':'As agreed','الدفع مقدمًا 100%':'100% advance payment','الدفع خلال 30 يومًا من تاريخ استلام الطلب':'Payment within 30 days from receipt of the order','الدفع خلال 60 يومًا من تاريخ استلام الطلب':'Payment within 60 days from receipt of the order','50% عند اعتماد الطلب و50% قبل الاستلام عند جاهزية الطلب':'50% upon order confirmation and 50% before collection when the order is ready'};return map[value]||value;}
 
-  function measure(value,unit,standard,lang){
-    const amount=String(value??'').trim();
-    const label=String(unit??'').trim();
-    const printedUnit=/^(mm|مم)$/i.test(label) ? (lang==='ar'?'مم':'mm') : label;
-    return amount && label && !standard.test(label) ? amount+' '+printedUnit : amount;
+  function columnUnits(items,field,fallback,lang){
+    const labels={cm:['سم','cm'],mm:['مم','mm'],micron:['ميكرون','µm'],kg:['كجم','kg']};
+    const aliases={'سم':'cm','سنتيمتر':'cm','مم':'mm','ميكرون':'micron','µm':'micron','μm':'micron','microns':'micron','كيلو':'kg','كجم':'kg','كغ':'kg'};
+    const unit=item=>{
+      const raw=String(item[field]||fallback).trim();
+      return labels[aliases[raw]||raw.toLowerCase()]?.[lang==='ar'?0:1]||raw;
+    };
+    const units=new Set(items.map(unit));
+    const common=units.size===1?unit(items[0]):'';
+    return {heading:title=>common?title+' ('+common+')':title,
+      value:(item,value)=>value==null||value===''?'':String(value)+(common?'':' '+unit(item))};
   }
-  const dimension=(value,unit,lang)=>measure(value,unit,/^(cm|سم|سنتيمتر)$/i,lang);
   function fold(value){
     const amount=String(value??'').trim();
     return /^[٠۰0]*(?:[.٫][٠۰0]+)?$/.test(amount) ? '' : amount;
@@ -190,6 +195,10 @@
     doc.querySelector('.jms-bank-details')?.remove();
     const items=Array.isArray(q.items)&&q.items.length?q.items:[q];
     const cliches=items.length>0&&items.every(item=>/كلايش|كليش/.test(String(item.product||'')));
+    const size=columnUnits(items,'size_unit','cm',lang);
+    const thickness=columnUnits(items,'thickness_unit','micron',lang);
+    const quantity=columnUnits(items,'unit','kg',lang);
+    const gussetUnit=lang==='ar'?' (سم)':' (cm)';
     const definitions=cliches?[
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
       ['description',lang==='ar'?'وصف الصنف':'Description',item=>item.description||item.size||'',true],
@@ -200,16 +209,16 @@
       ['product',lang==='ar'?'الصنف':'Item',item=>translateProduct(item.product||'',lang),true],
       ['material',lang==='ar'?'الخامة':'Material',item=>displayMaterial(item.material),true],
       ['color',lang==='ar'?'اللون':'Color',item=>item.color,false],
-      ['length',lang==='ar'?'الطول':'Length',item=>dimension(item.length,item.size_unit,lang),true],
-      ['width',lang==='ar'?'العرض':'Width',item=>dimension(item.width,item.size_unit,lang),true],
-      ['fold_side',lang==='ar'?'الطوية الجانبية':'Side gusset',item=>fold(item.fold_side),false],
-      ['fold_bottom',lang==='ar'?'الطوية السفلية':'Bottom fold',item=>fold(item.fold_bottom),false],
-      ['fold_top',lang==='ar'?'الطوية العلوية':'Top fold',item=>fold(item.fold_top),false],
-      ['thickness',lang==='ar'?'السماكة':'Thickness',item=>measure(item.thickness,item.thickness_unit,/^(microns?|µm|μm|ميكرون)$/i,lang),true],
+      ['length',size.heading(lang==='ar'?'الطول':'Length'),item=>size.value(item,item.length),true],
+      ['width',size.heading(lang==='ar'?'العرض':'Width'),item=>size.value(item,item.width),true],
+      ['fold_side',(lang==='ar'?'الطوية الجانبية':'Side gusset')+gussetUnit,item=>fold(item.fold_side),false],
+      ['fold_bottom',(lang==='ar'?'الطوية السفلية':'Bottom fold')+gussetUnit,item=>fold(item.fold_bottom),false],
+      ['fold_top',(lang==='ar'?'الطوية العلوية':'Top fold')+gussetUnit,item=>fold(item.fold_top),false],
+      ['thickness',thickness.heading(lang==='ar'?'السماكة':'Thickness'),item=>thickness.value(item,item.thickness),true],
       ['handle',lang==='ar'?'نوع اليد':'Handle type',item=>displayHandle(item),false],
       ['print',lang==='ar'?'الطباعة':'Printing',item=>{const p=translatePrint(item.print||'',lang);return [p,item.print_colors?`${item.print_colors} ${lang==='ar'?'ألوان':'colors'}`:''].filter(Boolean).join(' - ')},false],
       ['description',lang==='ar'?'الوصف':'Description',item=>item.description||'',false],
-      ['total_kg',lang==='ar'?'الكمية':'Qty',item=>item.total_kg?`${item.total_kg} ${/^(kg|كجم|كيلو|كغ)$/i.test(item.unit||'kg')?(lang==='ar'?'كجم':'kg'):item.unit}`:'',true],
+      ['total_kg',quantity.heading(lang==='ar'?'الكمية':'Qty'),item=>quantity.value(item,item.total_kg==null||item.total_kg===''?'':Number(item.total_kg).toLocaleString('en-US',{maximumFractionDigits:6})),true],
       ['price_kg',lang==='ar'?'سعر الوحدة':'Unit price',item=>String(item.price_kg??''),true],
       ['total_amount',lang==='ar'?'الإجمالي':'Total',item=>item.total_amount?Number(item.total_amount).toLocaleString('en-US'):'',true]
     ];
@@ -239,8 +248,28 @@
     bank.innerHTML=`<div class="jms-bank-heading"><b>${lang==='ar'?'بيانات التحويل البنكي':'Bank Transfer Details'}</b><span>${lang==='ar'?'مصرف الراجحي':'Al Rajhi Bank'}</span></div><div class="jms-bank-fields"><div><span>${lang==='ar'?'اسم المستفيد':'Beneficiary'}</span><b data-i18n-text>${lang==='ar'?'شركة جده النموذجي للصناعه':'شركة جده النموذجي للصناعه'}</b></div><div><span>${lang==='ar'?'رقم الحساب':'Account No.'}</span><b dir="ltr">445000010006080230905</b></div><div class="jms-bank-iban"><span>IBAN</span><b dir="ltr">SA2080000445608010230905</b></div></div>`;
     const summary=doc.querySelector('.quote-a4-summary');
     if(summary) summary.insertAdjacentElement('afterend',bank); else doc.querySelector('.jms-smart-specs')?.insertAdjacentElement('afterend',bank);
+    function printDate(value){
+      return String(value||'').replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3/$2/$1');
+    }
+    const dateLines=doc.querySelectorAll('.quote-a4-title p');
+    [[1,lang==='ar'?'تاريخ الإصدار':'Issue date',q.date],[2,lang==='ar'?'صالح حتى':'Valid until',q.valid_until]].forEach(([index,label,date])=>{
+      if(!dateLines[index]||!date)return;
+      const number=document.createElement('bdi');number.dir='ltr';number.textContent=printDate(date);
+      dateLines[index].replaceChildren(label+' ',number);
+    });
+    for(const label of doc.querySelectorAll('.quote-a4-card:first-child p b')){
+      const value=label.nextSibling;
+      if(value?.nodeType===3 && /^[-–—]*$/.test(value.textContent.trim())){
+        const separator=label.previousSibling;
+        if(separator?.nodeName==='BR')separator.remove();
+        value.remove();label.remove();
+      }
+    }
     const termsList=doc.querySelector('.quote-a4-terms ul');
-    if(termsList) termsList.dir=doc.dir;
+    if(termsList){
+      termsList.dir=doc.dir;
+      termsList.classList.add('quote-inline-bullets');
+    }
     const walker=document.createTreeWalker(doc,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()){
       const node=walker.currentNode;
@@ -248,6 +277,8 @@
     }
     const layout=document.createElement('style');
     layout.textContent=`
+    .quote-a4 .quote-a4-approval{align-items:stretch!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    .quote-a4 .quote-a4-approval>.quote-a4-sign{box-sizing:border-box;align-self:stretch;min-width:0}
     .quote-a4 .jms-smart-specs .jms-smart-spec-table{table-layout:auto!important;width:100%!important}
     .quote-a4 .jms-smart-specs .jms-smart-spec-table :is(th,td){word-break:normal!important;overflow-wrap:normal!important;line-height:1.45!important;padding:5px 2px!important;font-size:9px!important;text-align:center!important}
     .quote-a4 .jms-smart-specs .jms-smart-spec-table th{white-space:nowrap!important}
@@ -258,6 +289,8 @@
     .quote-a4 .quote-a4-total-row>b{white-space:nowrap;font-variant-numeric:tabular-nums}
     .quote-a4 .quote-a4-summary{grid-template-columns:minmax(0,1fr) max-content!important;gap:10px!important}
     .quote-a4 .quote-a4-summary .quote-a4-terms ul{list-style:disc outside!important;padding:0!important;padding-inline-start:1.25em!important;margin:0!important;text-align:start!important}
+    .quote-a4 .quote-a4-summary .quote-a4-terms ul.quote-inline-bullets{list-style:none!important;padding-inline-start:0!important}
+    .quote-inline-bullets li::before{content:'• ';color:#475569}
     .quote-a4 .quote-a4-terms li{text-align:start!important;text-wrap:pretty;line-height:1.6}
     .quote-a4 .jms-bank-details .jms-bank-fields{grid-template-columns:minmax(0,1fr) max-content max-content!important;align-items:center!important;column-gap:8px!important}
     .quote-a4 .jms-bank-details .jms-bank-fields b[dir=ltr]{font:600 10.5px/1.6 Arial,sans-serif!important;text-align:start;white-space:nowrap!important;letter-spacing:0!important}
