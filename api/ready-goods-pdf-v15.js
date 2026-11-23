@@ -155,7 +155,8 @@ function documentHtml(n,settings,packs,logo,font){
 async function fitPrintDocument(page){
   await page.evaluate(()=>{
     const doc=document.querySelector('.doc');
-    if(!doc||doc.dataset.density==='comfortable')return;
+    if(!doc)return;
+    if(doc.dataset.density==='comfortable' && doc.getBoundingClientRect().height<=273*96/25.4+1)return;
     const target=263*96/25.4;
     if(doc.getBoundingClientRect().height<=target+2)return;
     doc.dataset.density='dense';
@@ -180,6 +181,12 @@ export default async function handler(req,res){
     const id=String(body.id||'');if(!id){res.statusCode=400;return res.end('id_required')}
     const rows=await supabase(`jms_ready_goods?select=id,data&id=eq.${encodeURIComponent(id)}&limit=1`);const n=rows?.[0]?.data;if(!n){res.statusCode=404;return res.end('notice_not_found')}
     if(auth.role==='rep'&&String(n.rep_id||'')!==String(auth.id)){res.statusCode=403;return res.end('forbidden')}
+    const requestedRevision=Number(body.revision||0);
+    const savedRevision=Number(n.revision||0);
+    if(savedRevision<requestedRevision || (savedRevision===requestedRevision && Date.parse(n.updated_at)<Date.parse(body.updatedAt))){
+      res.statusCode=409;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
+      return res.end(JSON.stringify({error:'notice_sync_pending'}));
+    }
     const sr=await supabase(`jms_ready_goods?select=data&id=eq.${encodeURIComponent(SETTINGS_ID)}&limit=1`);const settings=sr?.[0]?.data?.settings||sr?.[0]?.data||{};
     const [packs,font,repoLogo]=await Promise.all([resolvePackaging(n),fontCss(),defaultLogo()]);const logo=repoLogo||safeDataImage(body.logoData);
     if(!logo)throw new Error('Company logo is unavailable');
