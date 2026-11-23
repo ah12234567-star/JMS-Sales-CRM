@@ -22,10 +22,10 @@
 
   function quotePrintCss() {
     return `
-      @page{size:Letter portrait;margin:0}
+      @page{size:A4 portrait;margin:0}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-      html,body{margin:0!important;padding:0!important;width:216mm!important;height:auto!important;min-height:0!important;background:#fff!important;color:#111827!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important}
-      .quote-a4{width:216mm!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8mm 12mm 5mm!important;background:#fff!important;color:#111827!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:visible!important;page-break-before:avoid!important;page-break-after:avoid!important;break-before:avoid!important;break-after:avoid!important}
+      html,body{margin:0!important;padding:0!important;width:210mm!important;height:auto!important;min-height:0!important;background:#fff!important;color:#111827!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important}
+      .quote-a4{width:210mm!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8mm 12mm 5mm!important;background:#fff!important;color:#111827!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:visible!important;page-break-before:avoid!important;page-break-after:avoid!important;break-before:avoid!important;break-after:avoid!important}
       .quote-a4-head{display:grid!important;grid-template-columns:32mm 1fr 43mm!important;gap:7mm!important;align-items:center!important;border-bottom:2px solid #111827!important;padding-bottom:5mm!important}
       .quote-a4-logo{display:block!important;width:30mm!important;height:22mm!important;object-fit:contain!important;background:#fff!important}
       .quote-a4-company h1{font-size:16pt!important;line-height:1.2!important;margin:0!important;color:#111827!important}.quote-a4-company p{font-size:7.5pt!important;color:#64748b!important;margin:1.5mm 0!important}
@@ -47,11 +47,12 @@
     if (!approvals || approvals.dataset.compact === '1') return;
     approvals.dataset.compact = '1';
     const english = root?.dataset?.lang === 'en';
-    approvals.innerHTML = english ? `
-      <div class="quote-a4-sign"><b>Customer Approval</b><div class="quote-a4-line">Name: ____________________ &nbsp; Signature: ______________ &nbsp; Date: __________</div></div>
-      <div class="quote-a4-sign"><b>Company Approval</b><div class="quote-a4-line">Authorized by: ____________ &nbsp; Signature & Stamp: ________ &nbsp; Date: __________</div></div>` : `
-      <div class="quote-a4-sign"><b>اعتماد العميل</b><div class="quote-a4-line">الاسم: ____________________ &nbsp; التوقيع: ______________ &nbsp; التاريخ: __________</div></div>
-      <div class="quote-a4-sign"><b>اعتماد الشركة</b><div class="quote-a4-line">اسم المسؤول: ______________ &nbsp; التوقيع والختم: ____________ &nbsp; التاريخ: __________</div></div>`;
+    const blocks=english
+      ? [['Customer Approval','Name','Date','Signature'],['Company Approval','Authorized by','Date','Signature & stamp']]
+      : [['اعتماد العميل','الاسم','التاريخ','التوقيع'],['اعتماد الشركة','اسم المسؤول','التاريخ','التوقيع والختم']];
+    approvals.innerHTML=blocks.map(([title,...fields])=>
+      '<div class="quote-a4-sign"><b>'+title+'</b><div class="quote-a4-line jms-sign-fields">'+fields.map(label=>'<span>'+label+'</span>').join('')+'</div></div>'
+    ).join('');
   }
 
   function safeFilePart(value) {
