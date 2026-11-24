@@ -31,9 +31,27 @@
     renderPending=false;
     try{window.renderAll?.();window.scrollTo(x,y);}catch(_){}
   }
+  function syncStatus(kind,message){
+    let el=document.getElementById('cloudSyncStatus');
+    if(!el){el=document.createElement('div');el.id='cloudSyncStatus';document.body.appendChild(el)}
+    el.className='cloud-sync-status '+kind;
+    if(window.JMSI18n)window.JMSI18n.setText(el,message);else el.textContent=message;
+  }
+  function openRequestedQuote(rows){
+    const url=new URL(location.href),number=url.searchParams.get('openQuote');
+    if(!number||typeof window.viewQuote!=='function')return;
+    const quote=(rows||[]).find(row=>row.quote_no===number);
+    if(!quote)return;
+    window.viewQuote(quote.id);
+    url.searchParams.delete('openQuote');
+    history.replaceState(history.state,'',url);
+  }
   async function pull(){
-    if(busy||!navigator.onLine||!token())return false;busy=true;
-    try{const r=await fetch('/api/data-sync',{headers:headers()});if(!r.ok)throw new Error(await r.text());const out=await r.json();const before=visibleSnapshot();for(const k of KEYS)merge(k,out.data?.[k]||[]);const d=getDb();if(d&&Array.isArray(out.data?.reps)){for(const rep of out.data.reps){if(!rep?.id)continue;for(const key of ['users','reps']){d[key] ||= [];const i=d[key].findIndex(u=>String(u.id)===String(rep.id));if(i<0)d[key].push({...rep});else d[key][i]={...d[key][i],...rep};}}}saveLocal();if(before!==visibleSnapshot()){renderPending=true;renderWhenIdle();}return true}catch(e){console.warn('JMS authenticated cloud pull failed',e);return false}finally{busy=false}
+    if(busy)return false;
+    if(!navigator.onLine){syncStatus('local','لا يوجد اتصال بالإنترنت');return false}
+    if(!token()){syncStatus('local','سجّل الدخول لمزامنة البيانات');return false}
+    busy=true;
+    try{const r=await fetch('/api/data-sync',{headers:headers()});if(r.status===401){syncStatus('local','انتهت الجلسة، سجّل الدخول للمزامنة');return false}if(!r.ok)throw new Error('HTTP '+r.status);const out=await r.json();const before=visibleSnapshot();for(const k of KEYS)merge(k,out.data?.[k]||[]);const d=getDb();if(d&&Array.isArray(out.data?.reps)){for(const rep of out.data.reps){if(!rep?.id)continue;for(const key of ['users','reps']){d[key] ||= [];const i=d[key].findIndex(u=>String(u.id)===String(rep.id));if(i<0)d[key].push({...rep});else d[key][i]={...d[key][i],...rep};}}}saveLocal();if(before!==visibleSnapshot()){renderPending=true;renderWhenIdle();}syncStatus('cloud','تم تحديث البيانات من الخادم');openRequestedQuote(out.data?.quotes);return true}catch(e){syncStatus('error','تعذر تحديث البيانات من الخادم');console.warn('JMS authenticated cloud pull failed',e);return false}finally{busy=false}
   }
   async function push(){
     if(busy||!navigator.onLine||!token())return false;const d=getDb();if(!d)return false;busy=true;
@@ -47,7 +65,7 @@
     window.pushCloudData=push;window.pullCloudData=pull;window.JMSAuthenticatedCloud={version:VERSION,push,pull,sync};
     window.addEventListener('online',()=>setTimeout(sync,250));window.addEventListener('pageshow',()=>setTimeout(pull,500));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(pull,300)});
-    setInterval(()=>{if(navigator.onLine&&token())pull()},15000);setTimeout(()=>{if(token())pull()},900);
+    setInterval(pull,15000);setTimeout(pull,900);
     document.addEventListener('jms:data-changed',schedule);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
