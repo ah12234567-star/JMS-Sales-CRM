@@ -23,7 +23,7 @@ try {
     document.body.appendChild(s);
   }
   function loadUpdates(){
-    addScript('jms-authenticated-cloud-sync','authenticated-cloud-sync.js?v=20260829-core2-3a');
+    addScript('jms-authenticated-cloud-sync','authenticated-cloud-sync.js?v=20261124-sync-status');
     addScript('jms-routes-cloud-sync','routes-cloud-sync.js?v=20260829-core2-3a');
     addScript('jms-core-v2','jms-core-v2.js?v=20260829-core2-3a');
     addScript('jms-core-v2-workflows','jms-core-v2-workflows.js?v=20260829-core2-3a');
