@@ -9,7 +9,7 @@
 #closeSearch{width:auto;margin:6px 0}#selected{font-weight:600}
 #manager table{width:100%;border-collapse:collapse}#manager td,#manager th{text-align:start;padding:8px 4px;border-bottom:1px solid #dae4df}#manager td:first-child{overflow-wrap:anywhere}
 </style><main><header><h1>جرد عبوات الأحبار</h1><button id="exit">خروج</button></header>
-<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="manager" hidden><h2>كشف جرد الأحبار</h2><p id="totals" aria-live="polite"></p><table><thead><tr><th>الصنف</th><th>الرفوف</th><th>العبوات</th><th>الصافي (كجم)</th></tr></thead><tbody id="countLines"></tbody></table><button id="refresh" type="button">تحديث الكشف</button></section>
+<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="manager" hidden><h2>كشف جرد الأحبار</h2><button type="button" id="exportCount">تحميل إكسل</button><p id="totals" aria-live="polite"></p><table><thead><tr><th>الصنف</th><th>الرفوف</th><th>العبوات</th><th>الصافي (كجم)</th></tr></thead><tbody id="countLines"></tbody></table><button id="refresh" type="button">تحديث الكشف</button></section>
 <section id="panel" hidden>
 <label for="search">بحث برقم الصنف أو اسمه</label><input id="search" type="search" autocomplete="off" placeholder="اكتب رقم الصنف أو اسمه" aria-controls="results" aria-expanded="false">
 <div id="results" hidden><button type="button" id="closeSearch">إغلاق البحث</button><div id="matches"></div></div>
@@ -18,6 +18,7 @@
 <label for="weight">وزن العبوة على الميزان (كجم)</label><input id="weight" required inputmode="decimal" autocomplete="off">
 <small>وزن العبوة الفارغة ١٫٧٥ كجم</small><p id="net"></p><button id="save" disabled>حفظ والتالية</button></form></section>
 <section id="history" hidden><h2>جرد الصنف</h2><p id="summary"></p><ol id="rows"></ol></section></main>
+<script defer src="/vendor/xlsx.full.min.js"></script>
 <script type="module">
 const el=id=>document.getElementById(id);
 const item=el('item'),weight=el('weight'),shelf=el('shelf'),status=el('status');
@@ -125,6 +126,35 @@ async function refreshManager(){
  catch{status.textContent='تعذر تحديث الكشف. حاول مرة أخرى.'}
  finally{el('refresh').disabled=false}
 }
+function exportWorkbook(data){
+ const names=new Map(data.items.map(item=>[item.id,item.label]));
+ const rows=[['الصنف','الرفوف','عدد العبوات','صافي الحبر (كجم)']];
+ let cans=0,grams=0;
+ for(const group of data.summary){
+   rows.push([names.get(group.item),group.shelves.join('، '),group.count,group.net/1000]);
+   cans+=group.count;
+   grams+=group.net;
+ }
+ rows.push(['الإجمالي','',cans,grams/1000]);
+ const sheet=XLSX.utils.aoa_to_sheet(rows);
+ sheet['!cols']=[{wch:55},{wch:20},{wch:15},{wch:22}];
+ for(let row=2;row<=rows.length;row++)sheet['D'+row].z='0.000';
+ const book=XLSX.utils.book_new();
+ book.Workbook={Views:[{RTL:true}]};
+ XLSX.utils.book_append_sheet(book,sheet,'جرد '+data.year);
+ XLSX.writeFile(book,'جرد-الأحبار-'+data.year+'.xlsx');
+}
+el('exportCount').onclick=async()=>{
+ const button=el('exportCount');
+ button.disabled=true;
+ try{
+   const data=await api();
+   if(!Array.isArray(data.summary))throw Error();
+   renderManager(data);
+   exportWorkbook(data);
+ }catch{status.textContent='تعذر تحميل ملف إكسل. حاول مرة أخرى.'}
+ finally{button.disabled=false}
+};
 el('refresh').onclick=refreshManager;
 try{const data=await api();year=data.year;items=data.items;renderManager(data);
  const draft=JSON.parse(sessionStorage.getItem(key)||'{}');const d=draft.year===year?draft:{};
