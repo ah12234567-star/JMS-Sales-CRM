@@ -3,10 +3,15 @@
 <title>جرد عبوات الأحبار | JMS</title>
 <style>
 *{box-sizing:border-box}body{font:16px system-ui,sans-serif;background:#f1f5f4;color:#162e29;margin:0}main{max-width:520px;margin:auto;padding:20px}header,section{background:white;padding:18px;border-radius:15px;margin:12px 0}header{display:flex;align-items:center;justify-content:space-between}h1{font-size:22px;margin:0}h2{font-size:18px}label{display:block;margin:12px 0 4px;font-weight:600}input,select,button{font:inherit;padding:12px;border:1px solid #9eada7;border-radius:9px;width:100%;background:white;color:inherit}button{cursor:pointer}header button{width:auto}#save{background:#155e50;color:white;margin-top:14px}button:disabled{opacity:.55}#summary{font-weight:bold;color:#155e50}li{padding:6px}#status{min-height:1.4em}
+
+#matches{max-height:min(32vh,16rem);overflow:auto;overscroll-behavior:contain}
+#matches button{display:block;text-align:start;margin:3px 0;overflow-wrap:anywhere}
+#closeSearch{width:auto;margin:6px 0}#selected{font-weight:600}
 </style><main><header><h1>جرد عبوات الأحبار</h1><button id="exit">خروج</button></header>
 <p id="status" role="status">جارٍ تحميل الجرد…</p><section id="panel" hidden>
-<label for="search">بحث برقم الصنف أو اسمه</label><input id="search" type="search">
-<label for="item">الصنف</label><select id="item"></select>
+<label for="search">بحث برقم الصنف أو اسمه</label><input id="search" type="search" autocomplete="off" placeholder="اكتب رقم الصنف أو اسمه" aria-controls="results" aria-expanded="false">
+<div id="results" hidden><button type="button" id="closeSearch">إغلاق البحث</button><div id="matches"></div></div>
+<input id="item" type="hidden"><p id="selected" role="status"></p>
 <form id="entry"><label for="shelf">رقم الرف</label><input id="shelf" required maxlength="40">
 <label for="weight">وزن العبوة على الميزان (كجم)</label><input id="weight" required inputmode="decimal" autocomplete="off">
 <small>وزن العبوة الفارغة ١٫٧٥ كجم</small><p id="net"></p><button id="save" disabled>حفظ والتالية</button></form></section>
@@ -20,7 +25,7 @@ const kg=g=>(g/1000).toLocaleString('ar-SA',{maximumFractionDigits:3});
 const normalize=s=>s.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٫,]/g,'.').trim();
 function grams(){const s=normalize(weight.value);return /^\d+(\.\d{1,3})?$/.test(s)?Math.round(Number(s)*1000):0}
 function validate(){
- const g=grams();el('save').disabled=busy||!ready||!item.value||!shelf.value.trim()||g<1750||g>1000000;
+ const g=grams();el('save').disabled=busy||!el('results').hidden||!ready||!item.value||!shelf.value.trim()||g<1750||g>1000000;
  el('net').textContent=g>=1750?'صافي العبوة '+kg(g-1750)+' كجم':'';
 }
 function remember(){sessionStorage.setItem(key,JSON.stringify({year,item:item.value,shelf:shelf.value,weight:weight.value,requestId}))}
@@ -30,10 +35,50 @@ async function api(path='',body){
  if(response.status===401){location.replace('/');throw Error()}
  if(!response.ok)throw Error();return response.json();
 }
-function options(list,selected){
- item.replaceChildren(new Option('اختر الصنف',''),...list.map(x=>new Option(x.label,x.id)));
- item.value=selected||'';if(item.selectedIndex<0)item.selectedIndex=0;
+const search=el('search'),results=el('results'),matches=el('matches');
+function selectItem(record){
+ item.value=record?.id??'';
+ el('selected').textContent=record?'الصنف المحدد · '+record.label:'لم يتم اختيار صنف';
 }
+function closeResults(){
+ results.hidden=true;
+ search.setAttribute('aria-expanded','false');
+ search.value='';
+ search.blur();
+ validate();
+}
+function renderMatches(){
+ const query=normalize(search.value).toLowerCase();
+ const records=items.filter(record=>normalize(record.label).toLowerCase().includes(query));
+ matches.replaceChildren(...records.map(record=>{
+   const button=document.createElement('button');
+   button.type='button';
+   button.textContent=record.label;
+   button.onclick=()=>{
+     selectItem(record);
+     requestId='';
+     closeResults();
+     remember();
+     show();
+   };
+   return button;
+ }));
+ if(!records.length)matches.textContent='لا يوجد صنف مطابق';
+ matches.scrollTop=0;
+ results.hidden=false;
+ search.setAttribute('aria-expanded','true');
+ validate();
+}
+search.onfocus=renderMatches;
+search.oninput=renderMatches;
+search.onkeydown=event=>{
+ if(event.key==='Escape'){event.preventDefault();closeResults()}
+ if(event.key==='Enter'&&matches.childElementCount===1){event.preventDefault();matches.firstElementChild.click()}
+};
+el('closeSearch').onclick=closeResults;
+document.addEventListener('pointerdown',event=>{
+ if(!results.hidden&&event.target!==search&&!results.contains(event.target))closeResults();
+});
 async function show(){
  const id=item.value;el('history').hidden=true;ready=false;validate();if(!id)return;
  try{
@@ -44,10 +89,6 @@ async function show(){
  el('history').hidden=false;ready=true;validate();
  }catch{status.textContent='تعذر تحميل الجرد. حدّث الصفحة للمحاولة مجددًا.'}
 }
-el('search').oninput=()=>{const query=normalize(el('search').value).toLowerCase();
- const list=items.filter(x=>x.label.toLowerCase().includes(query));options(list,list.length===1?list[0].id:item.value);changed()};
-function changed(){requestId='';remember();show()}
-item.onchange=changed;
 for(const input of [shelf,weight])input.oninput=()=>{requestId='';remember();validate()};
 el('entry').onsubmit=async e=>{
  e.preventDefault();if(el('save').disabled)return;busy=true;validate();
@@ -61,7 +102,7 @@ el('entry').onsubmit=async e=>{
 el('exit').onclick=async()=>{try{await api('',{logout:true});sessionStorage.removeItem(key);location.replace('/')}catch{status.textContent='تعذر الخروج. حاول مجددًا.'}};
 try{const data=await api();year=data.year;items=data.items;
  const draft=JSON.parse(sessionStorage.getItem(key)||'{}');const d=draft.year===year?draft:{};
- options(items,d.item);shelf.value=d.shelf||'';weight.value=d.weight||'';requestId=d.requestId||'';
+ selectItem(items.find(record=>String(record.id)===String(d.item)));shelf.value=d.shelf||'';weight.value=d.weight||'';requestId=d.requestId||'';
  status.textContent='جرد '+year;el('panel').hidden=false;await show();
 }catch{status.textContent='تعذر فتح الجرد. تحقق من الاتصال وصلاحية الحساب.'}
 </script></html>
