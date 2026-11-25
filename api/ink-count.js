@@ -1,8 +1,27 @@
 import {json,readBody,requireRole,supabase,verifyToken} from './auth-utils.js';
 
+async function countSummary(year){
+  const groups=new Map();
+  for(let offset=0;;offset+=500){
+    const rows=await supabase('jms_ink_count_entries?select=item_id,shelf,gross_g,tare_g&count_year=eq.'+year+'&order=created_at,id&limit=500&offset='+offset);
+    for(const row of rows){
+      let group=groups.get(row.item_id);
+      if(!group){
+        group={item:row.item_id,shelves:new Set(),count:0,net:0};
+        groups.set(row.item_id,group);
+      }
+      group.shelves.add(row.shelf);
+      group.count++;
+      group.net+=row.gross_g-row.tare_g;
+    }
+    if(rows.length<500)break;
+  }
+  return Array.from(groups.values(),group=>({...group,shelves:[...group.shelves]}));
+}
+
 export default async function handler(req,res){
   const ticket=(req.headers.cookie||'').match(/(?:^|;\s*)jms_ink=([^;]+)/)?.[1];
-  const auth=verifyToken(ticket,43200000,'ink-count:') || requireRole(req,['admin']);
+  const auth=requireRole(req,['admin']) || verifyToken(ticket,43200000,'ink-count:');
   if(!auth) return json(res,401,{error:'login'});
   try {
     const users=await supabase('jms_users?select=data->role,data->status&id=eq.'+encodeURIComponent(auth.id));
@@ -10,7 +29,10 @@ export default async function handler(req,res){
     const year=Number(new Intl.DateTimeFormat('en',{year:'numeric',timeZone:'Asia/Riyadh'}).format(new Date()));
     const query=new URL(req.url,'https://jms.local').searchParams;
     if(req.method==='GET' && !query.has('item')){
-      return json(res,200,{year,items:await supabase('jms_ink_count_items?select=id,label&order=label')});
+      const items=await supabase('jms_ink_count_items?select=id,label&order=label');
+      const result={year,items};
+      if(auth.role==='admin')result.summary=await countSummary(year);
+      return json(res,200,result);
     }
     if(req.method==='GET'){
       const item=Number(query.get('item'));
