@@ -9,7 +9,7 @@
 #closeSearch{width:auto;margin:6px 0}#selected{font-weight:600}
 #manager table{width:100%;border-collapse:collapse}#manager td,#manager th{text-align:start;padding:8px 4px;border-bottom:1px solid #dae4df}#manager td:first-child{overflow-wrap:anywhere}
 </style><main><header><h1>جرد عبوات الأحبار</h1><button id="exit">خروج</button></header>
-<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="manager" hidden><h2>كشف جرد الأحبار</h2><button type="button" id="exportCount">تحميل إكسل</button><p id="totals" aria-live="polite"></p><table><thead><tr><th>الصنف</th><th>الرفوف</th><th>العبوات</th><th>الصافي (كجم)</th></tr></thead><tbody id="countLines"></tbody></table><button id="refresh" type="button">تحديث الكشف</button></section>
+<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="manager" hidden><h2>كشف جرد الأحبار</h2><button type="button" id="exportCount">تحميل إكسل</button><p id="totals" aria-live="polite"></p><table><thead><tr><th>تحديد</th><th>الصنف</th><th>الرفوف</th><th>العبوات</th><th>الصافي (كجم)</th></tr></thead><tbody id="countLines"></tbody></table><button type="button" id="removeCounts" disabled>حذف جرد الأصناف المحددة</button><button id="refresh" type="button">تحديث الكشف</button></section>
 <section id="panel" hidden>
 <label for="search">بحث برقم الصنف أو اسمه</label><input id="search" type="search" autocomplete="off" placeholder="اكتب رقم الصنف أو اسمه" aria-controls="results" aria-expanded="false">
 <div id="results" hidden><button type="button" id="closeSearch">إغلاق البحث</button><div id="matches"></div></div>
@@ -88,7 +88,9 @@ async function show(){
  const {entries}=await api('?item='+id);if(item.value!==id)return;
  const sum=entries.reduce((v,x)=>v+x.gross_g-x.tare_g,0);
  el('summary').textContent=entries.length+' عبوة · '+kg(sum)+' كجم صافي';
- el('rows').replaceChildren(...entries.map(x=>{const li=document.createElement('li');li.textContent='رف '+x.shelf+' · الميزان '+kg(x.gross_g)+' · الصافي '+kg(x.gross_g-x.tare_g)+' كجم';return li}));
+ el('rows').replaceChildren(...entries.map(x=>{const li=document.createElement('li');li.textContent='رف '+x.shelf+' · الميزان '+kg(x.gross_g)+' · الصافي '+kg(x.gross_g-x.tare_g)+' كجم';if(!el('manager').hidden){
+   const edit=document.createElement('button');edit.textContent='تعديل العبوة';edit.onclick=()=>editEntry(id,x,edit);li.append(edit);
+ }return li}));
  el('history').hidden=false;ready=true;validate();
  }catch{status.textContent='تعذر تحميل الجرد. حدّث الصفحة للمحاولة مجددًا.'}
 }
@@ -103,15 +105,43 @@ el('entry').onsubmit=async e=>{
  finally{busy=false;for(const input of [weight,item,shelf,el('search')])input.disabled=false;validate();weight.focus()}
 };
 el('exit').onclick=async()=>{try{await api('',{logout:true});sessionStorage.removeItem(key);location.replace('/')}catch{status.textContent='تعذر الخروج. حاول مجددًا.'}};
+async function editEntry(id,row,button){
+ const shelf=prompt('رقم الرف',row.shelf);if(shelf===null)return;
+ const weight=prompt('وزن العبوة على الميزان (كجم)',String(row.gross_g/1000));if(weight===null)return;
+ const value=normalize(weight);const grams=Math.round(Number(value)*1000);
+ if(!shelf.trim()||shelf.trim().length>40||!/^\d+(\.\d{1,3})?$/.test(value)||grams<1750||grams>1000000){alert('تحقق من رقم الرف ووزن العبوة');return}
+ button.disabled=true;
+ try{await api('',{action:'edit',year,id:row.id,item:Number(id),shelf:shelf.trim(),grams,oldShelf:row.shelf,oldGrams:row.gross_g});
+ await refreshManager();await show();status.textContent='تم تعديل العبوة'}
+ catch{alert('تعذر تعديل العبوة. حدّث الكشف وتحقق من بياناتها.')}
+ finally{button.disabled=false}
+}
+const selectedCounts=new Map();
+el('removeCounts').onclick=async()=>{
+ const groups=[...selectedCounts.values()];
+ const ids=groups.flatMap(group=>group.ids);
+ if(!ids.length||!confirm('حذف جرد '+groups.length+' أصناف ('+ids.length+' عبوة)؟ ستبقى الأصناف متاحة لإعادة الجرد.'))return;
+ el('removeCounts').disabled=true;
+ try{const result=await api('',{action:'remove',year,ids});await refreshManager();await show();status.textContent='تم حذف '+result.removed+' عبوة من الجرد'}
+ catch{alert('تعذر تأكيد الحذف. حدّث الكشف للتحقق.')}
+ finally{el('removeCounts').disabled=!selectedCounts.size}
+};
 function renderManager(data){
  if(!Array.isArray(data.summary))return;
  const names=new Map(data.items.map(x=>[x.id,x.label]));
  let count=0,net=0;
+ selectedCounts.clear();el('removeCounts').disabled=true;
  const rows=data.summary.map(group=>{
    count+=group.count;
    net+=group.net;
    const tr=document.createElement('tr');
-   for(const value of [names.get(group.item),group.shelves.join('، '),group.count,kg(group.net)]){
+   const tick=document.createElement('input');tick.type='checkbox';tick.setAttribute('aria-label','تحديد '+names.get(group.item));
+   tick.onchange=()=>{if(tick.checked)selectedCounts.set(group.item,group);else selectedCounts.delete(group.item);el('removeCounts').disabled=!selectedCounts.size};
+   const choice=document.createElement('td');choice.append(tick);tr.append(choice);
+   const name=document.createElement('button');name.textContent=names.get(group.item);
+   name.onclick=()=>{selectItem(data.items.find(x=>x.id===group.item));requestId='';remember();show().then(()=>el('history').scrollIntoView())};
+   const cell=document.createElement('td');cell.append(name);tr.append(cell);
+   for(const value of [group.shelves.join('، '),group.count,kg(group.net)]){
      const td=document.createElement('td');td.textContent=value;tr.append(td);
    }
    return tr;
