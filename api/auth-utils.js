@@ -69,19 +69,19 @@ function authSecret(){
   return secret;
 }
 
-export function sign(payload){
+export function sign(payload, scope=''){
   const secret = authSecret();
   const body = Buffer.from(JSON.stringify({ ...payload, sv: 2, iat: Date.now() })).toString('base64url');
-  const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(scope + body).digest('base64url');
   return body + '.' + sig;
 }
 
-export function verifyToken(token, maxAgeMs = 12 * 60 * 60 * 1000){
+export function verifyToken(token, maxAgeMs = 12 * 60 * 60 * 1000, scope=''){
   const raw = String(token || '').trim();
   const [body, sig, extra] = raw.split('.');
   if(!body || !sig || extra) return null;
   try{
-    const expected = crypto.createHmac('sha256', authSecret()).update(body).digest('base64url');
+    const expected = crypto.createHmac('sha256', authSecret()).update(scope + body).digest('base64url');
     const a = Buffer.from(sig), b = Buffer.from(expected);
     if(a.length !== b.length || !crypto.timingSafeEqual(a,b)) return null;
     const payload = JSON.parse(Buffer.from(body,'base64url').toString('utf8'));

@@ -49,7 +49,7 @@ self.addEventListener('fetch',event=>{
 
   if(request.mode==='navigate'){
     const storePage=url.pathname==='/store'||url.pathname==='/store.html'||url.pathname.startsWith('/store/');
-    const fallback=url.pathname==='/field-rounds.html'?'/field-rounds.html':storePage?'/store.html':'/index.html';
+    const fallback=url.pathname==='/ink-count.html'?'/ink-count.html':url.pathname==='/field-rounds.html'?'/field-rounds.html':storePage?'/store.html':'/index.html';
     event.respondWith(
       fetch(request,{cache:'no-store'}).then(response=>{
         const copy=response.clone();

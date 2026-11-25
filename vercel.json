@@ -20,6 +20,7 @@
     }
   ],
   "rewrites": [
+    {"source": "/ink-count.html", "destination": "/ink-count.html"},
     {
       "source": "/field-rounds.html",
       "destination": "/field-rounds.html"

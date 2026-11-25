@@ -41,6 +41,14 @@
         body: JSON.stringify({email: email, password: password})
       });
       var data = await response.json().catch(function () { return {}; });
+      if (response.ok && data.inkCount) {
+        for (const storage of [sessionStorage,localStorage]) {
+          storage.removeItem('jms_auth_token');
+          storage.removeItem('jms_current_user');
+        }
+        location.replace('/ink-count.html');
+        return;
+      }
       if (!response.ok || !data.user || !data.token) { setStatus('البريد أو كلمة المرور غير صحيحة', true); return; }
 
       var user = { id:data.user.id, name:data.user.name, email:data.user.email, role:data.user.role, status:data.user.status||'active', permissions:data.user.permissions||{}, language:data.user.language==='en'?'en':'ar' };
