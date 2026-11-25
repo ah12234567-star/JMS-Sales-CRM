@@ -7,8 +7,10 @@
 #matches{max-height:min(32vh,16rem);overflow:auto;overscroll-behavior:contain}
 #matches button{display:block;text-align:start;margin:3px 0;overflow-wrap:anywhere}
 #closeSearch{width:auto;margin:6px 0}#selected{font-weight:600}
+#manager table{width:100%;border-collapse:collapse}#manager td,#manager th{text-align:start;padding:8px 4px;border-bottom:1px solid #dae4df}#manager td:first-child{overflow-wrap:anywhere}
 </style><main><header><h1>جرد عبوات الأحبار</h1><button id="exit">خروج</button></header>
-<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="panel" hidden>
+<p id="status" role="status">جارٍ تحميل الجرد…</p><section id="manager" hidden><h2>كشف جرد الأحبار</h2><p id="totals" aria-live="polite"></p><table><thead><tr><th>الصنف</th><th>الرفوف</th><th>العبوات</th><th>الصافي (كجم)</th></tr></thead><tbody id="countLines"></tbody></table><button id="refresh" type="button">تحديث الكشف</button></section>
+<section id="panel" hidden>
 <label for="search">بحث برقم الصنف أو اسمه</label><input id="search" type="search" autocomplete="off" placeholder="اكتب رقم الصنف أو اسمه" aria-controls="results" aria-expanded="false">
 <div id="results" hidden><button type="button" id="closeSearch">إغلاق البحث</button><div id="matches"></div></div>
 <input id="item" type="hidden"><p id="selected" role="status"></p>
@@ -95,12 +97,36 @@ el('entry').onsubmit=async e=>{
  for(const input of [weight,item,shelf,el('search')])input.disabled=true;
  requestId||=crypto.randomUUID();remember();
  try{await api('',{id:requestId,item:Number(item.value),year,shelf:shelf.value,grams:grams()});
- weight.value='';requestId='';remember();status.textContent='تم حفظ العبوة';await show();
+ weight.value='';requestId='';remember();status.textContent='تم حفظ العبوة';await show();if(!el('manager').hidden)await refreshManager();
  }catch{status.textContent='تعذر تأكيد الحفظ. اضغط حفظ مرة أخرى.'}
  finally{busy=false;for(const input of [weight,item,shelf,el('search')])input.disabled=false;validate();weight.focus()}
 };
 el('exit').onclick=async()=>{try{await api('',{logout:true});sessionStorage.removeItem(key);location.replace('/')}catch{status.textContent='تعذر الخروج. حاول مجددًا.'}};
-try{const data=await api();year=data.year;items=data.items;
+function renderManager(data){
+ if(!Array.isArray(data.summary))return;
+ const names=new Map(data.items.map(x=>[x.id,x.label]));
+ let count=0,net=0;
+ const rows=data.summary.map(group=>{
+   count+=group.count;
+   net+=group.net;
+   const tr=document.createElement('tr');
+   for(const value of [names.get(group.item),group.shelves.join('، '),group.count,kg(group.net)]){
+     const td=document.createElement('td');td.textContent=value;tr.append(td);
+   }
+   return tr;
+ });
+ el('countLines').replaceChildren(...rows);
+ el('totals').textContent=rows.length?'عدد الأصناف '+rows.length+' · عدد العبوات '+count+' · إجمالي الصافي '+kg(net)+' كجم':'لم تُسجّل عبوات في هذا الجرد بعد';
+ el('manager').hidden=false;
+}
+async function refreshManager(){
+ el('refresh').disabled=true;
+ try{renderManager(await api());status.textContent='جرد '+year}
+ catch{status.textContent='تعذر تحديث الكشف. حاول مرة أخرى.'}
+ finally{el('refresh').disabled=false}
+}
+el('refresh').onclick=refreshManager;
+try{const data=await api();year=data.year;items=data.items;renderManager(data);
  const draft=JSON.parse(sessionStorage.getItem(key)||'{}');const d=draft.year===year?draft:{};
  selectItem(items.find(record=>String(record.id)===String(d.item)));shelf.value=d.shelf||'';weight.value=d.weight||'';requestId=d.requestId||'';
  status.textContent='جرد '+year;el('panel').hidden=false;await show();
